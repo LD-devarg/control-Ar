@@ -11,6 +11,7 @@ from .servicios.validaciones_empresa import (
     validar_borrado_usuario,
     validar_modificacion_usuario,
 )
+from .permissions import RoleBasedPermission, is_admin
 
 
 def _run_validation(fn, *args, **kwargs):
@@ -23,7 +24,20 @@ def _run_validation(fn, *args, **kwargs):
 class EmpresaViewSet(viewsets.ModelViewSet):
     queryset = Empresa.objects.all()
     serializer_class = EmpresaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        return is_admin(request.user)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        if self.request.user.empresa_id:
+            return qs.filter(id=self.request.user.empresa_id)
+        return qs.none()
 
     def perform_create(self, serializer):
         _run_validation(validar_usuario_superusuario, self.request.user)
@@ -38,7 +52,20 @@ class EmpresaViewSet(viewsets.ModelViewSet):
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        return is_admin(request.user)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        if self.request.user.empresa_id:
+            return qs.filter(empresa_id=self.request.user.empresa_id)
+        return qs.none()
 
     def perform_create(self, serializer):
         grupos = serializer.validated_data.get("groups") or []

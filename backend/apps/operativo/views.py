@@ -7,6 +7,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
 from apps.recursos.servicios.whatsapp_rotacion import seleccionar_numero_whatsapp
 from .models import Cliente, EventosMeta, Landing, Compra
 from .serializers import (
@@ -21,6 +22,14 @@ from .servicios.calculos import calcular_compra
 from .servicios.enviador import enviar_evento_meta
 
 
+def _filter_by_empresa(qs, user):
+    if user.is_superuser:
+        return qs
+    if user.empresa_id:
+        return qs.filter(empresa_id=user.empresa_id)
+    return qs.none()
+
+
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     filterset_fields = ["empresa__id"]
@@ -28,7 +37,19 @@ class ClienteViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == "create":
             return [AllowAny()]
-        return [IsAuthenticated()]
+        return [IsAuthenticated(), RoleBasedPermission()]
+
+    def has_role_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        if is_admin(request.user):
+            return True
+        if is_operador(request.user):
+            return self.action in {"list", "retrieve"}
+        return False
+
+    def get_queryset(self):
+        return _filter_by_empresa(super().get_queryset(), self.request.user)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -40,6 +61,19 @@ class LandingViewSet(viewsets.ModelViewSet):
     queryset = Landing.objects.all()
     serializer_class = LandingSerializer
 
+    def get_permissions(self):
+        if self.action == "whatsapp_rotacion":
+            return [AllowAny()]
+        return [IsAuthenticated(), RoleBasedPermission()]
+
+    def has_role_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        return is_admin(request.user) or is_pauta(request.user)
+
+    def get_queryset(self):
+        return _filter_by_empresa(super().get_queryset(), self.request.user)
+
     @action(detail=False, methods=["get"], permission_classes=[AllowAny], url_path="whatsapp-rotacion")
     def whatsapp_rotacion(self, request):
         token = request.query_params.get("landing_token")
@@ -49,55 +83,27 @@ class LandingViewSet(viewsets.ModelViewSet):
         numero = seleccionar_numero_whatsapp(landing.empresa_id)
         return Response({"numero": numero})
 
-    def get_permissions(self):
-        if self.action in {"list", "retrieve"}:
-            return [AllowAny()]
-        return [IsAuthenticated()]
-
 
 class EventosMetaViewSet(viewsets.ModelViewSet):
-
-    @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated], url_path="test-event")
-    def test_event(self, request):
-        if not (request.user.is_superuser or request.user.groups.filter(name="Admin").exists() or request.user.groups.filter(name="Pauta").exists()):
-            raise ValidationError("Solo admin o pauta puede probar eventos.")
-        cliente_id = request.data.get("cliente_id")
-        if not cliente_id:
-            raise ValidationError("cliente_id requerido")
-        cliente = get_object_or_404(Cliente, id=cliente_id)
-        payload = {
-            "email": request.data.get("email"),
-            "phone": request.data.get("phone"),
-            "value": request.data.get("value"),
-            "currency": request.data.get("currency"),
-            "fbp": request.data.get("fbp"),
-            "fbc": request.data.get("fbc"),
-        }
-        evento = EventosMeta.objects.create(
-            tipo=request.data.get("tipo", "lead"),
-            data=payload,
-            cliente=cliente,
-            empresa=cliente.empresa,
-            operador=request.user,
-            landing=None,
-        )
-        try:
-            respuesta = enviar_evento_meta(evento, request=request)
-        except Exception as exc:
-            evento.estado_envio = "fallido"
-            evento.respuesta_meta = {"error": str(exc)}
-            evento.save(update_fields=["estado_envio", "respuesta_meta"])
-            raise ValidationError(str(exc))
-
-        output = EventosMetaReadSerializer(evento)
-        return Response({"evento": output.data, "meta": respuesta}, status=status.HTTP_201_CREATED)
     queryset = EventosMeta.objects.all()
     http_method_names = ["get", "post"]
 
     def get_permissions(self):
         if self.action == "create":
             return [AllowAny()]
-        return [IsAuthenticated()]
+        return [IsAuthenticated(), RoleBasedPermission()]
+
+    def has_role_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        if self.action == "test_event":
+            return is_admin(request.user) or is_pauta(request.user)
+        if is_admin(request.user) or is_operador(request.user) or is_pauta(request.user):
+            return self.action in {"list", "retrieve"}
+        return False
+
+    def get_queryset(self):
+        return _filter_by_empresa(super().get_queryset(), self.request.user)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -140,13 +146,58 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         output = EventosMetaReadSerializer(evento)
         return Response(output.data, status=status.HTTP_201_CREATED)
 
+    @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated], url_path="test-event")
+    def test_event(self, request):
+        if not (request.user.is_superuser or is_admin(request.user) or is_pauta(request.user)):
+            raise ValidationError("Solo admin o pauta puede probar eventos.")
+        cliente_id = request.data.get("cliente_id")
+        if not cliente_id:
+            raise ValidationError("cliente_id requerido")
+        cliente = get_object_or_404(Cliente, id=cliente_id)
+        payload = {
+            "email": request.data.get("email"),
+            "phone": request.data.get("phone"),
+            "value": request.data.get("value"),
+            "currency": request.data.get("currency"),
+            "fbp": request.data.get("fbp"),
+            "fbc": request.data.get("fbc"),
+        }
+        evento = EventosMeta.objects.create(
+            tipo=request.data.get("tipo", "lead"),
+            data=payload,
+            cliente=cliente,
+            empresa=cliente.empresa,
+            operador=request.user,
+            landing=None,
+        )
+        try:
+            respuesta = enviar_evento_meta(evento, request=request)
+        except Exception as exc:
+            evento.estado_envio = "fallido"
+            evento.respuesta_meta = {"error": str(exc)}
+            evento.save(update_fields=["estado_envio", "respuesta_meta"])
+            raise ValidationError(str(exc))
+
+        output = EventosMetaReadSerializer(evento)
+        return Response({"evento": output.data, "meta": respuesta}, status=status.HTTP_201_CREATED)
+
 
 class CompraViewSet(viewsets.ModelViewSet):
     queryset = Compra.objects.all()
     serializer_class = CompraSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
 
-    def get_permissions(self):
-        return [IsAuthenticated()]
+    def has_role_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        if is_admin(request.user):
+            return True
+        if is_operador(request.user):
+            return self.action in {"list", "retrieve", "create"}
+        return False
+
+    def get_queryset(self):
+        return _filter_by_empresa(super().get_queryset(), self.request.user)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

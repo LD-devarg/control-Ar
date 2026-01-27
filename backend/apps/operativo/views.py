@@ -1,6 +1,10 @@
 import uuid
-from django.db import transaction
+from datetime import datetime, time, timedelta
+
+from django.db import models, transaction
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -28,6 +32,39 @@ def _filter_by_empresa(qs, user):
     if user.empresa_id:
         return qs.filter(empresa_id=user.empresa_id)
     return qs.none()
+
+
+def _apply_date_filters(qs, field: str, request):
+    period = request.query_params.get("period")
+    from_str = request.query_params.get("from")
+    to_str = request.query_params.get("to")
+
+    start = end = None
+
+    if from_str:
+        d = parse_date(from_str)
+        if d:
+            start = timezone.make_aware(datetime.combine(d, time.min))
+    if to_str:
+        d = parse_date(to_str)
+        if d:
+            end = timezone.make_aware(datetime.combine(d, time.max))
+
+    if not start and not end and period:
+        now = timezone.now()
+        if period == "day":
+            start = now - timedelta(days=1)
+        elif period == "week":
+            start = now - timedelta(days=7)
+        elif period == "month":
+            start = now - timedelta(days=30)
+
+    if start:
+        qs = qs.filter(**{f"{field}__gte": start})
+    if end:
+        qs = qs.filter(**{f"{field}__lte": end})
+
+    return qs
 
 
 class ClienteViewSet(viewsets.ModelViewSet):
@@ -103,7 +140,18 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         return False
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        qs = _filter_by_empresa(super().get_queryset(), self.request.user)
+        user = self.request.user
+        if user.is_authenticated and is_operador(user):
+            qs = qs.filter(
+                (models.Q(tipo='lead') & models.Q(operador__isnull=True)) |
+                (models.Q(tipo__in=['contact', 'purchase']) & models.Q(operador=user))
+            )
+        tipo = self.request.query_params.get("tipo")
+        if tipo:
+            qs = qs.filter(tipo=tipo)
+        qs = _apply_date_filters(qs, "creado_en", self.request)
+        return qs
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -154,6 +202,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         if not cliente_id:
             raise ValidationError("cliente_id requerido")
         cliente = get_object_or_404(Cliente, id=cliente_id)
+        test_event_code = request.data.get("test_event_code")
         payload = {
             "email": request.data.get("email"),
             "phone": request.data.get("phone"),
@@ -171,7 +220,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             landing=None,
         )
         try:
-            respuesta = enviar_evento_meta(evento, request=request)
+            respuesta = enviar_evento_meta(evento, request=request, test_event_code=test_event_code)
         except Exception as exc:
             evento.estado_envio = "fallido"
             evento.respuesta_meta = {"error": str(exc)}
@@ -197,7 +246,12 @@ class CompraViewSet(viewsets.ModelViewSet):
         return False
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        qs = _filter_by_empresa(super().get_queryset(), self.request.user)
+        user = self.request.user
+        if user.is_authenticated and is_operador(user):
+            qs = qs.filter(operador=user)
+        qs = _apply_date_filters(qs, "creado_en", self.request)
+        return qs
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

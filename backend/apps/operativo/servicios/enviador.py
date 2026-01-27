@@ -38,7 +38,7 @@ def _merge_payload(evento) -> dict[str, Any]:
     return payload
 
 
-def enviar_evento_meta(evento, request=None, credenciales: CredencialesMeta | None = None) -> dict[str, Any]:
+def enviar_evento_meta(evento, request=None, credenciales: CredencialesMeta | None = None, test_event_code: str | None = None) -> dict[str, Any]:
     """
     Envia un evento CAPI a Meta usando las CredencialesMeta de la empresa.
     Actualiza el estado del evento en la base de datos.
@@ -52,7 +52,7 @@ def enviar_evento_meta(evento, request=None, credenciales: CredencialesMeta | No
     data["event_id"] = str(evento.id_evento)
 
     token_acceso = decrypt_token(credenciales.token_acceso_encrypted)
-    url = _build_capi_url(credenciales.pixel_id, token_acceso, META_TEST_EVENT_CODE)
+    url = _build_capi_url(credenciales.pixel_id, token_acceso, test_event_code or META_TEST_EVENT_CODE)
 
     response = None
     response_data: dict[str, Any]

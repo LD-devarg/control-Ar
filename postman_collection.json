@@ -1,0 +1,1014 @@
+{
+  "info": {
+    "name": "control-Ar API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "accessToken",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY5NTI2Njk5LCJpYXQiOjE3Njk1MjYzOTksImp0aSI6IjdjN2NlYjIxZDdkYTRlN2VhYTdlNTQzNTRhZDgzNmQ1IiwidXNlcl9pZCI6IjIifQ.1KGbxBgr3qdrwrLUBOs2x7Anm1Naod-eedkmw8Ww1-0"
+    },
+    {
+      "key": "landingToken",
+      "value": "df118d55-cccb-4dd2-952b-dab74833901d"
+    },
+    {
+      "key": "clienteId",
+      "value": "1"
+    },
+    {
+      "key": "empresaId",
+      "value": "3"
+    },
+    {
+      "key": "userId",
+      "value": "1"
+    },
+    {
+      "key": "landingId",
+      "value": "1"
+    },
+    {
+      "key": "whatsappId",
+      "value": "1"
+    },
+    {
+      "key": "bmId",
+      "value": "1"
+    },
+    {
+      "key": "cuentaId",
+      "value": "1"
+    },
+    {
+      "key": "campaniaId",
+      "value": "1"
+    },
+    {
+      "key": "conjuntoId",
+      "value": "1"
+    },
+    {
+      "key": "anuncioId",
+      "value": "1"
+    },
+    {
+      "key": "gastoId",
+      "value": "1"
+    },
+    {
+      "key": "credId",
+      "value": "1"
+    },
+    {
+      "key": "pixelId",
+      "value": ""
+    },
+    {
+      "key": "appId",
+      "value": ""
+    },
+    {
+      "key": "metaAccessToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Token Obtain",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/token/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\": \"admin\", \"password\": \"password\"}"
+            }
+          }
+        },
+        {
+          "name": "Token Refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/token/refresh/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"refresh\": \"<refresh_token>\"}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "WhatsApp Rotacion",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/landings/whatsapp-rotacion/?landing_token={landingToken}"
+          }
+        },
+        {
+          "name": "Crear Cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/clientes/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"landing_token\": \"{{landingToken}}\", \"nombre\": \"Juan Perez\", \"contacto\": \"5491122334455\", \"username\": \"juanp\"}"
+            }
+          }
+        },
+        {
+          "name": "Crear Evento Meta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/eventos-meta/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cliente_id\": 1, \"landing_token\": \"{{landingToken}}\", \"tipo\": \"lead\", \"email\": \"test@example.com\", \"phone\": \"1122334455\", \"fbp\": \"\", \"fbc\": \"\"}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Privados (JWT)",
+      "item": [
+        {
+          "name": "Empresas - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/empresas/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Empresas - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/empresas/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Empresa Demo\", \"activo\": true}"
+            }
+          }
+        },
+        {
+          "name": "Empresas - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/empresas/{empresaId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Empresa Demo 2\"}"
+            }
+          }
+        },
+        {
+          "name": "Empresas - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/empresas/{empresaId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Usuarios - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/usuarios/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Usuarios - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/usuarios/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"username\": \"user_demo\", \"password\": \"password123\", \"first_name\": \"User\", \"last_name\": \"Demo\", \"email\": \"user_demo@example.com\", \"is_staff\": false, \"is_active\": true, \"is_superuser\": false, \"activo\": true, \"empresa\": \"{{empresaId}}\", \"groups\": []}"
+            }
+          }
+        },
+        {
+          "name": "Usuarios - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/usuarios/{userId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"first_name\": \"User2\"}"
+            }
+          }
+        },
+        {
+          "name": "Usuarios - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/usuarios/{userId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Clientes - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/clientes/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Landings - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/landings/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Landings - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/landings/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"empresa\": \"{{empresaId}}\", \"nombre\": \"Landing Demo\", \"url\": \"https://example.com\", \"bono\": \"100%\", \"activo\": true}"
+            }
+          }
+        },
+        {
+          "name": "Landings - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/landings/{landingId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"activo\": false}"
+            }
+          }
+        },
+        {
+          "name": "Landings - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/landings/{landingId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Eventos Meta - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/eventos-meta/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Test Event (Admin/Pauta)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/eventos-meta/test-event/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cliente_id\": 1, \"tipo\": \"lead\", \"email\": \"test@example.com\", \"phone\": \"1122334455\"}"
+            }
+          }
+        },
+        {
+          "name": "Compras - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/compras/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Compras - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/compras/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cliente\": 1, \"monto_ars\": 150000, \"comprobante\": \"ABC123\"}"
+            }
+          }
+        },
+        {
+          "name": "WhatsApps - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/whatsapps/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "WhatsApps - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/whatsapps/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"numero\": \"+5491122334455\", \"empresa\": \"{{empresaId}}\", \"activo\": true}"
+            }
+          }
+        },
+        {
+          "name": "WhatsApps - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/whatsapps/{whatsappId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"activo\": false}"
+            }
+          }
+        },
+        {
+          "name": "WhatsApps - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/whatsapps/{whatsappId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Tipos Cambio - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/tipos-cambio/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "BM - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bms/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "BM - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bms/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"empresa\": \"{{empresaId}}\", \"meta_id\": \"bm_1\", \"nombre\": \"BM Demo\", \"estado\": \"active\"}"
+            }
+          }
+        },
+        {
+          "name": "BM - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/bms/{bmId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"BM Demo 2\"}"
+            }
+          }
+        },
+        {
+          "name": "BM - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/bms/{bmId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Cuenta Publicitaria - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/cuentas-publicitarias/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Cuenta Publicitaria - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/cuentas-publicitarias/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"empresa\": \"{{empresaId}}\", \"bm\": \"{{bmId}}\", \"meta_id\": \"act_1\", \"nombre\": \"Cuenta Demo\", \"estado\": \"active\"}"
+            }
+          }
+        },
+        {
+          "name": "Cuenta Publicitaria - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/cuentas-publicitarias/{cuentaId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Cuenta Demo 2\"}"
+            }
+          }
+        },
+        {
+          "name": "Cuenta Publicitaria - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/cuentas-publicitarias/{cuentaId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Campanias - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/campanias/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Campanias - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/campanias/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"empresa\": \"{{empresaId}}\", \"cuenta_publicitaria\": \"{{cuentaId}}\", \"meta_id\": \"camp_1\", \"nombre\": \"Campania Demo\", \"estado\": \"active\", \"objetivo\": \"LEAD\"}"
+            }
+          }
+        },
+        {
+          "name": "Campanias - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/campanias/{campaniaId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Campania Demo 2\"}"
+            }
+          }
+        },
+        {
+          "name": "Campanias - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/campanias/{campaniaId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Conjuntos Anuncios - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/conjuntos-anuncios/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Conjuntos Anuncios - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/conjuntos-anuncios/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"empresa\": \"{{empresaId}}\", \"campana\": \"{{campaniaId}}\", \"meta_id\": \"set_1\", \"nombre\": \"Set Demo\", \"estado\": \"active\", \"presupuesto_diario\": 100, \"segmentacion\": {}}"
+            }
+          }
+        },
+        {
+          "name": "Conjuntos Anuncios - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/conjuntos-anuncios/{conjuntoId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Set Demo 2\"}"
+            }
+          }
+        },
+        {
+          "name": "Conjuntos Anuncios - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/conjuntos-anuncios/{conjuntoId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Anuncios - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/anuncios/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Anuncios - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/anuncios/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"empresa\": \"{{empresaId}}\", \"conjunto_anuncios\": \"{{conjuntoId}}\", \"meta_id\": \"ad_1\", \"nombre\": \"Anuncio Demo\", \"estado\": \"active\", \"contenido\": {}}"
+            }
+          }
+        },
+        {
+          "name": "Anuncios - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/anuncios/{anuncioId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Anuncio Demo 2\"}"
+            }
+          }
+        },
+        {
+          "name": "Anuncios - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/anuncios/{anuncioId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Gastos Diarios - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/gastos-diarios/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Gastos Diarios - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/gastos-diarios/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"empresa\": \"{{empresaId}}\", \"cuenta_publicitaria\": \"{{cuentaId}}\", \"fecha\": \"2026-01-01\", \"monto_usd\": 100, \"tc\": 1500, \"monto_ars\": 150000}"
+            }
+          }
+        },
+        {
+          "name": "Gastos Diarios - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/gastos-diarios/{gastoId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"monto_usd\": 120}"
+            }
+          }
+        },
+        {
+          "name": "Gastos Diarios - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/gastos-diarios/{gastoId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Credenciales Meta - List",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/credenciales-meta/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Credenciales Meta - Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/credenciales-meta/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"empresa\": \"{{empresaId}}\", \"bm\": \"{{bmId}}\", \"pixel_id\": \"{{pixelId}}\", \"app_id\": \"{{appId}}\", \"token_acceso_encrypted\": \"{{metaAccessToken}}\"}"
+            }
+          }
+        },
+        {
+          "name": "Credenciales Meta - Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/credenciales-meta/{credId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"app_id\": \"{{appId}}\"}"
+            }
+          }
+        },
+        {
+          "name": "Credenciales Meta - Delete",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/credenciales-meta/{credId}/",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

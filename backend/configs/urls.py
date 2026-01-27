@@ -1,4 +1,5 @@
 from django.contrib import admin
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
@@ -26,13 +27,15 @@ router.register(r"whatsapps", WhatsAppViewSet, basename="whatsapp")
 router.register(r"tipos-cambio", TipoCambioViewSet, basename="tipo-cambio")
 router.register(r"bms", BMViewSet, basename="bm")
 router.register(r"cuentas-publicitarias", CuentaPublicitariaViewSet, basename="cuenta-publicitaria")
-router.register(r"campanias", CampañaViewSet, basename="campania")
+router.register(r"campañas", CampañaViewSet, basename="campaña")
 router.register(r"conjuntos-anuncios", ConjuntoAnunciosViewSet, basename="conjunto-anuncios")
 router.register(r"anuncios", AnuncioViewSet, basename="anuncio")
 router.register(r"gastos-diarios", GastoDiarioViewSet, basename="gasto-diario")
 router.register(r"credenciales-meta", CredencialesMetaViewSet, basename="credenciales-meta")
 
 urlpatterns = [
+    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("admin/", admin.site.urls),
     path("", include(router.urls)),
 ]

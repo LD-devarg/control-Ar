@@ -118,3 +118,25 @@ Body:
 ## Notas
 - Los endpoints usan JSON.
 - Ajusta CORS y AUTH segun el entorno.
+
+## Filtros
+
+### Eventos Meta
+- `tipo`: lead | contact | purchase
+- `period`: day | week | month (rolling)
+- `from`: YYYY-MM-DD
+- `to`: YYYY-MM-DD
+
+Ejemplo:
+`GET /eventos-meta/?tipo=lead&period=week`
+`GET /eventos-meta/?from=2026-01-01&to=2026-01-31`
+
+### Compras
+- `period`: day | week | month (rolling)
+- `from`: YYYY-MM-DD
+- `to`: YYYY-MM-DD
+
+Ejemplo:
+`GET /compras/?period=month`
+
+> Operadores: ven todos los leads (sin operador) y solo sus contact/purchase.

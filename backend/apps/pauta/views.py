@@ -5,7 +5,7 @@ from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador
 from .models import (
     BM,
     CuentaPublicitaria,
-    Campa??a,
+    Campaña,
     ConjuntoAnuncios,
     Anuncio,
     GastoDiario,
@@ -14,7 +14,7 @@ from .models import (
 from .serializers import (
     BMSerializer,
     CuentaPublicitariaSerializer,
-    Campa??aSerializer,
+    CampañaSerializer,
     ConjuntoAnunciosSerializer,
     AnuncioSerializer,
     GastoDiarioSerializer,
@@ -66,9 +66,9 @@ class CuentaPublicitariaViewSet(viewsets.ModelViewSet):
         return _filter_by_empresa(super().get_queryset(), self.request.user)
 
 
-class Campa??aViewSet(viewsets.ModelViewSet):
-    queryset = Campa??a.objects.all()
-    serializer_class = Campa??aSerializer
+class CampañaViewSet(viewsets.ModelViewSet):
+    queryset = Campaña.objects.all()
+    serializer_class = CampañaSerializer
     permission_classes = [IsAuthenticated, RoleBasedPermission]
 
     def has_role_permission(self, request, view):

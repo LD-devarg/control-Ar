@@ -1,0 +1,78 @@
+.sidebar {
+    padding: 10px;
+    width: 200px;
+    height: 100vh;
+    background-color: #292727;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+.sidebar .logo {
+    height: 70px;
+    width: 70px;
+    display: block;
+    margin: 0;
+}
+
+.sidebar-logo {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    align-content: center;
+    border-bottom: 1px solid #505050;
+}
+
+.brand-text {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 0;
+    font-family: "Inter", sans-serif;
+}
+
+.control {
+    font-size: 16px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    line-height: 1;
+}
+.ar {
+    font-size: 12px;
+    font-weight: lighter;
+    margin-left: 2px;
+    line-height: 1;
+    align-self: flex-start;
+}
+
+.sidebar-menu {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    list-style: none;
+    padding-left: 10px;
+}
+
+.Button:hover {
+    background-color: #505050;
+    cursor: pointer;
+}
+
+.sidebar .MuiButton-root {
+    font-size: 12px;
+}
+
+.sidebar .MuiButton-root {
+    align-items: center;
+}
+
+.sidebar .MuiButton-startIcon {
+    align-self: center;
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding: 20px 0;
+    font-size: 12px;
+    text-align: center;
+    border-top: 1px solid #505050;
+}

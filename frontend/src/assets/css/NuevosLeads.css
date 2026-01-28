@@ -1,0 +1,16 @@
+.nuevos-leads-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #575757;
+    height: 100%;
+    box-sizing: border-box;
+    border-radius: 30px;
+}
+
+.nuevos-leads-container h1 {
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    color: #797979;
+}

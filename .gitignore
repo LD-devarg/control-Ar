@@ -37,6 +37,15 @@ node_modules/
 dist/
 build/
 coverage/
+.eslintcache
+.vite/
+
+# Frontend (Vite/React)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+frontend/.eslintcache
 
 # Temp
 *.tmp

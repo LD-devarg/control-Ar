@@ -38,9 +38,6 @@ function Home() {
           {activeForm === "contacto" && <FormContacto />}
         </div>
       </section>
-      <aside className="home-aside">
-        <NuevosLeads />
-      </aside>
     </div>
   );
 }

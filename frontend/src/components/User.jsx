@@ -4,8 +4,8 @@ import '../assets/css/User.css';
 function User() {
     return (
         <div className="user-logged">
-                <AccountCircleOutlinedIcon />
-                <span className="user-name">Nombre de Usuario</span>
+            <AccountCircleOutlinedIcon />
+            <span className="user-name">Nombre de Usuario</span>
         </div>    
     );
 }

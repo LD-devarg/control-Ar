@@ -1,0 +1,72 @@
+.card {
+    display: flex;
+    width: 150px;
+    height: 100px;
+    flex-direction: column;
+    background-color: #1e1e1e;
+    border: 1px solid #575757;
+    border-radius: 15px;
+    padding: 0 20px 20px 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s;
+    position: relative;
+}
+
+.card:hover {
+    transform: translateY(-5px) scale(1.02);
+}
+
+.card-title {
+    font-size: 1em;
+    font-family: 'inter', sans-serif;
+    margin-bottom: 10px;
+    color: #ffffff;
+    text-align: center;
+}
+
+.card-icon {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: inline-flex;
+    color: #8a8a8a;
+}
+
+.card-subtitle {
+    font-size: 1.2em;
+    color: #ffffff;
+    margin: 0;
+    font-weight: bold;
+    text-align: center;
+}
+
+.card-value {
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-top: 10px;
+    text-align: center;
+}
+
+.card-accent-green .card-value {
+    color: #4caf50;
+}
+
+.card-accent-blue .card-value {
+    color: #2196f3;
+}
+
+.card-accent-red .card-value {
+    color: #f44336;
+}
+
+.card-accent-yellow .card-value {
+    color: #ffeb3b;
+}
+
+.card-accent-purple .card-value {
+    color: #9c27b0;
+}
+
+.card-accent-orange .card-value {
+    color: #ff9800;
+}

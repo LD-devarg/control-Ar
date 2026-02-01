@@ -1,0 +1,71 @@
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-card {
+    max-width: 92vw;
+    background-color: #292727;
+    border: 1px solid #575757;
+    border-radius: 20px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+    padding: 20px 22px;
+    color: #ffffff;
+}
+
+.modal-title {
+    margin: 0 0 12px;
+    font-size: 20px;
+    color: #797979;
+}
+
+.modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-size: 14px;
+    color: #d0d0d0;
+}
+
+.modal-text {
+    margin: 0;
+}
+
+.modal-actions {
+    margin-top: 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.modal-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.modal-card .MuiInputBase-root {
+    color: #ffffff;
+}
+
+.modal-card .MuiInputLabel-root {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.modal-card .MuiOutlinedInput-notchedOutline {
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.modal-card .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+    border-color: #ffffff;
+}
+
+.modal-card .MuiSvgIcon-root {
+    color: #ffffff;
+}

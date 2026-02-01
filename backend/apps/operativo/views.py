@@ -99,7 +99,7 @@ class LandingViewSet(viewsets.ModelViewSet):
     serializer_class = LandingSerializer
 
     def get_permissions(self):
-        if self.action == "whatsapp_rotacion":
+        if self.action in {"whatsapp_rotacion", "public"}:
             return [AllowAny()]
         return [IsAuthenticated(), RoleBasedPermission()]
 
@@ -119,6 +119,15 @@ class LandingViewSet(viewsets.ModelViewSet):
         landing = get_object_or_404(Landing, token=token, activo=True)
         numero = seleccionar_numero_whatsapp(landing.empresa_id)
         return Response({"numero": numero})
+
+    @action(detail=False, methods=["get"], permission_classes=[AllowAny], url_path="public")
+    def public(self, request):
+        token = request.query_params.get("landing_token")
+        if not token:
+            raise ValidationError("landing_token requerido")
+        landing = get_object_or_404(Landing, token=token, activo=True)
+        serializer = self.get_serializer(landing)
+        return Response(serializer.data)
 
 
 class EventosMetaViewSet(viewsets.ModelViewSet):

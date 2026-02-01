@@ -1,0 +1,24 @@
+.landing-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    color: #ffffff;
+    font-family: 'Roboto', sans-serif;
+    background: linear-gradient(135deg, #c129a3 0%, #b700ff 100%);
+}
+
+.landing-data-title {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.landing-data-subtitle {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.landing-image {
+    max-width: 100%;
+    height: auto;
+}

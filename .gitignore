@@ -21,6 +21,8 @@ local_settings.py
 db.sqlite3
 staticfiles/
 media/
+celerybeat-schedule
+celerybeat.pid
 
 # Environment variables / secrets
 .env
@@ -39,6 +41,8 @@ build/
 coverage/
 .eslintcache
 .vite/
+.coverage
+htmlcov/
 
 # Frontend (Vite/React)
 frontend/node_modules/

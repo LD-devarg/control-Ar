@@ -1,0 +1,22 @@
+.alerta-lead {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    font-family: 'Roboto', sans-serif;
+    font-size: 0.8em;
+    margin-right: 20px;
+}
+
+.alerta-lead .MuiBadge-badge {
+    right: -3px;
+    top: 3px;
+    border: 2px solid white;
+    padding: 0 4px;
+}
+
+.alerta-lead .MuiSvgIcon-root {
+    font-size: 2em;
+    color: white;
+}
+

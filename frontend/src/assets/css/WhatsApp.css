@@ -1,10 +1,10 @@
-.home-layout{
+.whatsapp-layout {
     display: flex;
     gap: 16px;
     height: 100%;
 }
 
-.home-container{
+.whatsapp-container {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -17,14 +17,19 @@
     background-color: #292727;
 }
 
-h1{
+.whatsapp-container h1 {
     font-size: 2.5em;
     margin-bottom: 20px;
     color: #797979;
 }
 
-.form-container {
-    margin-top: 50px;
+.whatsapp-cards {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 90%;
+    max-width: 800px;
+    overflow-y: none;
+    padding-bottom: 20px;
 }
-
-

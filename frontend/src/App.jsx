@@ -3,6 +3,9 @@ import Login from './pages/Login.jsx'
 import DesktopLayout from './layouts/DesktopLayout.jsx'
 import Home from './pages/Home.jsx'
 import Stats from './pages/Stats.jsx'
+import WhatsApp from './pages/WhatsApp.jsx'
+import Landing from './pages/Landing.jsx'
+import Agenda from './pages/Contacts.jsx'
 
 function App() {
 
@@ -14,7 +17,10 @@ function App() {
           <Route element={<DesktopLayout />}>
             <Route path="/home" element={<Home />} />
             <Route path="/stats" element={<Stats />} />
+            <Route path="/whatsapp" element={<WhatsApp />} />
+            <Route path="/contacts" element={<Agenda />} />
           </Route>
+          <Route path="/landing" element={<Landing />} />
         </Routes>
       </div>
     </>

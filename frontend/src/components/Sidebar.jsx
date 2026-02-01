@@ -6,7 +6,12 @@ import Button from "@mui/material/Button";
 import OtherHousesOutlinedIcon from '@mui/icons-material/OtherHousesOutlined';
 import QueryStatsOutlinedIcon from '@mui/icons-material/QueryStatsOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
-
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import WebIcon from '@mui/icons-material/Web';
+import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
+import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined';
+import AdsClickOutlinedIcon from '@mui/icons-material/AdsClickOutlined';
+import ContactPageOutlinedIcon from '@mui/icons-material/ContactPageOutlined';
 
 function Sidebar() {
     return (
@@ -19,45 +24,138 @@ function Sidebar() {
                 </span>
             </div>
             <div className="sidebar-body">
-                <ul className="sidebar-menu">
-                    <li>
-                        <Stack direction="row" spacing={2}>
+                <div>
+                    <div className="sidebar-gestion">
+                        <h3 className="title">
+                            GESTIÓN
+                        </h3>
+                        <Stack direction="column" spacing={0.5}>
                             <Button
-                            variant="text"
-                            className="Button"
-                            color="white"
-                            startIcon={<OtherHousesOutlinedIcon />}
-                            sx={{
-                                '& .MuiButton-startIcon .MuiSvgIcon-root': {
-                                fontSize: 30,
-                                },
-                            }}
-                            >
-                            Inicio
+                                variant="text"
+                                className="Button"
+                                startIcon={<OtherHousesOutlinedIcon />}
+                                sx={{
+                                    '& .MuiButton-startIcon .MuiSvgIcon-root': {
+                                        fontSize: 20,
+                                        color:"gray"
+                                    },
+                                }}
+                                >
+                                <span className="button-text">Inicio</span>
+                            </Button>
+                            <Button
+                                variant="text"
+                                className="Button"
+                                startIcon={<QueryStatsOutlinedIcon />}
+                                sx={{
+                                    '& .MuiButton-startIcon .MuiSvgIcon-root': {
+                                        fontSize: 20,
+                                        color:"gray"
+                                    },
+                                }}
+                                >
+                                <span className="button-text">Análisis</span>
+                            </Button>
+                            <Button
+                                variant="text"
+                                className="Button"
+                                startIcon={<ContactPageOutlinedIcon />}
+                                sx={{
+                                    '& .MuiButton-startIcon .MuiSvgIcon-root': {
+                                        fontSize: 20,
+                                        color:"gray"
+                                    },
+                                }}
+                                >
+                                <span className="button-text">Agenda</span>
                             </Button>
                         </Stack>
-                    </li>
-                    <li>
-                        <Stack direction="row" spacing={2}>
+                    </div>
+                    <div className="sidebar-recursos">
+                        <h3 className="title">
+                            RECURSOS
+                        </h3>
+                        <Stack>    
                             <Button
-                            variant="text"
-                            className="Button"
-                            color="white"
-                            startIcon={<QueryStatsOutlinedIcon />}
-                            sx={{
-                                '& .MuiButton-startIcon .MuiSvgIcon-root': {
-                                fontSize: 30,
-                                },
-                            }}
-                            >
-                                Estadisticas
+                                variant="text"
+                                className="Button"
+                                startIcon={<WhatsAppIcon />}
+                                sx={{
+                                    '& .MuiButton-startIcon .MuiSvgIcon-root': {
+                                        fontSize: 20,
+                                        color:"gray"
+                                    },
+                                }}
+                                >
+                                <span className="button-text">Líneas</span>
+                            </Button>
+                            <Button
+                                variant="text"
+                                className="Button"
+                                startIcon={<CurrencyExchangeIcon />}
+                                sx={{
+                                    '& .MuiButton-startIcon .MuiSvgIcon-root': {
+                                    fontSize: 20,
+                                    color: "gray"
+                                    },
+                                }}
+                                >
+                                <span className="button-text">Tipo de Cambio</span>
+                            </Button>
+                            <Button
+                                variant="text"
+                                className="Button"
+                                startIcon={<WebIcon />}
+                                sx={{
+                                    '& .MuiButton-startIcon .MuiSvgIcon-root': {
+                                    fontSize: 20,
+                                    color: "gray"
+                                    },
+                                }}
+                                >
+                                <span className="button-text">Landing</span>
                             </Button>
                         </Stack>
-                    </li>
-                </ul>
+                    </div>
+                    <div className="sidebar-pauta">
+                        <h3 className="title">
+                            PAUTA
+                        </h3>
+                        <Stack>
+                            <Button
+                                variant="text"
+                                className="Button"
+                                startIcon={<CampaignOutlinedIcon />}
+                                color=""
+                                sx={{
+                                    '& .MuiButton-startIcon .MuiSvgIcon-root': {
+                                        fontSize: 20,
+                                        color: "gray"
+                                    },
+                                }}
+                                >
+                                <span className="button-text">Database</span>
+                            </Button>
+                            <Button
+                                variant="text"
+                                className="Button"
+                                startIcon={<AdsClickOutlinedIcon />}
+                                color=""
+                                sx={{
+                                    '& .MuiButton-startIcon .MuiSvgIcon-root': {
+                                        fontSize: 20,
+                                        color:"gray"
+                                    },
+                                }}
+                                >
+                                <span className="button-text">Rendimientos</span>
+                            </Button>
+                        </Stack>
+                    </div>
+                </div>
             </div>
             <div className="sidebar-footer">
-                <Stack direction="row" spacing={2}>
+                <Stack direction="column" spacing={2}>
                     <Button
                     variant="text"
                     className="Button"
@@ -65,11 +163,11 @@ function Sidebar() {
                     startIcon={<LogoutOutlinedIcon />}
                     sx={{
                         '& .MuiButton-startIcon .MuiSvgIcon-root': {
-                        fontSize: 30,
+                        fontSize: 20,
                         },
                     }}
                     >
-                        Cerrar Sesion
+                        <span className="button-text">Cerrar Sesion</span>
                     </Button>
                 </Stack>
             </div>

@@ -1,0 +1,94 @@
+.filter-bar-container {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #666;
+}
+
+.filter-bar-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.filter-bar-buttons button {
+    font-size: 0.75rem;
+    padding: 0 6px;
+    border: none;
+    background-color: transparent;
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    border-radius: 6px;
+    min-height: 24px;
+}
+
+.filter-bar-buttons button:hover {
+    background-color: transparent;
+    box-shadow:
+        inset -2px 0 0 rgba(45, 124, 255, 0.9),
+        inset -20px 0 24px rgba(45, 124, 255, 0.25);
+    transition: box-shadow 0.3s ease;
+    transform: scale(1.02);
+}
+
+.filter-bar-buttons button.active {
+    background-color: #007bff;
+}
+
+.filter-bar-dates {
+    border-left: #666 1px solid;
+    padding-left: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.filter-bar-operator {
+    border-left: #666 1px solid;
+    padding-left: 10px;
+    display: flex;
+    align-items: center;
+}
+
+.filter-bar-operator .form-stack {
+    width: 220px;
+}
+
+.filter-date-picker .MuiInputBase-root {
+    height: 35px;
+    min-height: 35px;
+    padding: 0;
+    font-size: 0.75rem;
+}
+
+.filter-date-picker .MuiPickersInputBase-root.MuiPickersOutlinedInput-root {
+    font-size: 0.75rem !important;
+}
+
+.filter-date-picker .MuiInputBase-input {
+    font-size: 0.75rem;
+    padding: 4px 6px;
+}
+
+.filter-date-picker .MuiInputLabel-root {
+    font-size: 0.7rem;
+}
+
+.filter-bar-operator .MuiInputBase-root {
+    height: 35px;
+    min-height: 35px;
+    padding: 0;
+    font-size: 0.75rem;
+}
+
+.filter-bar-operator .MuiInputBase-input {
+    font-size: 0.75rem;
+    padding: 4px 6px;
+}
+
+.filter-bar-operator .MuiInputLabel-root {
+    font-size: 0.7rem;
+}

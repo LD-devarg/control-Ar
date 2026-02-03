@@ -1,10 +1,10 @@
-.home-layout{
+.contact-layout {
     display: flex;
     gap: 16px;
     height: 100%;
 }
 
-.home-container{
+.contact-container {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -17,20 +17,13 @@
     background-color: #292727;
 }
 
-.home-container h1{
+h1 {
     font-size: 2.5em;
     margin-bottom: 20px;
     color: #797979;
 }
 
-.form-container {
-    margin-top: 50px;
-    
+.contact-table {
+    width: 90%;
+    border-collapse: collapse;
 }
-
-.button-container {
-    margin-top: 20px;
-    display: flex;
-    justify-content: center;
-}
-

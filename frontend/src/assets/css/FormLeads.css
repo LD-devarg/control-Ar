@@ -1,0 +1,77 @@
+.form-leads-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 30px;
+    box-shadow: 15px 15px 25px rgba(0, 0, 0, 0.3),
+        -15px -15px 25px rgba(255, 255, 255, 0.1);
+    padding: 1.5rem;
+    background: rgba(0, 0, 0, 0.8);
+    width: 30%;
+    min-width: 300px;
+    height: 50%;
+    margin-bottom: 1rem;
+    border: white 1px solid;
+}
+
+.form-leads-container h3 {
+    color: #ffffff;
+    margin-bottom: 1rem;
+    margin-top: 0;
+}
+
+.form-leads-button {
+    margin-top: 1rem;
+    border-radius: 20px;
+    padding: 0.5rem 2rem;
+    font-size: 1.2rem;
+    background: linear-gradient(135deg, #8ded79 0%, #58cb42 25%, #1ba200 50%, #126900 75%);
+    color: white;
+    border: 1px solid #f3fe55;
+    box-shadow: 2px 4px 20px rgba(255, 238, 56, 1);
+    cursor: pointer;
+}
+
+.MuiFormControl-root {
+    margin: 0.5rem;
+    width: 25ch;
+    color: #ffffff;
+}
+
+.MuiInputBase-input {
+    color: #ffffff;
+}
+
+.subtext {
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    color: #cccccc;
+}
+
+.logo-whatsapp {
+    width: 30px;
+    height: 30px;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.whatsapp-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.landing-disclaimer {
+    font-size: 1rem;
+    color: #000000;
+    text-align: center;
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .landing-disclaimer {
+        font-size: 0.9rem;
+        margin-top: 1.5rem;
+    }
+    
+}

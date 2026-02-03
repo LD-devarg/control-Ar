@@ -6,6 +6,7 @@ import Stats from './pages/Stats.jsx'
 import WhatsApp from './pages/WhatsApp.jsx'
 import Landing from './pages/Landing.jsx'
 import Agenda from './pages/Contacts.jsx'
+import LandingConfig from './pages/LandingConfig.jsx'
 
 function App() {
 
@@ -19,6 +20,7 @@ function App() {
             <Route path="/stats" element={<Stats />} />
             <Route path="/whatsapp" element={<WhatsApp />} />
             <Route path="/contacts" element={<Agenda />} />
+            <Route path="/landing-config" element={<LandingConfig />} />
           </Route>
           <Route path="/landing" element={<Landing />} />
         </Routes>

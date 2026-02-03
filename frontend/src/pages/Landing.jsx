@@ -1,97 +1,30 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
 import "../assets/css/Landing.css";
+import { motion } from "motion/react";
+import NuevoCliente from "../components/FormLeads";
 
-export default function Landing({ previewData, disableFetch = false }) {
-    const [searchParams] = useSearchParams();
-    const [landingData, setLandingData] = useState({
-        logo_marca_url: "",
-        titulo: "TEXTO BIENVENIDA",
-        subtitulo: "Subtitulo de bienvenida",
-        titulo_color: "#ffffff",
-        titulo_tamano: 48,
-        subtitulo_color: "#ffffff",
-        subtitulo_tamano: 24,
-        imagen_url: "",
-        boton_texto: "",
-        boton_url: "",
-    });
-
-    useEffect(() => {
-        if (disableFetch || previewData) {
-            return;
-        }
-        const token = searchParams.get("token");
-        if (!token) return;
-
-        const controller = new AbortController();
-        const baseUrl = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000";
-
-        fetch(`${baseUrl}/landings/public/?landing_token=${token}`, {
-            signal: controller.signal,
-        })
-            .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-            .then((data) => {
-                setLandingData((prev) => ({
-                    ...prev,
-                    logo_marca_url: data.logo_marca_url || prev.logo_marca_url,
-                    titulo: data.titulo || data.nombre || prev.titulo,
-                    subtitulo: data.subtitulo || prev.subtitulo,
-                    imagen_url: data.imagen_url || "",
-                    boton_texto: data.boton_texto || "",
-                    boton_url: data.boton_url || "",
-                }));
-            })
-            .catch(() => {});
-
-        return () => controller.abort();
-    }, [disableFetch, previewData, searchParams]);
-
-    useEffect(() => {
-        if (!previewData) return;
-        setLandingData((prev) => ({
-            ...prev,
-            ...previewData,
-        }));
-    }, [previewData]);
-
+export default function Landing() {
     return (
-        <div className="landing-container">
-            <header className="landing-header">
-                <div>{landingData.logo_marca_url}</div>
-            </header>
-            <main className="landing-main">
-                <section>
-                    <h1
-                        className="landing-data-title"
-                        style={{
-                            color: landingData.titulo_color,
-                            fontSize: landingData.titulo_tamano
-                                ? `${landingData.titulo_tamano}px`
-                                : undefined,
-                        }}
-                    >
-                        {landingData.titulo}
-                    </h1>
-                </section>
-                <section>
-                    <p
-                        className="landing-data-subtitle"
-                        style={{
-                            color: landingData.subtitulo_color,
-                            fontSize: landingData.subtitulo_tamano
-                                ? `${landingData.subtitulo_tamano}px`
-                                : undefined,
-                        }}
-                    >
-                        {landingData.subtitulo}
-                    </p>
-                </section>
-
-            </main>
-            <footer>
-                <p>(c) 2024 Mi Aplicacion. Todos los derechos reservados.</p>
-            </footer>
+        <div className="landing-layout">
+            <section className="landing-container">
+                <div className="landing-title-container">
+                    <motion.h1
+                    initial= {{ opacity: 0 }}
+                    animate={{ opacity: 1 , scale: [1, 1.2, 1] }}
+                    transition={{ duration: 1 }}
+                    >BONO DE BIENVENIDA</motion.h1>
+                    <motion.span className="landing-bono"
+                    animate={{ opacity: 1, scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 1, repeat: 10, repeatDelay: 1 }}
+                    >🎁 100% 🎁</motion.span>
+                    <h2>REGISTRATE AHORA Y <br /><span className="keyword">DUPLICAMOS</span> TU DEPÓSITO</h2>
+                </div>
+                <NuevoCliente />
+                <motion.span className="landing-disclaimer"
+                    initial={{ y: 50, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ duration: 0.8, delay: 0.5 }}
+                >+18 | Juega responsablemente | Se aplican Terminos y Condiciones</motion.span>
+            </section>
         </div>
     );
 }

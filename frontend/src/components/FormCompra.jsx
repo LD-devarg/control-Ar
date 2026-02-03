@@ -4,11 +4,12 @@ import Autocomplete from '@mui/material/Autocomplete';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import "../assets/css/Form.css";
+import UploadButton from './UploadButton';
 
-const productos = [
-  { label: "Producto A" },
-  { label: "Producto B" },
-  { label: "Producto C" },
+const usuarios = [
+  { label: "Usuario A" },
+  { label: "Usuario B" },
+  { label: "Usuario C" },
 ];
 
 export default function FormCompra() {
@@ -17,12 +18,12 @@ export default function FormCompra() {
         <Autocomplete
         disablePortal
         id="combo-box-demo"
-        options={productos}
+        options={usuarios}
         className="form-autocomplete"
-        renderInput={(params) => <TextField {...params} label="Seleccione un producto" />}
+        renderInput={(params) => <TextField {...params} label="Seleccione el username" />}
       />
-        <TextField id="outlined-basic" label="Cantidad" variant="outlined" />
-        <TextField id="outlined-basic" label="Precio Unitario" variant="outlined" />
+        <TextField id="outlined-basic" label="Monto" variant="outlined" fullWidth type='number'/>
+        <UploadButton />
         <Button variant="outlined">Guardar</Button>
     </Stack>
   );

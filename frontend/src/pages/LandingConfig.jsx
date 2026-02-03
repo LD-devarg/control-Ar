@@ -1,60 +1,109 @@
 ﻿import { useMemo, useState } from "react";
 import "../assets/css/LandingConfig.css";
-import LandingEditor from "../components/LandingEditor.jsx";
-import LandingPreviewFrame from "../components/LandingPreviewFrame.jsx";
+import Logo from "../assets/img/logo_meta.png";
+import Autocomplete from "@mui/material/Autocomplete";
+import TextField from "@mui/material/TextField";
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import SaveIcon from '@mui/icons-material/Save';
+
 
 function LandingConfig() {
-    const [titulo, setTitulo] = useState("");
-    const [subtitulo, setSubtitulo] = useState("");
-    const [descripcion, setDescripcion] = useState("");
-    const [botonTexto, setBotonTexto] = useState("");
-    const [tituloColor, setTituloColor] = useState("#ffffff");
-    const [tituloTamano, setTituloTamano] = useState(48);
-    const [subtituloColor, setSubtituloColor] = useState("#ffffff");
-    const [subtituloTamano, setSubtituloTamano] = useState(24);
-    const [isMobilePreview, setIsMobilePreview] = useState(true);
-
-    const previewData = useMemo(
-        () => ({
-            titulo: titulo || "TEXTO BIENVENIDA",
-            subtitulo: subtitulo || "Bienvenido a Nuestra Aplicacion",
-            descripcion: descripcion || "Contenido principal de la pagina de bienvenida.",
-            titulo_color: tituloColor,
-            titulo_tamano: tituloTamano,
-            subtitulo_color: subtituloColor,
-            subtitulo_tamano: subtituloTamano,
-            boton_texto: botonTexto,
-            boton_url: botonTexto ? "#" : "",
-        }),
-        [titulo, subtitulo, descripcion, botonTexto, tituloColor, tituloTamano, subtituloColor, subtituloTamano]
-    );
 
     return (
-        <div className="landing-config-container">
-            <LandingEditor
-              titulo={titulo}
-              onTituloChange={setTitulo}
-              tituloColor={tituloColor}
-              onTituloColorChange={setTituloColor}
-              tituloTamano={tituloTamano}
-              onTituloTamanoChange={setTituloTamano}
-              subtitulo={subtitulo}
-              onSubtituloChange={setSubtitulo}
-              subtituloColor={subtituloColor}
-              onSubtituloColorChange={setSubtituloColor}
-              subtituloTamano={subtituloTamano}
-              onSubtituloTamanoChange={setSubtituloTamano}
-              descripcion={descripcion}
-              onDescripcionChange={setDescripcion}
-              botonTexto={botonTexto}
-              onBotonTextoChange={setBotonTexto}
-              isMobilePreview={isMobilePreview}
-              onTogglePreview={setIsMobilePreview}
-            />
-            <LandingPreviewFrame
-              previewData={previewData}
-              isMobilePreview={isMobilePreview}
-            />
+        <div className="landing-config-layout">
+            <section className="landing-config-container">
+                <h1>Landing Pages</h1>
+                <div className="landing-selector">
+                    <Autocomplete
+                        options={["Landing Page 1", "Landing Page 2", "Landing Page 3"]}
+                        renderInput={(params) => <TextField {...params} label="Selecciona una landing page"
+                        sx={{
+                            width: 300,'& .MuiInputLabel-root': { color: 'white' },
+                            '& .MuiOutlinedInput-root': {
+                                '& fieldset': {
+                                    borderColor: 'white',
+                                },
+                                '&:hover fieldset': {
+                                    borderColor: 'white',
+                                },
+                                '&.Mui-focused fieldset': {
+                                    borderColor: 'white',
+                                },
+                            },
+                            '& .MuiSvgIcon-root': {
+                                color: 'white',
+                            },
+                        }} />}
+                    />
+                </div>
+                <div className="form-config-pixel">
+                    <div className="form-config-pixel-content">
+                    <div className="title">
+                        <img src={Logo} alt="Logo Meta" className="logo-meta"/> 
+                        <h2>Configuración de Pixel</h2>
+                    </div>
+                        <Stack spacing={2} direction="column" className="form-config-pixel-stack">
+                            <TextField
+                                label="ID de Pixel"
+                                variant="outlined"
+                                fullWidth
+                                size="small"
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        marginBottom: "10px",
+                                        borderRadius: "50px",
+                                        backgroundColor: "gray",
+                                        "& fieldset": {
+                                            borderColor: "rgba(9, 9, 9, 0.8)" },
+                                        "&:hover fieldset": { borderColor: "#fff" },
+                                        "&.Mui-focused fieldset": { borderColor: "#fff" },
+                                    },
+                                    "& .MuiInputLabel-root": {
+                                        textAlign:"center",
+                                        fontSize: "small",
+                                        fontFamily: "Roboto, sans-serif",
+                                        color: "rgba(255,255,255,0.85)" },
+                                    "& .MuiInputBase-input": { color: "#fff" },
+                                }}
+                            />
+                            <TextField
+                                label="Token de Acceso"
+                                type="password"
+                                variant="outlined"
+                                fullWidth
+                                size="small"
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        marginBottom: "10px",
+                                        borderRadius: "50px",
+                                        backgroundColor: "gray",
+                                        "& fieldset": {
+                                            borderColor: "rgba(9, 9, 9, 0.8)" },
+                                        "&:hover fieldset": { borderColor: "#fff" },
+                                        "&.Mui-focused fieldset": { borderColor: "#fff" },
+                                    },
+                                    "& .MuiInputLabel-root": {
+                                        textAlign:"center",
+                                        fontSize: "small",
+                                        fontFamily: "Roboto, sans-serif",
+                                        color: "rgba(255,255,255,0.85)" },
+                                    "& .MuiInputBase-input": { color: "#fff" },
+                                }}
+                            />
+                        </Stack>
+                        <Button 
+                        variant="outlined"
+                        startIcon={<SaveIcon />}
+                        sx={{
+                            marginBottom: "10px",
+                        }}
+                        >
+                            Guardar
+                        </Button>
+                    </div>
+                </div>
+            </section>
         </div>
     );
 }

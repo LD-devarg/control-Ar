@@ -5,10 +5,10 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import "../assets/css/Form.css";
 
-const contactos = [
-  { label: "Contacto A" },
-  { label: "Contacto B" },
-  { label: "Contacto C" },
+const usuarios = [
+  { label: "Usuario A" },
+  { label: "Usuario B" },
+  { label: "Usuario C" },
 ];
 
 export default function FormContacto() {
@@ -17,9 +17,9 @@ export default function FormContacto() {
         <Autocomplete
         disablePortal
         id="combo-box-demo"
-        options={contactos}
+        options={usuarios}
         className="form-autocomplete"
-        renderInput={(params) => <TextField {...params} label="Seleccione un contacto" />}
+        renderInput={(params) => <TextField {...params} label="Seleccione el username" />}
       />
         <Button variant="outlined">Guardar</Button>
     </Stack>

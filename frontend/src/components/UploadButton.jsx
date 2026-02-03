@@ -53,7 +53,7 @@ function UploadButton() {
         }
       }}
     >
-      <div className="upload-dropzone-title">Subir imagen</div>
+      <div className="upload-dropzone-title">Subir archivo</div>
       <div className="upload-dropzone-subtitle">
         Arrastra y soltá una imagen o hacé click (máx 1MB)
       </div>

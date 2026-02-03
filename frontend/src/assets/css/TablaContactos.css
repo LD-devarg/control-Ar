@@ -1,0 +1,97 @@
+.tabla-contactos-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+}
+
+.tabla-contactos-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tabla-contactos-input,
+.tabla-contactos-select,
+.tabla-contactos-clear {
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #3a3d49;
+  background: rgba(20, 21, 27, 0.72);
+  color: #eef0f5;
+  padding: 0 12px;
+}
+
+.tabla-contactos-input {
+  min-width: 260px;
+  flex: 1;
+}
+
+.tabla-contactos-select {
+  min-width: 200px;
+}
+
+.tabla-contactos-clear {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tabla-contactos-table-wrap {
+  min-height: 0;
+  flex: 1;
+}
+
+.tabla-contactos {
+  overflow: auto;
+  background: transparent !important;
+  scrollbar-width: thin;
+  scrollbar-color: #4f5461 #1c1f28;
+}
+
+.tabla-contactos.MuiPaper-root {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+.tabla-contactos .MuiTableRow-root {
+  background: #292727;
+}
+
+.tabla-contactos .MuiTable-root,
+.tabla-contactos .MuiTableBody-root,
+.tabla-contactos .MuiTableHead-root {
+  background: transparent !important;
+}
+
+.tabla-contactos .MuiTableBody-root .MuiTableRow-root {
+  border-bottom: 1px solid #2f313a;
+}
+
+.tabla-contactos-cell {
+  background: transparent !important;
+  color: #ffffff !important;
+  border-bottom: 1px solid #2f313a !important;
+  padding-top: 18px !important;
+  padding-bottom: 18px !important;
+}
+
+.tabla-contactos::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.tabla-contactos::-webkit-scrollbar-track {
+  background: #1c1f28;
+  border-radius: 8px;
+}
+
+.tabla-contactos::-webkit-scrollbar-thumb {
+  background: #4f5461;
+  border-radius: 8px;
+  border: 2px solid #1c1f28;
+}
+
+.tabla-contactos::-webkit-scrollbar-thumb:hover {
+  background: #6d7383;
+}

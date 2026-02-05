@@ -4,24 +4,5 @@
 
 .form-autocomplete .MuiInputBase-root,
 .form-stack .MuiInputBase-root {
-  color: #ffffff;
-}
-
-.form-autocomplete .MuiInputLabel-root,
-.form-stack .MuiInputLabel-root {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.form-autocomplete .MuiOutlinedInput-notchedOutline,
-.form-stack .MuiOutlinedInput-notchedOutline {
-  border-color: rgba(255, 255, 255, 0.6);
-}
-
-.form-autocomplete:hover .MuiOutlinedInput-notchedOutline,
-.form-stack .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
-  border-color: #ffffff;
-}
-
-.form-autocomplete .MuiSvgIcon-root {
-  color: #ffffff;
+  min-height: 40px;
 }

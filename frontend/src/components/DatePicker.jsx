@@ -1,125 +1,50 @@
-import * as React from 'react';
-import dayjs from 'dayjs';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { useTheme } from '@mui/material/styles';
 
-export function DatePickerDesde() {
-  const [value, setValue] = React.useState(dayjs());
-
-  return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <DatePicker
-        label="Desde"
-        value={value}
-        onChange={(newValue) => setValue(newValue)}
-        slotProps={{
-          textField: {
-            fullWidth: false,
-            size: 'small',
-            className: 'filter-date-picker',
-            sx: {
-              /* Texto de la fecha */
-              '& .MuiPickersSectionList-root': {
-                color: '#fff',
-                width: 'auto',
-                minWidth: 0,
-              },
-
-              /* Borde */
-              '& .MuiPickersOutlinedInput-notchedOutline': {
-                borderColor: '#fff',
-              },
-
-              '&:hover .MuiPickersOutlinedInput-notchedOutline': {
-                borderColor: '#9e9e9e',
-              },
-
-              '&.Mui-focused .MuiPickersOutlinedInput-notchedOutline': {
-                borderColor: '#1976d2',
-              },
-
-              /* Label */
-              '& .MuiInputLabel-root': {
-                color: '#fff',
-              },
-
-              '& .MuiInputLabel-root.Mui-focused': {
-                color: '#1976d2',
-              },
-
-              /* Icono calendario */
-              '& .MuiSvgIcon-root': {
-                color: '#fff',
-              },
-
-              '& .MuiInputBase-root': {
-                backgroundColor: 'rgba(255,255,255,0.03)',
-              },
-            },
-          },
-        }}
-      />
-    </LocalizationProvider>
-  );
-}
-
-export function DatePickerHasta() {
-  const [value, setValue] = React.useState(dayjs());
+export default function FilterDatePicker({ label, value, onChange }) {
+  const theme = useTheme();
+  const inputColor = theme.palette.mode === 'dark' ? '#f5f5f5' : '#171717';
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs}>
-      <DatePicker
-        label="Hasta"
-        value={value}
-        onChange={(newValue) => setValue(newValue)}
-        slotProps={{
-          textField: {
-            fullWidth: false,
-            size: 'small',
-            className: 'filter-date-picker',
-            sx: {
-              /* Texto de la fecha */
-              '& .MuiPickersSectionList-root': {
-                color: '#fff',
-                width: 'auto',
-                minWidth: 0,
-              },
-
-              /* Borde */
-              '& .MuiPickersOutlinedInput-notchedOutline': {
-                borderColor: '#fff',
-              },
-
-              '&:hover .MuiPickersOutlinedInput-notchedOutline': {
-                borderColor: '#9e9e9e',
-              },
-
-              '&.Mui-focused .MuiPickersOutlinedInput-notchedOutline': {
-                borderColor: '#1976d2',
-              },
-
-              /* Label */
-              '& .MuiInputLabel-root': {
-                color: '#fff',
-              },
-
-              '& .MuiInputLabel-root.Mui-focused': {
-                color: '#1976d2',
-              },
-
-              /* Icono calendario */
-              '& .MuiSvgIcon-root': {
-                color: '#fff',
-              },
-
-              '& .MuiInputBase-root': {
-                backgroundColor: 'rgba(255,255,255,0.03)',
-              },
+    <DatePicker
+      label={label}
+      value={value}
+      onChange={onChange}
+      slotProps={{
+        textField: {
+          fullWidth: false,
+          size: 'small',
+          className: 'filter-date-picker',
+          sx: {
+            '& .MuiPickersSectionList-root': {
+              color: inputColor,
+              width: 'auto',
+              minWidth: 0,
+            },
+            '& .MuiPickersOutlinedInput-notchedOutline': {
+              borderColor: inputColor,
+            },
+            '&:hover .MuiPickersOutlinedInput-notchedOutline': {
+              borderColor: '#9e9e9e',
+            },
+            '&.Mui-focused .MuiPickersOutlinedInput-notchedOutline': {
+              borderColor: '#1976d2',
+            },
+            '& .MuiInputLabel-root': {
+              color: inputColor,
+            },
+            '& .MuiInputLabel-root.Mui-focused': {
+              color: '#1976d2',
+            },
+            '& .MuiSvgIcon-root': {
+              color: inputColor,
+            },
+            '& .MuiInputBase-root': {
+              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
             },
           },
-        }}
-      />
-    </LocalizationProvider>
+        },
+      }}
+    />
   );
 }

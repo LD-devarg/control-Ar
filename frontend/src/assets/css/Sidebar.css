@@ -1,8 +1,9 @@
 .sidebar {
     padding: 10px;
-    width: 64px;
+    width: 80px;
     height: 100vh;
-    background-color: #292727;
+    height: 100dvh;
+    min-height: 100svh;
     color: white;
     display: flex;
     flex-direction: column;
@@ -11,10 +12,10 @@
     transition: width 0.25s ease;
 }
 .sidebar .logo {
-    height: 70px;
-    width: 70px;
+    height: 40px;
+    width: 40px;
     display: block;
-    margin: 0;
+    margin-bottom: 10px;
 }
 
 .sidebar-logo {
@@ -81,16 +82,6 @@
     inset -20px 0 24px rgba(45, 124, 255, 0.25); /* glow suave */
     transition: box-shadow 0.3s ease;
     transform: scale(1.02);
-}
-
-.Button:hover .button-text {
-    color: #ffffff;
-}
-
-.Button:hover .MuiButton-startIcon,
-.Button:hover .MuiButton-startIcon svg {
-    color: #ffffff;
-    fill: #ffffff;
 }
 
 .sidebar .MuiButton-root {
@@ -199,6 +190,10 @@
 
 .sidebar:hover .sidebar-logo {
     justify-content: flex-start;
+}
+
+.sidebar:hover .logo {
+    margin-right: 10px;
 }
 
 .sidebar:hover .brand-text {

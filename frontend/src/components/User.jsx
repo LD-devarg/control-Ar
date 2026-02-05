@@ -1,11 +1,10 @@
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
-import '../assets/css/User.css';
 
 function User() {
     return (
-        <div className="user-logged">
+        <div className="flex items-center cursor-pointer text-sm text-black dark:text-white gap-2">
             <AccountCircleOutlinedIcon />
-            <span className="user-name">Nombre de Usuario</span>
+            <span>Nombre de Usuario</span>
         </div>    
     );
 }

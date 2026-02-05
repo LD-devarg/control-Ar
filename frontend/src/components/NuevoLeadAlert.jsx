@@ -1,13 +1,25 @@
 import Badge from '@mui/material/Badge';
 import MarkChatUnreadOutlinedIcon from '@mui/icons-material/MarkChatUnreadOutlined';
-import '../assets/css/NuevoLeadAlert.css';
 
 
 export default function SimpleBadge() {
   return (
-    <div className='alerta-lead'>
-        <Badge badgeContent={4} color="primary">
-            <MarkChatUnreadOutlinedIcon color="action" />
+    <div className='flex items-center cursor-pointer text-black dark:text-white gap-3 text-sm mr-5'>
+        <Badge 
+        badgeContent={4}  
+        sx={{
+          '& .MuiBadge-badge': {
+            backgroundColor: '#FF3D00',
+            color: 'inherit',
+          },
+
+        }}>
+            <MarkChatUnreadOutlinedIcon 
+            sx={{
+              fontSize: "1.5rem",
+              color: 'inherit',
+            }}
+            />
         </Badge>
     </div>
   );

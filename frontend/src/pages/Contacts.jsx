@@ -1,17 +1,14 @@
-import '../assets/css/Contacts.css';
+import Page from '../layouts/Page.jsx';
 import ReactVirtualizedTable from '../components/TablaContactos.jsx';
 
 
 function Agenda() {
     return (
-        <div className='contact-layout'>
-            <section className='contact-container'>
-                <h1>Agenda de Contactos</h1>
-                <div className='contact-table'>
+        <Page title="Agenda de Contactos">
+                <div className='w-full h-full'>
                     <ReactVirtualizedTable />
                 </div>
-            </section>
-        </div>
+        </Page>
     );
 }
 

@@ -30,6 +30,31 @@ function ModalAgregarLinea({ open, onClose, onSave, value, onChange }) {
                     value={value}
                     onChange={onChange}
                     helperText="Max. 10 digitos Ej: 2235123456"
+                    fullWidth
+                    sx={{
+                        fontSize: "10px",
+                        "& .MuiOutlinedInput-root": {
+                            "& fieldset": {
+                                borderColor: "rgba(9, 9, 9, 0.8)",
+                            },
+                            "&:hover fieldset": {
+                                borderColor: "#fff",
+                            },
+                            "&.Mui-focused fieldset": {
+                                borderColor: "#fff",
+                            },
+                        },
+                        "& .MuiInputLabel-root": {
+                            textAlign: "center",
+                            fontSize: "small",
+                        },
+                        "& .MuiInputBase-input": {
+                            color: "#fff",
+                        },
+                        "& .MuiFormHelperText-root": {
+                            color: "rgba(255,255,255,0.85)",
+                        },
+                    }}
                 />
                 <Tooltip
                     title="No agregar +54, 0 o 15"

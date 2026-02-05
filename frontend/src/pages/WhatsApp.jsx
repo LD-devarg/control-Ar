@@ -5,6 +5,7 @@ import AddIcon from "@mui/icons-material/Add";
 import CardWhatsapp from "../components/CardWhatsapp.jsx";
 import ModalConfirmacion from "../components/ModalConfirmacion.jsx";
 import ModalAgregarLinea from "../components/ModalAgregarLinea.jsx";
+import Page from "../layouts/Page.jsx";
 
 function WhatsApp() {
     const [lines, setLines] = useState([
@@ -68,9 +69,7 @@ function WhatsApp() {
     };
 
     return (
-        <div className="whatsapp-layout">
-            <section className="whatsapp-container">
-                <h1>Lineas WhatsApp</h1>
+        <Page title="Gestión de Líneas de WhatsApp">
                 <div className="whatsapp-cards">
                     {lines.map((line) => (
                         <CardWhatsapp
@@ -83,7 +82,6 @@ function WhatsApp() {
                         AGREGAR
                     </Button>
                 </div>
-            </section>
 
             <ModalConfirmacion
                 open={confirmOpen}
@@ -99,7 +97,7 @@ function WhatsApp() {
                 value={newNumber}
                 onChange={handleNewNumberChange}
             />
-        </div>
+        </Page>
     );
 }
 

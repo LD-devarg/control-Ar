@@ -6,14 +6,12 @@ import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import SaveIcon from '@mui/icons-material/Save';
-
+import Page from "../layouts/Page";
 
 function LandingConfig() {
 
     return (
-        <div className="landing-config-layout">
-            <section className="landing-config-container">
-                <h1>Landing Pages</h1>
+        <Page title="Configuración de Landing Page">
                 <div className="landing-selector">
                     <Autocomplete
                         options={["Landing Page 1", "Landing Page 2", "Landing Page 3"]}
@@ -103,8 +101,7 @@ function LandingConfig() {
                         </Button>
                     </div>
                 </div>
-            </section>
-        </div>
+        </Page>
     );
 }
 

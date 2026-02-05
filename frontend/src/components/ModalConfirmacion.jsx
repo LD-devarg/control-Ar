@@ -6,14 +6,14 @@ function ModalConfirmacion({ open, onClose, onConfirm, line }) {
         <ModalBase
             open={open}
             onClose={onClose}
-            title="Confirmar inactivacion"
+            title="Desactivar linea"
             actions={
                 <>
                     <Button onClick={onClose} variant="outlined">
                         Cancelar
                     </Button>
                     <Button onClick={onConfirm} variant="contained" color="error">
-                        Inactivar
+                        Desactivar
                     </Button>
                 </>
             }

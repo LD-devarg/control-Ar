@@ -1,10 +1,7 @@
 import * as React from 'react';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
 import { SparkLineChart } from '@mui/x-charts/SparkLineChart';
 import { areaElementClasses, lineElementClasses } from '@mui/x-charts/LineChart';
 import { chartsAxisHighlightClasses } from '@mui/x-charts/ChartsAxisHighlight';
-import Box from '@mui/material/Box';
 
 const data = [
   { start: '01-01', end: '01-07', downloads: 120 },
@@ -17,98 +14,77 @@ const data = [
 ];
 
 const downloads = data.map((item) => item.downloads);
-const weeks = data.map((item) => `${item.start} to ${item.end}`);
+const weeks = data.map((item) => `${item.start} al ${item.end}`);
 
 const settings = {
   data: downloads,
   baseline: 'min',
-  margin: { bottom: 0, top: 5, left: 4, right: 0 },
+  margin: { bottom: 0, top: 6, left: 4, right: 4 },
   xAxis: { id: 'week-axis', data: weeks },
   yAxis: {
     domainLimit: (_, maxValue) => ({
-      min: -maxValue / 6, //  Hack to add 5px bellow 0 like npm.
+      min: -maxValue / 6,
       max: maxValue,
     }),
   },
   sx: {
-    [`& .${areaElementClasses.root}`]: { opacity: 0.2 },
-    [`& .${lineElementClasses.root}`]: { strokeWidth: 3 },
+    [`& .${areaElementClasses.root}`]: { opacity: 0.22 },
+    [`& .${lineElementClasses.root}`]: { strokeWidth: 3.2 },
     [`& .${chartsAxisHighlightClasses.root}`]: {
-      stroke: 'rgb(137, 86, 255)',
+      stroke: 'rgb(2, 132, 199)',
       strokeDasharray: 'none',
       strokeWidth: 2,
     },
   },
   slotProps: {
-    lineHighlight: { r: 4 }, // Reduce the radius of the axis highlight.
+    lineHighlight: { r: 4 },
   },
-  clipAreaOffset: { top: 2, bottom: 2 },
+  clipAreaOffset: { top: 3, bottom: 3 },
   axisHighlight: { x: 'line' },
 };
 
 export default function GraficoLineas() {
   const [weekIndex, setWeekIndex] = React.useState(null);
+  const currentValue = downloads[weekIndex ?? downloads.length - 1].toLocaleString();
 
   return (
-    <Box
-      onKeyDown={(event) => {
-        switch (event.key) {
-          case 'ArrowLeft':
-            setWeekIndex((p) =>
-              p === null ? weeks.length - 1 : (weeks.length + p - 1) % weeks.length,
-            );
-            break;
-          case 'ArrowRight':
-            setWeekIndex((p) => (p === null ? 0 : (p + 1) % weeks.length));
-            break;
-          default:
-        }
-      }}
-      onFocus={() => {
-        setWeekIndex((p) => (p === null ? 0 : p));
-      }}
-      role="button"
-      aria-label="Showing weekly downloads"
-      tabIndex={0}
-      width="100%"
-      height="100%"
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-    >
-      <Stack direction="column" width={300}>
-        <Typography
-          sx={{
-            color: 'rgb(117, 117, 117)',
-            fontWeight: 500,
-            fontSize: '0.9rem',
-            pt: 1,
-          }}
-        >
-          <DownloadIcon
-            fill="rgb(117, 117, 117)"
-            width="8px"
-            height="12px"
-            style={{ marginRight: 8 }}
-          />
-          {weekIndex === null ? 'Weekly Downloads' : weeks[weekIndex]}
-        </Typography>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="flex-end"
-          sx={{ borderBottom: 'solid 2px rgba(137, 86, 255, 0.2)' }}
-        >
-          <Typography sx={{ fontSize: '1.25rem', fontWeight: 500 }}>
-            {downloads[weekIndex ?? downloads.length - 1].toLocaleString()}
-          </Typography>
+    <div className="h-24 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 shadow-sm border-zinc-700 bg-zinc-900">
+      <div
+        onKeyDown={(event) => {
+          switch (event.key) {
+            case 'ArrowLeft':
+              setWeekIndex((p) =>
+                p === null ? weeks.length - 1 : (weeks.length + p - 1) % weeks.length,
+              );
+              break;
+            case 'ArrowRight':
+              setWeekIndex((p) => (p === null ? 0 : (p + 1) % weeks.length));
+              break;
+            default:
+          }
+        }}
+        onFocus={() => setWeekIndex((p) => (p === null ? 0 : p))}
+        role="button"
+        aria-label="Evolucion semanal"
+        tabIndex={0}
+        className="flex h-full flex-col justify-between gap-1.5 outline-none"
+      >
+        <div className="flex items-center gap-2 text-xs font-medium tracking-wide text-zinc-500 dark:text-zinc-400">
+          <DownloadIcon fill="currentColor" width="9px" height="12px" />
+          <span>{weekIndex === null ? 'Comparativo semanal' : weeks[weekIndex]}</span>
+        </div>
+
+        <div className="flex items-center justify-between border-b border-sky-200 pb-2 dark:border-sky-900/60">
+          <p className="text-xl font-semibold leading-tight text-white">
+            {currentValue}
+          </p>
 
           <SparkLineChart
-            height={40}
-            width={195}
+            height={44}
+            width={210}
             area
             showHighlight
-            color="rgb(137, 86, 255)"
+            color="rgb(2, 132, 199)"
             onHighlightedAxisChange={(axisItems) => {
               setWeekIndex(axisItems[0]?.dataIndex ?? null);
             }}
@@ -119,9 +95,9 @@ export default function GraficoLineas() {
             }
             {...settings}
           />
-        </Stack>
-      </Stack>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 }
 

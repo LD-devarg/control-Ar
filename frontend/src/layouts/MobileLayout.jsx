@@ -5,24 +5,24 @@ import NuevoLeadAlert from "../components/NuevoLeadAlert.jsx";
 import { Outlet, useLocation } from "react-router-dom";
 import React from "react";
 
-function DesktopLayout() {
+function MobileLayout() {
   const location = useLocation();
   const showNuevosLeads = location.pathname === "/home";
 
   return (
-    <div className="flex h-screen w-full bg-neutral-100 dark:bg-zinc-800 overflow-hidden">
+    <div className="mobile-layout-container">
         <Sidebar />
-        <div className="flex grow flex-col min-w-0">
-            <header className="flex justify-end items-center px-4 pb-1 pt-5">
+        <div className="content-wrapper">
+            <header className="content-header">
                 <NuevoLeadAlert />
                 <User />
             </header>
-            <main className="flex grow overflow-hidden flex-row p-5 min-w-0">
-                <div className="flex-[3] min-w-0">
+            <main className="content-area">
+                <div className="main-content">
                     <Outlet />
                 </div>
                 {showNuevosLeads && (
-                  <div className="flex-[1] min-w-0 ml-4">
+                  <div className="main-aside">
                     <NuevosLeads />
                   </div>
                 )}
@@ -32,4 +32,4 @@ function DesktopLayout() {
   );
 }
 
-export default DesktopLayout;
+export default MobileLayout;

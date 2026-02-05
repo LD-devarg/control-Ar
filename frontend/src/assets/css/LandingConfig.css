@@ -1,29 +1,4 @@
-﻿.landing-config-layout {
-    display: flex;
-    gap: 16px;
-    height: 100%;
-}
-
-.landing-config-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0;
-    border: 1px solid #575757;
-    height: 100%;
-    box-sizing: border-box;
-    border-radius: 30px;
-    background-color: #292727;
-}
-
-h1 {
-    font-size: 2.5em;
-    margin-bottom: 0;
-    color: #797979;
-}
-
-.landing-selector {
+﻿.landing-selector {
     margin-top: 20px;
     width: 80%;
     display: flex;

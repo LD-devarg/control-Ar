@@ -79,7 +79,10 @@ function Sidebar() {
           <div className="sidebar-pauta">
             <h3 className="title">PAUTA</h3>
             <Stack>
-              <ButtonSidebar startIcon={<CampaignOutlinedIcon />} label="Database" />
+              <ButtonSidebar 
+              startIcon={<CampaignOutlinedIcon />} 
+              label="Database" 
+              onClick={() => navigate("/pauta-database")} />
               <ButtonSidebar startIcon={<AdsClickOutlinedIcon />} label="Rendimientos" />
             </Stack>
           </div>

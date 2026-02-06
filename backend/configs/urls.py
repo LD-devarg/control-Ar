@@ -14,6 +14,10 @@ from apps.pauta.views import (
     AnuncioViewSet,
     GastoDiarioViewSet,
     CredencialesMetaViewSet,
+    FanPageViewSet,
+    InstagramAccountViewSet,
+    PautaAssetViewSet,
+    CreativeViewSet,
 )
 
 router = DefaultRouter()
@@ -32,6 +36,10 @@ router.register(r"conjuntos-anuncios", ConjuntoAnunciosViewSet, basename="conjun
 router.register(r"anuncios", AnuncioViewSet, basename="anuncio")
 router.register(r"gastos-diarios", GastoDiarioViewSet, basename="gasto-diario")
 router.register(r"credenciales-meta", CredencialesMetaViewSet, basename="credenciales-meta")
+router.register(r"fanpages", FanPageViewSet, basename="fanpage")
+router.register(r"instagram-accounts", InstagramAccountViewSet, basename="instagram-account")
+router.register(r"pauta-assets", PautaAssetViewSet, basename="pauta-asset")
+router.register(r"creatives", CreativeViewSet, basename="creative")
 
 urlpatterns = [
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),

@@ -10,6 +10,10 @@ from .models import (
     Anuncio,
     GastoDiario,
     CredencialesMeta,
+    FanPage,
+    InstagramAccount,
+    PautaAsset,
+    Creative,
 )
 from .serializers import (
     BMSerializer,
@@ -19,6 +23,10 @@ from .serializers import (
     AnuncioSerializer,
     GastoDiarioSerializer,
     CredencialesMetaSerializer,
+    FanPageSerializer,
+    InstagramAccountSerializer,
+    PautaAssetSerializer,
+    CreativeSerializer,
 )
 
 
@@ -117,6 +125,54 @@ class GastoDiarioViewSet(viewsets.ModelViewSet):
 class CredencialesMetaViewSet(viewsets.ModelViewSet):
     queryset = CredencialesMeta.objects.all()
     serializer_class = CredencialesMetaSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        return _has_pauta_permission(request.user, self.action)
+
+    def get_queryset(self):
+        return _filter_by_empresa(super().get_queryset(), self.request.user)
+
+
+class FanPageViewSet(viewsets.ModelViewSet):
+    queryset = FanPage.objects.all()
+    serializer_class = FanPageSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        return _has_pauta_permission(request.user, self.action)
+
+    def get_queryset(self):
+        return _filter_by_empresa(super().get_queryset(), self.request.user)
+
+
+class InstagramAccountViewSet(viewsets.ModelViewSet):
+    queryset = InstagramAccount.objects.all()
+    serializer_class = InstagramAccountSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        return _has_pauta_permission(request.user, self.action)
+
+    def get_queryset(self):
+        return _filter_by_empresa(super().get_queryset(), self.request.user)
+
+
+class PautaAssetViewSet(viewsets.ModelViewSet):
+    queryset = PautaAsset.objects.all()
+    serializer_class = PautaAssetSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        return _has_pauta_permission(request.user, self.action)
+
+    def get_queryset(self):
+        return _filter_by_empresa(super().get_queryset(), self.request.user)
+
+
+class CreativeViewSet(viewsets.ModelViewSet):
+    queryset = Creative.objects.all()
+    serializer_class = CreativeSerializer
     permission_classes = [IsAuthenticated, RoleBasedPermission]
 
     def has_role_permission(self, request, view):

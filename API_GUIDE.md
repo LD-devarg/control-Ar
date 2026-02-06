@@ -95,11 +95,25 @@ Body:
 ### Pauta
 - `GET /bms/`
 - `GET /cuentas-publicitarias/`
-- `GET /campanias/`
+- `GET /campañas/`
 - `GET /conjuntos-anuncios/`
 - `GET /anuncios/`
 - `GET /gastos-diarios/`
 - `GET /credenciales-meta/`
+- `GET /fanpages/`
+- `GET /instagram-accounts/`
+- `GET /pauta-assets/`
+- `GET /creatives/`
+
+#### Orden recomendado de creaciÃ³n (Pauta)
+1. `POST /bms/`
+2. `POST /cuentas-publicitarias/` (depende de BM)
+3. `POST /campañas/` (depende de cuenta publicitaria)
+4. `POST /conjuntos-anuncios/` (depende de campaÃ±a)
+5. `POST /fanpages/` (depende de BM) *si usas creatives*
+6. `POST /pauta-assets/`
+7. `POST /creatives/` (depende de fanpage y asset; instagram opcional)
+8. `POST /anuncios/` (depende de conjunto y creative)
 
 ## Endpoints de test
 ### Enviar evento de prueba (solo Admin/Pauta/Superuser)

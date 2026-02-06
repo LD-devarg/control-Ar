@@ -8,6 +8,7 @@ import WhatsApp from './pages/WhatsApp.jsx'
 import Landing from './pages/Landing.jsx'
 import Agenda from './pages/Contacts.jsx'
 import TipoCambio from './pages/TipoCambio.jsx'
+import PautaDatabase from './pages/PautaDatabase.jsx'
 import LandingConfig from './pages/LandingConfig.jsx'
 import TabletLayout from './layouts/TabletLayout.jsx'
 import MobileLayout from './layouts/MobileLayout.jsx'
@@ -62,6 +63,7 @@ function App() {
             <Route path="/contacts" element={<Agenda />} />
             <Route path="/landing-config" element={<LandingConfig />} />
             <Route path="/tipo-cambio" element={<TipoCambio />} />
+            <Route path="/pauta-database" element={<PautaDatabase />} />
           </Route>
           <Route path="/landing" element={<Landing />} />
         </Routes>

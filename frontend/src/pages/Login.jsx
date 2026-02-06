@@ -38,7 +38,7 @@ function Login() {
   };
 
   return (
-    <div className='flex flex-col justify-start items-center min-h-screen h-full bg-white dark:bg-neutral-900'>
+    <div className='flex flex-col justify-start items-center min-h-screen h-full bg-white dark:bg-black'>
         <img src={isDarkMode ? LogoLight : LogoDark} className='text-center mb-5 h-50 w-50' alt="Logo Control-AR" />
         <div className='form-login flex flex-col justify-center items-center bg-neutral-100 dark:bg-zinc-900 p-6 rounded-2xl shadow-lg w-80'>
             <Box

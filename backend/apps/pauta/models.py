@@ -41,6 +41,45 @@ class CuentaPublicitaria(models.Model):
     def __str__(self):
         return f"{self.nombre} ({self.empresa})"
 
+class FanPage(models.Model):
+    empresa = models.ForeignKey(
+        "empresas.Empresa",
+        on_delete=models.CASCADE,
+        related_name="fanpages",
+    )
+    bm = models.ForeignKey(
+        "pauta.BM",
+        on_delete=models.CASCADE,
+        related_name="fanpages",
+    )
+
+    meta_id = models.CharField(max_length=100)
+    nombre = models.CharField(max_length=120)
+    estado = models.CharField(max_length=50)  # active, unpublished, restricted, etc.
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "pauta_fanpage"
+
+    def __str__(self):
+        return f"{self.nombre} ({self.empresa})"
+    
+class InstagramAccount(models.Model):
+    empresa = models.ForeignKey("empresas.Empresa", on_delete=models.CASCADE)
+    fanpage = models.OneToOneField(
+        "pauta.FanPage",
+        on_delete=models.CASCADE,
+        related_name="instagram_account",
+    )
+    meta_id = models.CharField(max_length=100)
+    username = models.CharField(max_length=120)
+    estado = models.CharField(max_length=50)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "pauta_instagram_account"
+
 
 class Campaña(models.Model):
     empresa = models.ForeignKey(
@@ -84,7 +123,7 @@ class ConjuntoAnuncios(models.Model):
     nombre = models.CharField(max_length=120)
     estado = models.CharField(max_length=50)
     presupuesto_diario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    segmentacion = models.JSONField()
+    segmentacion = models.JSONField(null=True, blank=True, default=dict)
     fecha_inicio = models.DateField(null=True, blank=True)
     fecha_fin = models.DateField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
@@ -97,27 +136,69 @@ class ConjuntoAnuncios(models.Model):
 
 
 class Anuncio(models.Model):
-    empresa = models.ForeignKey(
-        "empresas.Empresa",
-        on_delete=models.CASCADE,
-        related_name="anuncios",
-    )
+    empresa = models.ForeignKey("empresas.Empresa", on_delete=models.CASCADE)
     conjunto_anuncios = models.ForeignKey(
         "pauta.ConjuntoAnuncios",
         on_delete=models.CASCADE,
         related_name="anuncios",
     )
-    meta_id = models.CharField(max_length=100)
+    creative = models.ForeignKey(
+        "pauta.Creative",
+        on_delete=models.PROTECT,
+        related_name="anuncios",
+    )
+
+    meta_id = models.CharField(max_length=100, null=True, blank=True)
     nombre = models.CharField(max_length=120)
     estado = models.CharField(max_length=50)
-    contenido = models.JSONField()
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "pauta_anuncio"
 
-    def __str__(self):
-        return f"{self.nombre} ({self.empresa})"
+
+
+class PautaAsset(models.Model):
+    empresa = models.ForeignKey("empresas.Empresa", on_delete=models.CASCADE)
+    tipo = models.CharField(max_length=20)  # image | video
+    s3_url = models.URLField()
+    meta_asset_id = models.CharField(max_length=100, null=True, blank=True)  
+    estado = models.CharField(max_length=30, default="pending")  # uploaded / error
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "pauta_asset"
+
+class Creative(models.Model):
+    empresa = models.ForeignKey("empresas.Empresa", on_delete=models.CASCADE)
+    fanpage = models.ForeignKey(
+        "pauta.FanPage",
+        on_delete=models.PROTECT,
+        related_name="creatives",
+    )
+    instagram_account = models.ForeignKey(
+        "pauta.InstagramAccount",
+        on_delete=models.PROTECT,
+        related_name="creatives",
+        null=True,
+        blank=True,
+    )
+    nombre = models.CharField(max_length=120)
+
+    primary_text = models.TextField()
+    headline = models.CharField(max_length=255)
+    descripcion = models.CharField(max_length=255, null=True, blank=True)
+
+    url_destino = models.URLField()
+    cta = models.CharField(max_length=50)
+
+    asset = models.ForeignKey("pauta.PautaAsset", on_delete=models.PROTECT)
+    meta_id = models.CharField(max_length=100, null=True, blank=True)
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "pauta_creative"
 
 
 class GastoDiario(models.Model):

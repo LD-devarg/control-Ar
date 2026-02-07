@@ -18,6 +18,7 @@
     "@mui/x-date-pickers": "^8.26.0",
     "@mui/x-date-pickers-pro": "^8.26.0",
     "@tailwindcss/vite": "^4.1.18",
+    "axios": "^1.7.9",
     "chance": "^1.1.13",
     "dayjs": "^1.11.19",
     "motion": "^12.29.2",

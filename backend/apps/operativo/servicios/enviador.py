@@ -15,7 +15,10 @@ from .constructor import MetaEventBuilder
 
 META_API_VERSION = os.getenv("META_API_VERSION", "v18.0")
 META_TIMEOUT_SECONDS = float(os.getenv("META_TIMEOUT_SECONDS", "10"))
-META_TEST_EVENT_CODE = os.getenv("META_TEST_EVENT_CODE")
+
+
+def _get_test_event_code() -> str | None:
+    return os.getenv("META_TEST_EVENT_CODE")
 
 
 def _build_capi_url(pixel_id: str, access_token: str, test_event_code: str | None = None) -> str:
@@ -52,7 +55,7 @@ def enviar_evento_meta(evento, request=None, credenciales: CredencialesMeta | No
     data["event_id"] = str(evento.id_evento)
 
     token_acceso = decrypt_token(credenciales.token_acceso_encrypted)
-    url = _build_capi_url(credenciales.pixel_id, token_acceso, test_event_code or META_TEST_EVENT_CODE)
+    url = _build_capi_url(credenciales.pixel_id, token_acceso, test_event_code or _get_test_event_code())
 
     response = None
     response_data: dict[str, Any]

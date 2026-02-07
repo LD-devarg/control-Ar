@@ -18,6 +18,7 @@ BONO_CHOICES = [
 
 class Cliente(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    idempotency_key = models.UUIDField(null=True, blank=True, unique=True)
     nombre = models.CharField(max_length=100)
     contacto = models.CharField(max_length=15)
     username = models.CharField(max_length=50, unique=True)
@@ -50,6 +51,16 @@ class Landing(models.Model):
     bono = models.CharField(max_length=50, choices=BONO_CHOICES, default="100%")
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
+    titulo = models.CharField(max_length=255, null=True, blank=True)
+    subtitulo = models.CharField(max_length=255, null=True, blank=True)
+    texto_boton = models.CharField(max_length=100, null=True, blank=True)
+    texto_info = models.CharField(max_length=255, null=True, blank=True)
+    def _landing_upload_to(instance, filename):
+        empresa_id = instance.empresa_id or "unknown"
+        return f"landings/{empresa_id}/{filename}"
+
+    background_vertical = models.ImageField(upload_to=_landing_upload_to, null=True, blank=True)
+    background_horizontal = models.ImageField(upload_to=_landing_upload_to, null=True, blank=True)
 
     class Meta:
         db_table = "operativo_landing"
@@ -105,8 +116,14 @@ class EventosMeta(models.Model):
 
 
 class Compra(models.Model):
+    def _comprobante_upload_to(instance, filename):
+        empresa_id = instance.empresa_id or "unknown"
+        cliente_id = instance.cliente_id or "unknown"
+        return f"compras/{empresa_id}/clientes/{cliente_id}/{filename}"
+
     monto_ars = models.DecimalField(max_digits=10, decimal_places=2)
     comprobante = models.CharField(max_length=255, null=True, blank=True)
+    comprobante_archivo = models.FileField(upload_to=_comprobante_upload_to, null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     monto_usd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     tc = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)

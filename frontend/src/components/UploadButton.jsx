@@ -3,7 +3,7 @@ import "../assets/css/UploadButton.css";
 
 const MAX_SIZE_BYTES = 1024 * 1024;
 
-function UploadButton() {
+function UploadButton({ label = "Subir archivo", onUpload }) {
   const inputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [fileInfo, setFileInfo] = useState(null);
@@ -27,6 +27,9 @@ function UploadButton() {
       name: file.name,
       sizeKb: Math.round(file.size / 1024),
     });
+    if (onUpload) {
+      onUpload(file);
+    }
   };
 
   const handleDrop = (event) => {
@@ -53,7 +56,7 @@ function UploadButton() {
         }
       }}
     >
-      <div className="upload-dropzone-title">Subir archivo</div>
+      <div className="upload-dropzone-title">{label}</div>
       <div className="upload-dropzone-subtitle">
         Arrastra y soltá una imagen o hacé click (máx 1MB)
       </div>

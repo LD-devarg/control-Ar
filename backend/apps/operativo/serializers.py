@@ -29,7 +29,8 @@ class ClienteSerializer(serializers.ModelSerializer):
 
 
 class ClienteCreateSerializer(serializers.Serializer):
-    landing_token = serializers.UUIDField()
+    landing_token = serializers.UUIDField(write_only=True)
+    idempotency_key = serializers.UUIDField(required=False, write_only=True)
     nombre = serializers.CharField(max_length=100)
     contacto = serializers.CharField(max_length=15)
     username = serializers.CharField(max_length=50)
@@ -58,8 +59,17 @@ class ClienteCreateSerializer(serializers.Serializer):
     def create(self, validated_data):
         landing = validated_data.pop("landing")
         validated_data.pop("landing_token", None)
+        idempotency_key = validated_data.pop("idempotency_key", None)
+        if idempotency_key:
+            existing = Cliente.objects.filter(idempotency_key=idempotency_key).first()
+            if existing:
+                return existing
         validated_data["username"] = self._unique_username(validated_data["username"])
-        return Cliente.objects.create(empresa=landing.empresa, **validated_data)
+        return Cliente.objects.create(
+            empresa=landing.empresa,
+            idempotency_key=idempotency_key,
+            **validated_data,
+        )
 
 
 class LandingSerializer(serializers.ModelSerializer):
@@ -72,6 +82,12 @@ class LandingSerializer(serializers.ModelSerializer):
             "token",
             "url",
             "bono",
+            "titulo",
+            "subtitulo",
+            "texto_boton",
+            "texto_info",
+            "background_vertical",
+            "background_horizontal",
             "activo",
             "creado_en",
         ]
@@ -110,7 +126,8 @@ class EventosMetaReadSerializer(serializers.ModelSerializer):
 
 class EventosMetaCreateSerializer(serializers.Serializer):
     cliente_id = serializers.IntegerField()
-    landing_token = serializers.UUIDField()
+    landing_token = serializers.UUIDField(required=False)
+    empresa_id = serializers.IntegerField(required=False)
 
     tipo = serializers.ChoiceField(choices=EventosMeta._meta.get_field("tipo").choices)
 
@@ -124,16 +141,33 @@ class EventosMetaCreateSerializer(serializers.Serializer):
     fbc = serializers.CharField(required=False)
 
     def validate(self, data):
-        try:
-            landing = Landing.objects.get(token=data["landing_token"], activo=True)
-        except Landing.DoesNotExist:
-            raise serializers.ValidationError("Landing invalida o inactiva.")
-        if not Cliente.objects.filter(id=data["cliente_id"], empresa=landing.empresa).exists():
+        tipo = data["tipo"]
+        landing = None
+        empresa_id = data.get("empresa_id")
+
+        if tipo == "lead":
+            landing_token = data.get("landing_token")
+            if not landing_token:
+                raise serializers.ValidationError("landing_token requerido para lead.")
+            try:
+                landing = Landing.objects.get(token=landing_token, activo=True)
+            except Landing.DoesNotExist:
+                raise serializers.ValidationError("Landing invalida o inactiva.")
+            empresa_id = landing.empresa_id
+        else:
+            if not empresa_id:
+                request = self.context.get("request")
+                empresa_id = getattr(getattr(request, "user", None), "empresa_id", None)
+            if not empresa_id:
+                raise serializers.ValidationError("empresa_id requerido para contact/purchase.")
+
+        if not Cliente.objects.filter(id=data["cliente_id"], empresa_id=empresa_id).exists():
             raise serializers.ValidationError("El cliente no pertenece a la empresa.")
         if data["tipo"] == "purchase":
             if "value" not in data or "currency" not in data:
                 raise serializers.ValidationError("El evento purchase requiere value y currency")
         data["landing"] = landing
+        data["empresa_id"] = empresa_id
         return data
 
 
@@ -154,6 +188,7 @@ class CompraSerializer(serializers.ModelSerializer):
             "tc",
             "monto_usd",
             "comprobante",
+            "comprobante_archivo",
             "tipo_cambio",
             "creado_en",
         ]

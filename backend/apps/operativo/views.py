@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -24,7 +25,6 @@ from .serializers import (
 )
 from .servicios.calculos import calcular_compra
 from .servicios.enviador import enviar_evento_meta
-
 
 def _filter_by_empresa(qs, user):
     if user.is_superuser:
@@ -92,6 +92,41 @@ class ClienteViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             return ClienteCreateSerializer
         return ClienteSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        idempotency_key = serializer.validated_data.get("idempotency_key")
+        if idempotency_key:
+            existing = Cliente.objects.filter(idempotency_key=idempotency_key).first()
+            if existing:
+                output = ClienteSerializer(existing)
+                return Response(output.data, status=status.HTTP_200_OK)
+
+        landing = serializer.validated_data["landing"]
+        cliente = serializer.save()
+
+        evento = EventosMeta.objects.create(
+            id_evento=uuid.uuid4(),
+            cliente=cliente,
+            empresa=landing.empresa,
+            landing=landing,
+            operador=None,
+            tipo="lead",
+            data={"phone": cliente.contacto},
+            fbp=request.data.get("fbp"),
+            fbc=request.data.get("fbc"),
+        )
+        try:
+            enviar_evento_meta(evento, request=request)
+        except Exception as exc:
+            evento.estado_envio = "fallido"
+            evento.respuesta_meta = {"error": str(exc)}
+            evento.save(update_fields=["estado_envio", "respuesta_meta"])
+
+        output = ClienteSerializer(cliente)
+        return Response(output.data, status=status.HTTP_201_CREATED)
 
 
 class LandingViewSet(viewsets.ModelViewSet):
@@ -171,11 +206,15 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        landing = serializer.validated_data["landing"]
+        landing = serializer.validated_data.get("landing")
+        empresa_id = serializer.validated_data["empresa_id"]
         operador = request.user if request.user.is_authenticated else None
 
+        value = serializer.validated_data.get("value")
+        if value is not None:
+            value = float(value)
         payload = {
-            "value": serializer.validated_data.get("value"),
+            "value": value,
             "currency": serializer.validated_data.get("currency"),
             "email": serializer.validated_data.get("email"),
             "phone": serializer.validated_data.get("phone"),
@@ -184,7 +223,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         evento = EventosMeta.objects.create(
             id_evento=uuid.uuid4(),
             cliente_id=serializer.validated_data["cliente_id"],
-            empresa=landing.empresa,
+            empresa_id=empresa_id,
             landing=landing,
             operador=operador,
             tipo=serializer.validated_data["tipo"],
@@ -244,6 +283,7 @@ class CompraViewSet(viewsets.ModelViewSet):
     queryset = Compra.objects.all()
     serializer_class = CompraSerializer
     permission_classes = [IsAuthenticated, RoleBasedPermission]
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def has_role_permission(self, request, view):
         if request.user.is_superuser:
@@ -269,6 +309,7 @@ class CompraViewSet(viewsets.ModelViewSet):
         cliente = serializer.validated_data["cliente"]
         monto_ars = serializer.validated_data["monto_ars"]
         comprobante = serializer.validated_data.get("comprobante")
+        comprobante_archivo = serializer.validated_data.get("comprobante_archivo")
 
         with transaction.atomic():
             tc_obj, tc_valor, monto_usd = calcular_compra(monto_ars)
@@ -278,32 +319,16 @@ class CompraViewSet(viewsets.ModelViewSet):
                 operador=request.user,
                 monto_ars=monto_ars,
                 comprobante=comprobante,
+                comprobante_archivo=comprobante_archivo,
                 tc=tc_valor,
                 monto_usd=monto_usd,
                 tipo_cambio=tc_obj,
             )
 
-            era_primera = cliente.cant_compras == 0
             cliente.cant_compras += 1
             cliente.total_compras_ars = (cliente.total_compras_ars or 0) + monto_ars
             cliente.total_compras_usd = (cliente.total_compras_usd or 0) + monto_usd
             cliente.save(update_fields=["cant_compras", "total_compras_ars", "total_compras_usd"])
-
-            if era_primera:
-                evento = EventosMeta.objects.create(
-                    tipo="purchase",
-                    data={"value": float(monto_usd), "currency": "USD"},
-                    cliente=cliente,
-                    empresa=cliente.empresa,
-                    operador=request.user,
-                    landing=None,
-                )
-                try:
-                    enviar_evento_meta(evento, request=request)
-                except Exception as exc:
-                    evento.estado_envio = "fallido"
-                    evento.respuesta_meta = {"error": str(exc)}
-                    evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
         output = self.get_serializer(compra)
         return Response(output.data, status=status.HTTP_201_CREATED)

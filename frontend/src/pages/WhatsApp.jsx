@@ -1,20 +1,54 @@
-import "../assets/css/WhatsApp.css";
-import { useMemo, useState } from "react";
+﻿import "../assets/css/WhatsApp.css";
+import { useEffect, useMemo, useState } from "react";
 import Button from "@mui/material/Button";
 import AddIcon from "@mui/icons-material/Add";
 import CardWhatsapp from "../components/CardWhatsapp.jsx";
 import ModalConfirmacion from "../components/ModalConfirmacion.jsx";
 import ModalAgregarLinea from "../components/ModalAgregarLinea.jsx";
 import Page from "../layouts/Page.jsx";
+import { createWhatsapp, deactivateWhatsapp, fetchWhatsapps } from "../services/recursos/whatsapp";
 
 function WhatsApp() {
-    const [lines, setLines] = useState([
-        { id: 1, label: "LINEA 1", number: "2236334137", active: true },
-    ]);
+    const [lines, setLines] = useState([]);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [selectedLineId, setSelectedLineId] = useState(null);
     const [addOpen, setAddOpen] = useState(false);
     const [newNumber, setNewNumber] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        let mounted = true;
+        const load = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const data = await fetchWhatsapps();
+            if (mounted) {
+                const normalized = (data || []).map((line) => ({
+                    ...line,
+                    number: line.numero,
+                    active: line.activo,
+                }));
+                setLines(normalized);
+            }
+        } catch (err) {
+            if (mounted) {
+                setError("No se pudieron cargar las líneas.");
+            }
+        } finally {
+            if (mounted) {
+                setLoading(false);
+            }
+        }
+        };
+        load();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const activeLines = useMemo(() => lines.filter((line) => line.activo), [lines]);
 
     const selectedLine = useMemo(
         () => lines.find((line) => line.id === selectedLineId),
@@ -31,13 +65,20 @@ function WhatsApp() {
         setSelectedLineId(null);
     };
 
-    const handleDeactivate = () => {
-        setLines((prev) =>
-            prev.map((line) =>
-                line.id === selectedLineId ? { ...line, active: false } : line
-            )
-        );
-        handleConfirmClose();
+    const handleDeactivate = async () => {
+        if (!selectedLine) return;
+        try {
+            const updated = await deactivateWhatsapp(selectedLine);
+            const normalized = {
+                ...updated,
+                number: updated.numero,
+                active: updated.activo,
+            };
+            setLines((prev) => prev.map((line) => (line.id === updated.id ? normalized : line)));
+            handleConfirmClose();
+        } catch (err) {
+            setError("No se pudo desactivar la línea.");
+        }
     };
 
     const handleAddOpen = () => {
@@ -54,31 +95,37 @@ function WhatsApp() {
         setNewNumber(digitsOnly);
     };
 
-    const handleAddLine = () => {
+    const handleAddLine = async () => {
         const trimmed = newNumber.trim();
         if (!trimmed) return;
-        setLines((prev) => {
-            const nextId = prev.length ? Math.max(...prev.map((line) => line.id)) + 1 : 1;
-            const nextLabel = `LINEA ${prev.length + 1}`;
-            return [
-                ...prev,
-                { id: nextId, label: nextLabel, number: trimmed, active: true },
-            ];
-        });
-        handleAddClose();
+        try {
+            const created = await createWhatsapp(trimmed);
+            const normalized = {
+                ...created,
+                number: created.numero,
+                active: created.activo,
+            };
+            setLines((prev) => [...prev, normalized]);
+            handleAddClose();
+        } catch (err) {
+            setError("No se pudo crear la línea. Verificá permisos.");
+        }
     };
 
     return (
         <Page title="Gestión de Líneas de WhatsApp">
                 <div className="whatsapp-cards">
-                    {lines.map((line) => (
+                    {error ? (
+                        <span className="text-red-600 text-sm mb-2">{error}</span>
+                    ) : null}
+                    {activeLines.map((line, index) => (
                         <CardWhatsapp
                             key={line.id}
-                            line={line}
+                            line={{ ...line, label: `LINEA ${index + 1}` }}
                             onStatusClick={handleOpenConfirm}
                         />
                     ))}
-                    <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddOpen}>
+                    <Button variant="outlined" startIcon={<AddIcon />} onClick={handleAddOpen} disabled={loading}>
                         AGREGAR
                     </Button>
                 </div>

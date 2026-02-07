@@ -15,8 +15,8 @@
     width: 90%;
     max-width: 1200px;
     border-radius: 50px;
-    box-shadow: 20px 20px 30px rgba(0, 0, 0, 0.3);
-    background-image: url('/fondo_landing_desktop.png'); /* desde public */
+    box-shadow: 20px 20px 30px rgba(0, 0, 0, 0.5);
+    background-image: var(--landing-bg-desktop, url('/fondo_landing_desktop.png')); /* desde public */
     background-repeat: no-repeat;
     background-position: center;
     background-size: cover;
@@ -64,7 +64,7 @@
         margin-top: 0.5rem;
         margin-bottom: 0.5rem;
         border-radius: 30px;
-        background-image: url('/fondo_landing_mobile.png'); /* desde public */
+        background-image: var(--landing-bg-mobile, url('/fondo_landing_mobile.png')); /* desde public */
     }
 
     .landing-container h1 {

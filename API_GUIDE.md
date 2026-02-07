@@ -17,7 +17,30 @@ Respuesta:
 { "numero": "+54911XXXXXXX" }
 ```
 
-### Crear lead (cliente) desde landing
+### Obtener configuracion publica de landing
+`GET /landings/public/?landing_token=<TOKEN>`
+
+Respuesta:
+```json
+{
+  "id": 1,
+  "empresa": 1,
+  "nombre": "Landing X",
+  "token": "<TOKEN>",
+  "url": "https://tu-landing.com",
+  "bono": "100%",
+  "titulo": "BONO DE BIENVENIDA",
+  "subtitulo": "REGISTRATE AHORA Y DUPLICAMOS TU DEPOSITO",
+  "texto_boton": "JUGA AHORA",
+  "texto_info": "Atencion personalizada las 24hs.",
+  "background_vertical": "https://.../mobile.png",
+  "background_horizontal": "https://.../desktop.png",
+  "activo": true,
+  "creado_en": "2026-02-06T00:00:00Z"
+}
+```
+
+### Crear lead (cliente) desde landing (crea evento lead automaticamente)
 `POST /clientes/`
 
 Body:
@@ -26,23 +49,35 @@ Body:
   "landing_token": "<TOKEN>",
   "nombre": "Juan Perez",
   "contacto": "5491122334455",
-  "username": "juanp"
+  "username": "juanp",
+  "idempotency_key": "<UUID opcional>"
 }
 ```
 
-### Crear evento Meta (lead/contact/purchase)
+### Crear evento Meta (contact/purchase)
 `POST /eventos-meta/`
 
 Body:
 ```json
 {
   "cliente_id": 1,
-  "landing_token": "<TOKEN>",
-  "tipo": "lead",
+  "empresa_id": 1,
+  "tipo": "contact",
   "email": "test@example.com",
   "phone": "1122334455",
   "fbp": "<fbp>",
   "fbc": "<fbc>"
+}
+```
+
+Para purchase (con value):
+```json
+{
+  "cliente_id": 1,
+  "empresa_id": 1,
+  "tipo": "purchase",
+  "value": 150000,
+  "currency": "ARS"
 }
 ```
 
@@ -85,7 +120,7 @@ Body:
 }
 ```
 
-> En la primera compra del cliente se crea automaticamente un evento `purchase`.
+> La compra no crea evento automatico. El evento purchase se env?a desde `/eventos-meta/`.
 
 ### Recursos
 - `GET /whatsapps/`
@@ -95,7 +130,7 @@ Body:
 ### Pauta
 - `GET /bms/`
 - `GET /cuentas-publicitarias/`
-- `GET /campañas/`
+- `GET /campa?as/`
 - `GET /conjuntos-anuncios/`
 - `GET /anuncios/`
 - `GET /gastos-diarios/`
@@ -105,11 +140,11 @@ Body:
 - `GET /pauta-assets/`
 - `GET /creatives/`
 
-#### Orden recomendado de creaciÃ³n (Pauta)
+#### Orden recomendado de creaci?n (Pauta)
 1. `POST /bms/`
 2. `POST /cuentas-publicitarias/` (depende de BM)
-3. `POST /campañas/` (depende de cuenta publicitaria)
-4. `POST /conjuntos-anuncios/` (depende de campaÃ±a)
+3. `POST /campa?as/` (depende de cuenta publicitaria)
+4. `POST /conjuntos-anuncios/` (depende de campa?a)
 5. `POST /fanpages/` (depende de BM) *si usas creatives*
 6. `POST /pauta-assets/`
 7. `POST /creatives/` (depende de fanpage y asset; instagram opcional)
@@ -125,7 +160,8 @@ Body:
   "cliente_id": 1,
   "tipo": "lead",
   "email": "test@example.com",
-  "phone": "1122334455"
+  "phone": "1122334455",
+  "test_event_code": "<opcional>"
 }
 ```
 

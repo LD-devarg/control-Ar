@@ -15,6 +15,7 @@ import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import AdsClickOutlinedIcon from "@mui/icons-material/AdsClickOutlined";
 import ContactPageOutlinedIcon from "@mui/icons-material/ContactPageOutlined";
 import ButtonSidebar from "./ButtonSidebar";
+import { logout } from "../services/auth";
 
 function Sidebar() {
   const navigate = useNavigate();
@@ -92,7 +93,10 @@ function Sidebar() {
       <div className="sidebar-footer">
         <Stack direction="column" spacing={2}>
           <ButtonSidebar
-            onClick={() => navigate("/")}
+            onClick={() => {
+              logout();
+              navigate("/");
+            }}
             startIcon={<LogoutOutlinedIcon />}
             label="Cerrar Sesion"
           />

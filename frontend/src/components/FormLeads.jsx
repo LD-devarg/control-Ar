@@ -1,17 +1,179 @@
-import Box from '@mui/material/Box';
+﻿import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import "../assets/css/FormLeads.css";
 import { motion } from "motion/react";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import { useEffect, useMemo, useRef, useState } from "react";
+import axios from "axios";
+import { markClientesDirty } from "../services/operativo/clientes";
 
+const QUEUE_KEY = "pending_clients";
+const RETRY_DELAYS = [];
 
-export default function NuevoCliente() {
+function generateIdempotencyKey() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = Math.random() * 16 | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+}
+
+function buildUsername(name, phoneDigits) {
+    const cleanName = name.replace(/\s+/g, "");
+    const last3 = phoneDigits.slice(-3);
+    return `${cleanName}${last3}`;
+}
+
+function buildWhatsappUrl(number, text) {
+    if (!number) return "";
+    const encoded = encodeURIComponent(text || "");
+    return `https://wa.me/${number}?text=${encoded}`;
+}
+
+function loadQueue() {
+    try {
+        const raw = localStorage.getItem(QUEUE_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch {
+        return [];
+    }
+}
+
+function saveQueue(queue) {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+}
+
+export default function NuevoLead({ buttonText, infoText, whatsappNumber, landingToken, bonusText }) {
+    const [name, setName] = useState("");
+    const [phone, setPhone] = useState("");
+    const [error, setError] = useState("");
+    const [sending, setSending] = useState(false);
+    const retryIndexRef = useRef(0);
+    const retryTimerRef = useRef(null);
+
+    const phoneDigits = useMemo(() => phone.replace(/\D/g, ""), [phone]);
+    const trimmedName = useMemo(() => name.trim(), [name]);
+    const username = useMemo(() => {
+        if (!trimmedName || !phoneDigits) return "";
+        return buildUsername(trimmedName, phoneDigits);
+    }, [trimmedName, phoneDigits]);
+
+    const finalButtonText = buttonText || "JUGÁ AHORA";
+    const finalInfoText = infoText || "🤳Atención personalizada las 24hs.";
+    const messageText = `Hola vengo por el bono del ${bonusText || "100%"} mi username es ${username}`;
+    const whatsappUrl = useMemo(() => buildWhatsappUrl(whatsappNumber, messageText), [whatsappNumber, messageText]);
+
+    const isNameValid = trimmedName.length > 1;
+    const isPhoneValid = phoneDigits.length >= 10;
+    const canSubmit =
+        Boolean(whatsappNumber) &&
+        Boolean(landingToken) &&
+        Boolean(username) &&
+        isNameValid &&
+        isPhoneValid;
+
+    const scheduleRetry = () => {
+        return;
+    };
+
+    const tryFlushQueue = async () => {
+        if (sending) return;
+        const queue = loadQueue();
+        if (!queue.length) {
+            retryIndexRef.current = 0;
+            return;
+        }
+        setSending(true);
+        try {
+            const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+            const remaining = [];
+            let lastError = null;
+            for (const item of queue) {
+                try {
+                    await axios.post(`${baseUrl}/clientes/`, item);
+                    markClientesDirty();
+                } catch (err) {
+                    lastError = err;
+                    remaining.push(item);
+                }
+            }
+            saveQueue(remaining);
+            if (remaining.length === 0) {
+                retryIndexRef.current = 0;
+            } else {
+                retryIndexRef.current = Math.min(retryIndexRef.current + 1, RETRY_DELAYS.length);
+                scheduleRetry();
+            }
+            if (lastError) {
+                throw lastError;
+            }
+        } finally {
+            setSending(false);
+        }
+    };
+
+    useEffect(() => {
+        tryFlushQueue();
+        return () => {
+            if (retryTimerRef.current) {
+                clearTimeout(retryTimerRef.current);
+                retryTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    const enqueueClient = (payload) => {
+        const queue = loadQueue();
+        queue.push(payload);
+        saveQueue(queue);
+        scheduleRetry();
+    };
+
+    const handleWhatsappClick = () => {
+        if (!canSubmit) {
+            if (!isNameValid) {
+                setError("Ingresá un nombre válido.");
+            } else if (!isPhoneValid) {
+                setError("Ingresá un número válido (mínimo 10 dígitos).");
+            }
+            return;
+        }
+        setError("");
+
+        const payload = {
+            idempotency_key: generateIdempotencyKey(),
+            landing_token: landingToken,
+            nombre: trimmedName,
+            contacto: phoneDigits,
+            username,
+        };
+        enqueueClient(payload);
+        tryFlushQueue();
+
+        window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    };
+
+    const handleNameChange = (event) => {
+        const value = event.target.value;
+        const onlyLetters = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "");
+        setName(onlyLetters);
+        if (error) setError("");
+    };
+
+    const handlePhoneChange = (event) => {
+        setPhone(event.target.value);
+        if (error) setError("");
+    };
+
     return (
-        <div className="form-leads-container">
-            <h3>Contactanos</h3>
-            <Stack spacing={3} direction="column" className="form-leads-stack">
+        <div className="flex flex-col items-center rounded-2xl shadow-xl bg-black/50 w-8/10 lg:w-3/10 h-5/10 pt-2 m-4">
+            <h3 className='text-white text-xl lg:text-2xl mb-2'>Contactanos</h3>
+            <Stack spacing={0.5} direction="column" className="form-leads-stack">
                 <TextField
                 className='textfield'
                 required
@@ -19,6 +181,8 @@ export default function NuevoCliente() {
                 label="Nombre"
                 variant="outlined"
                 fullWidth
+                value={name}
+                onChange={handleNameChange}
                 sx={{
                     "& .MuiOutlinedInput-root": {
                         marginBottom: "10px",
@@ -38,9 +202,11 @@ export default function NuevoCliente() {
                     id="celular"
                     label="Celular"
                     fullWidth
+                    value={phone}
+                    onChange={handlePhoneChange}
                     sx={{
                         "& .MuiOutlinedInput-root": {
-                        marginBottom: "10px",
+                        marginBottom: "0",
                             borderRadius: "50px",
                             backgroundColor: "rgba(217, 221, 88, 0.12)",
                             "& fieldset": { borderColor: "rgba(251, 255, 20, 0.8)",
@@ -54,33 +220,40 @@ export default function NuevoCliente() {
                     }}
                     />
             </Stack>
+            {error ? <span className='text-red-400 text-xs mt-2'>{error}</span> : null}
             <motion.div
                 className=""
                 animate={{ 
-                    scale: [1, 1.5, 1], }}
+                    scale: [1.2, 1.7, 1.2], }}
                 transition={{ duration: 1, repeat: Infinity, repeatDelay: 1 }}
-                startIcon="🚀"
                 >
                 <Button variant="contained" startIcon={<WhatsAppIcon />}
+                onClick={handleWhatsappClick}
+                disabled={!canSubmit}
                 sx={{
                     backgroundColor: "transparent",
-                    marginTop: "10px",
+                    marginTop: "30px",
                     color: "#ffffff",
                     border: "none",
                     borderRadius: "50px",
-                    padding: "10px 30px",
+                    padding: "10px 20px",
                     fontWeight: "bold",
-                    fontSize: "1rem",
-                    background: "linear-gradient(90deg, #09671f 0%, #6aff65 100%)",
+                    fontSize: "1.2rem",
+                    background: "linear-gradient(135deg, #2bd528 0%, #038f0c 100%)",
                     boxShadow: "0 4px 15px rgba(255, 203, 13, 0.4), 0 2px 5px rgba(0, 0, 0, 0.2)",
                     "&:hover": {
                         backgroundColor: "transparent",
                     },
+                    "&.Mui-disabled": {
+                        background: "linear-gradient(135deg, rgba(43, 213, 40, 0.35) 0%, rgba(3, 143, 12, 0.35) 100%)",
+                        color: "rgba(255,255,255,0.7)",
+                        boxShadow: "none",
+                    },
                 }}
                 >
-                    JUGÁ AHORA
+                    {finalButtonText}
                 </Button>
             </motion.div>
-            <span className='subtext'>🤳Atención personalizada las 24hs.</span>
+            <span className='text-white font-bold text-md mt-10'>{finalInfoText}</span>
         </div>);
 }

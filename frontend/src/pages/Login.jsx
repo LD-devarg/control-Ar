@@ -1,10 +1,12 @@
-import Stack from '@mui/material/Stack';
-import Button from '@mui/material/Button';
-import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
-import { useNavigate } from 'react-router-dom';
-import '../assets/css/Login.css';
-import { useTheme } from '@mui/material/styles';
+import { useState } from "react";
+import Stack from "@mui/material/Stack";
+import Button from "@mui/material/Button";
+import Box from "@mui/material/Box";
+import TextField from "@mui/material/TextField";
+import { useNavigate } from "react-router-dom";
+import "../assets/css/Login.css";
+import { useTheme } from "@mui/material/styles";
+import { login } from "../services/auth";
 
 function Login() {
   const navigate = useNavigate();
@@ -36,6 +38,25 @@ function Login() {
       color: '#1976d2',
     },
   };
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!username || !password) return;
+    setLoading(true);
+    setError("");
+    try {
+      await login(username, password);
+      navigate("/home");
+    } catch (err) {
+      setError("Usuario o contraseña inválidos.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className='flex flex-col justify-start items-center min-h-screen h-full bg-white dark:bg-black'>
@@ -48,6 +69,7 @@ function Login() {
           }}
             noValidate
             autoComplete="off"
+            onSubmit={handleSubmit}
             >
             <TextField
                 required
@@ -55,6 +77,8 @@ function Login() {
                 id="standard-required"
                 label="Ingrese su usuario"
                 variant="standard"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
             />
             <TextField
                 required
@@ -64,12 +88,17 @@ function Login() {
                 type="password"
                 autoComplete="current-password"
                 variant="standard"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
             />
+            {error ? (
+              <span className="text-xs text-red-600 mt-2">{error}</span>
+            ) : null}
             </Box>
         </div>
         <Stack spacing={2} direction="row" sx={{ mt: 2 }}>
-          <Button variant="outlined" onClick={() => navigate('/home')}>
-            Iniciar sesion
+          <Button variant="outlined" onClick={handleSubmit} disabled={loading || !username || !password}>
+            {loading ? "Ingresando..." : "Iniciar sesion"}
           </Button>
         </Stack>
         <footer className='absolute bottom-2 w-full text-center flex flex-col gap-1 items-center'>

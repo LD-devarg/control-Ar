@@ -5,6 +5,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import App from './App.jsx'
 import './main.css'
+import { startTokenRefresh } from './services/auth'
 
 function Root() {
   const [mode, setMode] = useState(() =>
@@ -17,6 +18,10 @@ function Root() {
 
     mediaQuery.addEventListener('change', onChange)
     return () => mediaQuery.removeEventListener('change', onChange)
+  }, [])
+
+  useEffect(() => {
+    startTokenRefresh()
   }, [])
 
   const theme = useMemo(

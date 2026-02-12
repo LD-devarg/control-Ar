@@ -64,12 +64,13 @@ class MetaEventBuilder:
         # -------------------------
         # payload final
         # -------------------------
+        event_source_url = payload.get("event_source_url") or (request.build_absolute_uri() if request else None)
         data = _clean_dict({
             "event_name": EVENT_NAME_MAP[tipo],
             "event_time": event_time,
             "event_id": str(event_id),
             "action_source": "website",
-            "event_source_url": request.build_absolute_uri() if request else None,
+            "event_source_url": event_source_url,
             "user_data": user_data,
             "custom_data": custom_data,
         })

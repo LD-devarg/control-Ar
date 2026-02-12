@@ -3,6 +3,8 @@ import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
 import "../assets/css/Form.css";
 import UploadButton from './UploadButton';
 import { useTheme } from '@mui/material/styles';
@@ -19,6 +21,7 @@ export default function FormCompra() {
   const [comprobanteFile, setComprobanteFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
   const empresaId = getCurrentUser()?.empresa;
   const fieldSx = {
     '& .MuiInputBase-input': { color },
@@ -66,19 +69,20 @@ export default function FormCompra() {
       if (comprobanteFile) {
         formData.append("comprobante_archivo", comprobanteFile);
       }
-      const { data: compra } = await apiClient.post("/compras/", formData, {
+      await apiClient.post("/compras/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
-      });
-      await apiClient.post("/eventos-meta/", {
-        cliente_id: selectedCliente.id,
-        tipo: "purchase",
-        value: compra?.monto_usd ?? Number(monto),
-        currency: "USD",
-        empresa_id: empresaId,
       });
       setMonto("");
       setSelectedCliente(null);
       setComprobanteFile(null);
+      setToast({ open: true, severity: "success", message: "Compra guardada." });
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setToast({
+        open: true,
+        severity: "error",
+        message: detail || "No se pudo guardar la compra.",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -106,6 +110,21 @@ export default function FormCompra() {
         <Button variant="outlined" onClick={handleSubmit} disabled={!canSubmit || submitting}>
           {submitting ? "Guardando..." : "Guardar"}
         </Button>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }

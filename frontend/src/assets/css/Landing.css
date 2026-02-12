@@ -5,7 +5,7 @@
     height: 100vh;
     color: #ffffff;
     font-family: 'Roboto', sans-serif;
-    background: linear-gradient(135deg, #c129a3 0%, #b700ff 100%);
+    background: var(--landing-bg-gradient, linear-gradient(135deg, #c129a3 0%, #b700ff 100%));
 }
 
 .landing-container {
@@ -19,7 +19,7 @@
     background-image: var(--landing-bg-desktop, url('/fondo_landing_desktop.png')); /* desde public */
     background-repeat: no-repeat;
     background-position: center;
-    background-size: cover;
+    background-size: contain;
     margin-top: 1rem;
     margin-bottom: 1rem;
     height: 100vh;
@@ -65,6 +65,8 @@
         margin-bottom: 0.5rem;
         border-radius: 30px;
         background-image: var(--landing-bg-mobile, url('/fondo_landing_mobile.png')); /* desde public */
+        background-size: cover;
+        background-position: center top;
     }
 
     .landing-container h1 {

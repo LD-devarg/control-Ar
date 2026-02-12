@@ -12,7 +12,10 @@ import PautaDatabase from './pages/PautaDatabase.jsx'
 import LandingConfig from './pages/LandingConfig.jsx'
 import TabletLayout from './layouts/TabletLayout.jsx'
 import MobileLayout from './layouts/MobileLayout.jsx'
-
+import PautaKPI from './pages/PautaKPI.jsx'
+import Health from './pages/Health.jsx'
+import Tenant from './pages/Tenant.jsx'
+import Users from './pages/Users.jsx'
 
 const MOBILE_MAX_WIDTH = 767
 const TABLET_MAX_WIDTH = 1024
@@ -63,7 +66,11 @@ function App() {
             <Route path="/contacts" element={<Agenda />} />
             <Route path="/landing-config" element={<LandingConfig />} />
             <Route path="/tipo-cambio" element={<TipoCambio />} />
+            <Route path="/health" element={<Health />} />
             <Route path="/pauta-database" element={<PautaDatabase />} />
+            <Route path="/pauta-kpi" element={<PautaKPI />} />
+            <Route path="/empresas" element={<Tenant />} />
+            <Route path="/usuarios" element={<Users />} />
           </Route>
           <Route path="/landing" element={<Landing />} />
         </Routes>

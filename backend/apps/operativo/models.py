@@ -48,13 +48,25 @@ class Landing(models.Model):
     nombre = models.CharField(max_length=120)
     token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     url = models.URLField()
-    bono = models.CharField(max_length=50, choices=BONO_CHOICES, default="100%")
+    bono = models.CharField(max_length=50, default="100%")
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     titulo = models.CharField(max_length=255, null=True, blank=True)
     subtitulo = models.CharField(max_length=255, null=True, blank=True)
     texto_boton = models.CharField(max_length=100, null=True, blank=True)
     texto_info = models.CharField(max_length=255, null=True, blank=True)
+    mostrar_disclaimer = models.BooleanField(default=True)
+    color_titulo = models.CharField(max_length=20, default="#ffffff")
+    color_subtitulo = models.CharField(max_length=20, default="#ffffff")
+    color_keyword = models.CharField(max_length=20, default="#ffe600")
+    color_bono = models.CharField(max_length=20, default="#ffe600")
+    color_info = models.CharField(max_length=20, default="#ffffff")
+    bg_type = models.CharField(max_length=20, default="gradient")
+    bg_color = models.CharField(max_length=40, default="#0f172a")
+    bg_gradient = models.CharField(
+        max_length=255,
+        default="linear-gradient(135deg, #0b1f3a 0%, #0f172a 40%, #111827 100%)",
+    )
     def _landing_upload_to(instance, filename):
         empresa_id = instance.empresa_id or "unknown"
         return f"landings/{empresa_id}/{filename}"
@@ -67,6 +79,26 @@ class Landing(models.Model):
 
     def __str__(self):
         return f"{self.nombre} ({self.empresa})"
+
+
+class LandingVisit(models.Model):
+    landing = models.ForeignKey(
+        "operativo.Landing",
+        on_delete=models.CASCADE,
+        related_name="visitas",
+    )
+    empresa = models.ForeignKey(
+        "empresas.Empresa",
+        on_delete=models.CASCADE,
+        related_name="visitas_landing",
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "operativo_landing_visit"
+
+    def __str__(self):
+        return f"Visit {self.landing_id} ({self.creado_en})"
 
 
 class EventosMeta(models.Model):

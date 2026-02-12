@@ -107,6 +107,17 @@ Para purchase (con value):
 ### Eventos Meta (lectura)
 - `GET /eventos-meta/`
 
+### Health
+- `GET /health/` (solo superuser)
+
+### Stats
+- `GET /stats/`
+  - filtros: `period` | `from` + `to`
+  - opcional: `include_meta=1` para traer `meta_page_views`
+
+Ejemplo:
+`GET /stats/?period=week&include_meta=1`
+
 ### Compras
 - `GET /compras/`
 - `POST /compras/`

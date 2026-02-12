@@ -3,9 +3,10 @@ import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
 import "../assets/css/Form.css";
 import { useTheme } from '@mui/material/styles';
-import { fetchClientes } from '../services/operativo/clientes';
 import { apiClient, getCurrentUser } from '../services/auth';
 
 export default function FormContacto() {
@@ -16,6 +17,7 @@ export default function FormContacto() {
   const [selectedCliente, setSelectedCliente] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
   const empresaId = getCurrentUser()?.empresa;
   const fieldSx = {
     '& .MuiInputBase-input': { color },
@@ -28,24 +30,89 @@ export default function FormContacto() {
 
   useEffect(() => {
     let mounted = true;
-    const load = async () => {
-      setLoading(true);
+    const CACHE_KEY = "leads_cache";
+    const DIRTY_KEY = "leads_dirty";
+
+    const readCache = () => {
       try {
-        const data = await fetchClientes();
-        if (mounted) {
-          const options = (data || []).map((cliente) => ({
-            ...cliente,
-            label: `${cliente.contacto} - ${cliente.username}`,
-          }));
-          setUsuarios(options);
-        }
-      } finally {
-        if (mounted) setLoading(false);
+        const raw = localStorage.getItem(CACHE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
       }
     };
-    load();
+
+    const writeCache = (data) => {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(data || []));
+        localStorage.setItem(DIRTY_KEY, "0");
+      } catch {
+        // ignore cache errors
+      }
+    };
+
+    const isDirty = () => localStorage.getItem(DIRTY_KEY) === "1";
+
+    const normalize = (data) => {
+      const unique = new Map();
+      (data || []).forEach((evento) => {
+        if (!evento?.cliente) return;
+        if (unique.has(evento.cliente)) return;
+        const contacto = evento.cliente_contacto || "";
+        const username = evento.cliente_username || "Sin username";
+        unique.set(evento.cliente, {
+          id: evento.cliente,
+          username,
+          contacto,
+          nombre: evento.cliente_nombre,
+          label: `${contacto || "-"} - ${username}`,
+        });
+      });
+      return Array.from(unique.values());
+    };
+
+    const load = async (opts = {}) => {
+      const { silent } = opts;
+      if (!silent) {
+        setLoading(true);
+      }
+      try {
+        const { data } = await apiClient.get("/eventos-meta/", {
+          params: { tipo: "lead", sin_contacto: 1 },
+        });
+        const normalized = normalize(data);
+        writeCache(normalized);
+        if (mounted) {
+          setUsuarios(normalized);
+        }
+      } finally {
+        if (!silent && mounted) setLoading(false);
+      }
+    };
+
+    const cached = readCache();
+    if (cached && !isDirty()) {
+      setUsuarios(cached);
+    } else {
+      load();
+    }
+
+    const handleRefresh = () => {
+      if (isDirty()) {
+        load({ silent: true });
+      }
+    };
+    const handleStorage = (event) => {
+      if (event.key === "leads_refresh_ts") {
+        load({ silent: true });
+      }
+    };
+    window.addEventListener("leads:refresh", handleRefresh);
+    window.addEventListener("storage", handleStorage);
     return () => {
       mounted = false;
+      window.removeEventListener("leads:refresh", handleRefresh);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
@@ -60,7 +127,16 @@ export default function FormContacto() {
         tipo: "contact",
         empresa_id: empresaId,
       });
+      window.dispatchEvent(new CustomEvent("leads:refresh"));
       setSelectedCliente(null);
+      setToast({ open: true, severity: "success", message: "Contacto guardado." });
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setToast({
+        open: true,
+        severity: "error",
+        message: detail || "No se pudo guardar el contacto.",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -77,11 +153,31 @@ export default function FormContacto() {
         getOptionLabel={(option) => option.label || ""}
         value={selectedCliente}
         onChange={(event, value) => setSelectedCliente(value)}
+        renderOption={(props, option) => (
+          <li {...props}>
+            {option.contacto || "-"} - {option.username || "Sin username"}
+          </li>
+        )}
         renderInput={(params) => <TextField {...params} label="Seleccione el cliente" sx={fieldSx} />}
       />
         <Button variant="outlined" onClick={handleSubmit} disabled={!canSubmit || submitting}>
           {submitting ? "Guardando..." : "Guardar"}
         </Button>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Stack>
   );
 }

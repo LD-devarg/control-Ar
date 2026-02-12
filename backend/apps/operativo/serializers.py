@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from .models import Cliente, EventosMeta, Compra, Landing
+from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit
+from apps.pauta.models import CredencialesMeta
 
 
 class ClienteSerializer(serializers.ModelSerializer):
@@ -73,6 +74,18 @@ class ClienteCreateSerializer(serializers.Serializer):
 
 
 class LandingSerializer(serializers.ModelSerializer):
+    bono = serializers.CharField()
+    pixel_id = serializers.SerializerMethodField()
+
+    def get_pixel_id(self, obj):
+        cred = CredencialesMeta.objects.filter(empresa=obj.empresa).order_by("id").first()
+        return cred.pixel_id if cred else None
+
+    def validate_url(self, value):
+        if value and not value.startswith(("http://", "https://")):
+            value = f"https://{value}"
+        return value
+
     class Meta:
         model = Landing
         fields = [
@@ -86,17 +99,54 @@ class LandingSerializer(serializers.ModelSerializer):
             "subtitulo",
             "texto_boton",
             "texto_info",
+            "mostrar_disclaimer",
+            "color_titulo",
+            "color_subtitulo",
+            "color_keyword",
+            "color_bono",
+            "color_info",
+            "bg_type",
+            "bg_color",
+            "bg_gradient",
             "background_vertical",
             "background_horizontal",
             "activo",
             "creado_en",
+            "pixel_id",
         ]
         read_only_fields = ["id", "empresa", "token", "creado_en"]
+
+
+class LandingVisitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LandingVisit
+        fields = ["id", "landing", "empresa", "creado_en"]
+        read_only_fields = fields
+
+
+class LandingVisitCreateSerializer(serializers.Serializer):
+    landing_token = serializers.UUIDField(write_only=True)
+
+    def validate(self, data):
+        try:
+            landing = Landing.objects.get(token=data["landing_token"], activo=True)
+        except Landing.DoesNotExist:
+            raise serializers.ValidationError("Landing invalida o inactiva.")
+        data["landing"] = landing
+        return data
+
+    def create(self, validated_data):
+        landing = validated_data["landing"]
+        return LandingVisit.objects.create(
+            landing=landing,
+            empresa=landing.empresa,
+        )
 
 
 class EventosMetaReadSerializer(serializers.ModelSerializer):
     cliente_nombre = serializers.CharField(source="cliente.nombre", read_only=True)
     cliente_username = serializers.CharField(source="cliente.username", read_only=True)
+    cliente_contacto = serializers.CharField(source="cliente.contacto", read_only=True)
     contactado = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -107,6 +157,7 @@ class EventosMetaReadSerializer(serializers.ModelSerializer):
             "cliente",
             "cliente_nombre",
             "cliente_username",
+            "cliente_contacto",
             "contactado",
             "empresa",
             "landing",
@@ -161,11 +212,14 @@ class EventosMetaCreateSerializer(serializers.Serializer):
             if not empresa_id:
                 raise serializers.ValidationError("empresa_id requerido para contact/purchase.")
 
-        if not Cliente.objects.filter(id=data["cliente_id"], empresa_id=empresa_id).exists():
+        cliente = Cliente.objects.filter(id=data["cliente_id"], empresa_id=empresa_id).only("id", "cant_compras").first()
+        if not cliente:
             raise serializers.ValidationError("El cliente no pertenece a la empresa.")
         if data["tipo"] == "purchase":
             if "value" not in data or "currency" not in data:
                 raise serializers.ValidationError("El evento purchase requiere value y currency")
+            if cliente.cant_compras > 0:
+                raise serializers.ValidationError("El evento purchase solo aplica a clientes con 0 compras.")
         data["landing"] = landing
         data["empresa_id"] = empresa_id
         return data

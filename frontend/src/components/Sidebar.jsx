@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { useTheme } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
 import logoLight from "/controlar_blanco_sin_texto.png";
@@ -14,6 +14,7 @@ import CurrencyExchangeIcon from "@mui/icons-material/CurrencyExchange";
 import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import AdsClickOutlinedIcon from "@mui/icons-material/AdsClickOutlined";
 import ContactPageOutlinedIcon from "@mui/icons-material/ContactPageOutlined";
+import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
 import ButtonSidebar from "./ButtonSidebar";
 import { logout } from "../services/auth";
 
@@ -80,13 +81,37 @@ function Sidebar() {
           <div className="sidebar-pauta">
             <h3 className="title">PAUTA</h3>
             <Stack>
-              <ButtonSidebar 
-              startIcon={<CampaignOutlinedIcon />} 
-              label="Database" 
+              <ButtonSidebar
+              startIcon={<CampaignOutlinedIcon />}
+              label="Database"
               onClick={() => navigate("/pauta-database")} />
-              <ButtonSidebar startIcon={<AdsClickOutlinedIcon />} label="Rendimientos" />
+              <ButtonSidebar
+              startIcon={<AdsClickOutlinedIcon />}
+              label="Rendimientos"
+              onClick={() => navigate("/pauta-kpi")} />
             </Stack>
           </div>
+
+          <div className="sidebar-empresa">
+            <h3 className="title">EMPRESA</h3>
+            <Stack>
+              <ButtonSidebar
+              startIcon={<CampaignOutlinedIcon />}
+              label="Empresas"
+              onClick={() => navigate("/empresas")} />
+              <ButtonSidebar
+              startIcon={<AdsClickOutlinedIcon />}
+              label="Usuarios"
+              onClick={() => navigate("/usuarios")} />
+              <ButtonSidebar
+                onClick={() => navigate("/health")}
+                startIcon={<HealthAndSafetyOutlinedIcon />}
+                label="Health"
+              />              
+            </Stack>
+          </div>
+
+          
         </div>
       </div>
 

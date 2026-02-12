@@ -48,7 +48,19 @@ function saveQueue(queue) {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
-export default function NuevoLead({ buttonText, infoText, whatsappNumber, landingToken, bonusText }) {
+function getCookieValue(name) {
+    if (typeof document === "undefined") return "";
+    const parts = document.cookie.split("; ");
+    for (const part of parts) {
+        const [key, ...rest] = part.split("=");
+        if (key === name) {
+            return decodeURIComponent(rest.join("="));
+        }
+    }
+    return "";
+}
+
+export default function NuevoLead({ buttonText, infoText, whatsappNumber, landingToken, bonusText, infoColor, isPreview = false }) {
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
     const [error, setError] = useState("");
@@ -93,10 +105,12 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
             const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
             const remaining = [];
             let lastError = null;
+            let anySuccess = false;
             for (const item of queue) {
                 try {
                     await axios.post(`${baseUrl}/clientes/`, item);
                     markClientesDirty();
+                    anySuccess = true;
                 } catch (err) {
                     lastError = err;
                     remaining.push(item);
@@ -109,6 +123,15 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
                 retryIndexRef.current = Math.min(retryIndexRef.current + 1, RETRY_DELAYS.length);
                 scheduleRetry();
             }
+            if (anySuccess && typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("leads:refresh"));
+                try {
+                    localStorage.setItem("leads_dirty", "1");
+                    localStorage.setItem("leads_refresh_ts", String(Date.now()));
+                } catch {
+                    // ignore storage errors
+                }
+            }
             if (lastError) {
                 throw lastError;
             }
@@ -118,6 +141,7 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
     };
 
     useEffect(() => {
+        if (isPreview) return undefined;
         tryFlushQueue();
         return () => {
             if (retryTimerRef.current) {
@@ -125,7 +149,7 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
                 retryTimerRef.current = null;
             }
         };
-    }, []);
+    }, [isPreview]);
 
     const enqueueClient = (payload) => {
         const queue = loadQueue();
@@ -135,6 +159,7 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
     };
 
     const handleWhatsappClick = () => {
+        if (isPreview) return;
         if (!canSubmit) {
             if (!isNameValid) {
                 setError("Ingresá un nombre válido.");
@@ -145,12 +170,22 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
         }
         setError("");
 
+        const fbp = getCookieValue("_fbp") || undefined;
+        const fbc = getCookieValue("_fbc") || undefined;
+        const eventSourceUrl =
+            typeof window !== "undefined"
+                ? `${window.location.origin}${window.location.pathname}`
+                : undefined;
+
         const payload = {
             idempotency_key: generateIdempotencyKey(),
             landing_token: landingToken,
             nombre: trimmedName,
             contacto: phoneDigits,
             username,
+            ...(fbp ? { fbp } : {}),
+            ...(fbc ? { fbc } : {}),
+            ...(eventSourceUrl ? { event_source_url: eventSourceUrl } : {}),
         };
         enqueueClient(payload);
         tryFlushQueue();
@@ -183,6 +218,7 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
                 fullWidth
                 value={name}
                 onChange={handleNameChange}
+                InputProps={{ readOnly: isPreview }}
                 sx={{
                     "& .MuiOutlinedInput-root": {
                         marginBottom: "10px",
@@ -204,6 +240,7 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
                     fullWidth
                     value={phone}
                     onChange={handlePhoneChange}
+                    InputProps={{ readOnly: isPreview }}
                     sx={{
                         "& .MuiOutlinedInput-root": {
                         marginBottom: "0",
@@ -229,7 +266,7 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
                 >
                 <Button variant="contained" startIcon={<WhatsAppIcon />}
                 onClick={handleWhatsappClick}
-                disabled={!canSubmit}
+                disabled={isPreview || !canSubmit}
                 sx={{
                     backgroundColor: "transparent",
                     marginTop: "30px",
@@ -254,6 +291,6 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
                     {finalButtonText}
                 </Button>
             </motion.div>
-            <span className='text-white font-bold text-md mt-10'>{finalInfoText}</span>
+            <span className='font-bold text-md mt-10' style={{ color: infoColor || "#ffffff" }}>{finalInfoText}</span>
         </div>);
 }

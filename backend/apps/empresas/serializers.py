@@ -51,3 +51,9 @@ class UsuarioSerializer(serializers.ModelSerializer):
             user.set_password(password)
             user.save(update_fields=["password"])
         return user
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Group
+        fields = ["id", "name"]

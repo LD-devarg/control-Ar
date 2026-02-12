@@ -8,3 +8,8 @@ from .servicios.tipo_cambio_fetcher import actualizar_tipo_cambio
 @shared_task(bind=True)
 def fetch_tipo_cambio(self):
     return actualizar_tipo_cambio()
+
+
+@shared_task(bind=True)
+def health_heartbeat(self):
+    return "ok"

@@ -215,3 +215,20 @@
     height: auto;
     margin-bottom: 0;
 }
+
+.sidebar-empresa .title {
+    font-size: 14px;
+    font-weight: normal;
+    margin-bottom: 0;
+    font-family: "Roboto", sans-serif;
+    color: #505050;
+    opacity: 0;
+    height: 0;
+    margin: 5px 0 0 0;
+    overflow: hidden;
+    transition: opacity 0.2s ease, height 0.25s ease;
+}
+
+.sidebar-empresa {
+    margin-top: 20px;
+}

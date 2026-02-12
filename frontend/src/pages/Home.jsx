@@ -10,7 +10,7 @@ import Page from "../layouts/Page.jsx";
 
 
 function Home() {
-  const [activeForm, setActiveForm] = useState("compra");
+  const [activeForm, setActiveForm] = useState("contacto");
   const theme = useTheme();
 
   return (

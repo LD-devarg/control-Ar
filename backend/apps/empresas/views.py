@@ -3,7 +3,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 
 from .models import Empresa, Usuario
-from .serializers import EmpresaSerializer, UsuarioSerializer
+from django.contrib.auth.models import Group
+from .serializers import EmpresaSerializer, UsuarioSerializer, GroupSerializer
 from .servicios.validaciones_empresa import (
     validar_usuario_superusuario,
     validar_nombre_empresa,
@@ -68,6 +69,8 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         return qs.none()
 
     def perform_create(self, serializer):
+        if serializer.validated_data.get("is_superuser"):
+            raise ValidationError("No se puede crear un superusuario por API.")
         grupos = serializer.validated_data.get("groups") or []
         for grupo in grupos:
             _run_validation(validar_creacion_usuario, self.request.user, grupo)
@@ -75,6 +78,10 @@ class UsuarioViewSet(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = self.get_object()
+        if serializer.validated_data.get("is_superuser"):
+            raise ValidationError("No se puede asignar superusuario por API.")
+        if not (self.request.user.is_superuser or self.request.user.groups.filter(name="Admin").exists()):
+            raise ValidationError("No tenes permisos para modificar usuarios.")
         grupos = serializer.validated_data.get("groups") or []
         if grupos:
             for grupo in grupos:
@@ -82,6 +89,17 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         else:
             _run_validation(validar_modificacion_usuario, self.request.user, instance, None)
         serializer.save()
+
+
+class GroupViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        return is_admin(request.user)
 
     def perform_destroy(self, instance):
         _run_validation(validar_borrado_usuario, self.request.user, instance)

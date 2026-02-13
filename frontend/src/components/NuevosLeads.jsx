@@ -1,8 +1,7 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "../services/auth";
+import { subscribeRealtimeEvents } from "../services/realtime";
 import ModalBase from "./ModalBase.jsx";
-
-const POLL_MS = 180000;
 
 function formatDateTime(value) {
     if (!value) return "-";
@@ -45,7 +44,6 @@ function NuevosLeads() {
 
     useEffect(() => {
         loadLeads();
-        const timer = setInterval(() => loadLeads({ silent: true }), POLL_MS);
         const handleRefresh = () => loadLeads({ silent: true });
         const handleStorage = (event) => {
             if (event.key === "leads_refresh_ts") {
@@ -55,10 +53,18 @@ function NuevosLeads() {
         window.addEventListener("leads:refresh", handleRefresh);
         window.addEventListener("storage", handleStorage);
         return () => {
-            clearInterval(timer);
             window.removeEventListener("leads:refresh", handleRefresh);
             window.removeEventListener("storage", handleStorage);
         };
+    }, [loadLeads]);
+
+    useEffect(() => {
+        const unsubscribe = subscribeRealtimeEvents((message) => {
+            if (message?.type === "lead_created") {
+                loadLeads({ silent: true });
+            }
+        });
+        return unsubscribe;
     }, [loadLeads]);
 
     const handleOpen = async (lead) => {

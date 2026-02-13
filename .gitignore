@@ -27,6 +27,7 @@ celerybeat.pid
 # Environment variables / secrets
 .env
 .env.*
+!frontend/.env.production
 
 # IDEs / OS
 .vscode/

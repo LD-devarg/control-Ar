@@ -32,6 +32,7 @@ from .serializers import (
 from .servicios.calculos import calcular_compra
 from .servicios.enviador import enviar_evento_meta
 from apps.pauta.servicios.insights import fetch_meta_page_views
+from .realtime import publish_empresa_event
 
 def _filter_by_empresa(qs, user):
     if user.is_superuser:
@@ -157,6 +158,18 @@ class ClienteViewSet(viewsets.ModelViewSet):
             evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
         output = ClienteSerializer(cliente)
+        publish_empresa_event(
+            empresa_id=landing.empresa_id,
+            event_type="lead_created",
+            payload={
+                "id": evento.id,
+                "cliente": cliente.id,
+                "cliente_nombre": cliente.nombre,
+                "cliente_username": cliente.username,
+                "cliente_contacto": cliente.contacto,
+                "creado_en": evento.creado_en.isoformat(),
+            },
+        )
         return Response(output.data, status=status.HTTP_201_CREATED)
 
 
@@ -440,6 +453,19 @@ class CompraViewSet(viewsets.ModelViewSet):
                 evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
         output = self.get_serializer(compra)
+        publish_empresa_event(
+            empresa_id=cliente.empresa_id,
+            event_type="compra_created",
+            payload={
+                "id": compra.id,
+                "username": cliente.username,
+                "contacto": cliente.contacto,
+                "hora": compra.creado_en.isoformat(),
+                "monto_ars": float(compra.monto_ars or 0),
+                "monto_usd": float(compra.monto_usd or 0),
+                "operador": request.user.username if request.user else "",
+            },
+        )
         return Response(output.data, status=status.HTTP_201_CREATED)
 
 
@@ -527,3 +553,40 @@ class StatsViewSet(viewsets.ViewSet):
             )
 
         return Response(response)
+
+    @action(detail=False, methods=["get"], url_path="nuevas-compras")
+    def nuevas_compras(self, request):
+        user = request.user
+        if not user.empresa_id:
+            raise ValidationError("Empresa no disponible en el usuario actual.")
+
+        limit_param = request.query_params.get("limit", "20")
+        try:
+            limit = int(limit_param)
+        except ValueError:
+            limit = 20
+        limit = max(1, min(limit, 100))
+
+        compras_qs = (
+            Compra.objects.filter(empresa_id=user.empresa_id)
+            .select_related("cliente", "operador")
+        )
+        if is_operador(user):
+            compras_qs = compras_qs.filter(operador=user)
+
+        compras_qs = _apply_date_filters(compras_qs, "creado_en", request)
+        compras_qs = compras_qs.order_by("-creado_en")[:limit]
+
+        data = [
+            {
+                "id": compra.id,
+                "username": compra.cliente.username if compra.cliente else "",
+                "contacto": compra.cliente.contacto if compra.cliente else "",
+                "hora": compra.creado_en,
+                "monto_ars": compra.monto_ars,
+                "monto_usd": compra.monto_usd,
+                "operador": compra.operador.username if compra.operador else "",
+            }
+            for compra in compras_qs
+        ]
+        return Response(data)

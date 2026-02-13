@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Page from "../layouts/Page.jsx";
-import TextField from "@mui/material/TextField";
-import Button from "@mui/material/Button";
-import Checkbox from "@mui/material/Checkbox";
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
+import EmpresaForm from "../components/EmpresaForm.jsx";
 import {
     fetchEmpresas,
     createEmpresa,
@@ -14,33 +14,27 @@ export default function Tenant() {
     const [selected, setSelected] = useState(null);
     const [nombre, setNombre] = useState("");
     const [activo, setActivo] = useState(true);
-    const [loading, setLoading] = useState(false);
+    const [listLoading, setListLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
+    const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
 
-    const load = async () => {
-        setLoading(true);
+    const load = useCallback(async () => {
+        setListLoading(true);
         setError("");
         try {
             const data = await fetchEmpresas();
             setEmpresas(data);
-            if (selected) {
-                const updated = data.find((item) => item.id === selected.id);
-                if (updated) {
-                    setSelected(updated);
-                    setNombre(updated.nombre || "");
-                    setActivo(Boolean(updated.activo));
-                }
-            }
         } catch (err) {
             setError("No se pudieron cargar las empresas.");
         } finally {
-            setLoading(false);
+            setListLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         load();
-    }, []);
+    }, [load]);
 
     const handleSelect = (empresa) => {
         setSelected(empresa);
@@ -57,44 +51,56 @@ export default function Tenant() {
     };
 
     const handleSave = async () => {
-        if (!nombre.trim()) {
+        const trimmedNombre = nombre.trim();
+        if (!trimmedNombre) {
             setError("El nombre es obligatorio.");
             return;
         }
-        setLoading(true);
+        setSaving(true);
         setError("");
         try {
             if (selected) {
-                await updateEmpresa(selected.id, {
-                    nombre: nombre.trim(),
+                const updated = await updateEmpresa(selected.id, {
+                    nombre: trimmedNombre,
                     activo,
                 });
+                setEmpresas((prev) =>
+                    prev.map((item) => (item.id === updated.id ? updated : item))
+                );
+                handleSelect(updated);
+                setToast({ open: true, severity: "success", message: "Empresa actualizada." });
             } else {
-                await createEmpresa({
-                    nombre: nombre.trim(),
+                const created = await createEmpresa({
+                    nombre: trimmedNombre,
                     activo,
                 });
-            }
-            await load();
-            if (!selected) {
-                setNombre("");
-                setActivo(true);
+                setEmpresas((prev) => [created, ...prev]);
+                setToast({ open: true, severity: "success", message: "Empresa creada." });
+                handleClear();
             }
         } catch (err) {
             const detail = err?.response?.data?.detail;
             setError(detail || "No se pudo guardar la empresa.");
+            setToast({
+                open: true,
+                severity: "error",
+                message: detail || "No se pudo guardar la empresa.",
+            });
         } finally {
-            setLoading(false);
+            setSaving(false);
         }
     };
 
     return (
         <Page title="Empresas">
-            <div className="flex flex-col w-full gap-6 p-6">
-                <div className="flex gap-6">
+            <div className="flex flex-col w-full gap-4 md:gap-6 p-3 md:p-6">
+                <div className="flex flex-col lg:flex-row gap-4 md:gap-6">
                     <div className="flex-1 rounded-xl bg-black/80 text-white p-4 border border-white/10">
                         <div className="font-semibold text-lg mb-3">Listado</div>
                         <div className="flex flex-col gap-2 max-h-[60vh] overflow-auto">
+                            {listLoading ? (
+                                <div className="text-sm text-white/60">Cargando empresas...</div>
+                            ) : null}
                             {empresas.map((empresa) => (
                                 <button
                                     key={empresa.id}
@@ -108,72 +114,44 @@ export default function Tenant() {
                                 >
                                     <div className="font-semibold">{empresa.nombre}</div>
                                     <div className="text-xs text-white/70">
-                                        {empresa.activo ? "Activo" : "Inactivo"} · #{empresa.id}
+                                        {empresa.activo ? "Activo" : "Inactivo"} - #{empresa.id}
                                     </div>
                                 </button>
                             ))}
-                            {empresas.length === 0 ? (
+                            {!listLoading && empresas.length === 0 ? (
                                 <div className="text-sm text-white/60">Sin empresas.</div>
                             ) : null}
                         </div>
                     </div>
-                    <div className="w-[420px] rounded-xl bg-black/80 text-white p-4 border border-white/10">
-                        <div className="font-semibold text-lg mb-3">
-                            {selected ? "Editar empresa" : "Crear empresa"}
-                        </div>
-                        <TextField
-                            label="Nombre"
-                            value={nombre}
-                            onChange={(e) => setNombre(e.target.value)}
-                            fullWidth
-                            size="small"
-                            sx={{
-                                "& .MuiInputBase-input": { color: "#fff" },
-                                "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.8)" },
-                                "& .MuiOutlinedInput-root fieldset": {
-                                    borderColor: "rgba(255,255,255,0.4)",
-                                },
-                                "& .MuiOutlinedInput-root:hover fieldset": {
-                                    borderColor: "rgba(255,255,255,0.7)",
-                                },
-                                "& .MuiOutlinedInput-root.Mui-focused fieldset": {
-                                    borderColor: "#fff",
-                                },
-                            }}
-                        />
-                        <div className="flex items-center gap-2 mt-3">
-                            <Checkbox
-                                checked={activo}
-                                onChange={(e) => setActivo(e.target.checked)}
-                                sx={{
-                                    color: "rgba(255,255,255,0.7)",
-                                    "&.Mui-checked": { color: "#fff" },
-                                }}
-                            />
-                            <span className="text-sm">Activo</span>
-                        </div>
-                        {error ? <div className="text-red-400 text-sm mt-2">{error}</div> : null}
-                        <div className="flex gap-2 mt-4">
-                            <Button
-                                variant="contained"
-                                onClick={handleSave}
-                                disabled={loading}
-                                sx={{ backgroundColor: "#22c55e", color: "#0b0b0b", fontWeight: 700 }}
-                            >
-                                {selected ? "Guardar" : "Crear"}
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                onClick={handleClear}
-                                disabled={loading}
-                                sx={{ borderColor: "#fff", color: "#fff" }}
-                            >
-                                Limpiar
-                            </Button>
-                        </div>
-                    </div>
+                    <EmpresaForm
+                        selected={selected}
+                        nombre={nombre}
+                        activo={activo}
+                        error={error}
+                        saving={saving}
+                        onNombreChange={setNombre}
+                        onActivoChange={setActivo}
+                        onSave={handleSave}
+                        onClear={handleClear}
+                    />
                 </div>
             </div>
+            <Snackbar
+                open={toast.open}
+                autoHideDuration={3500}
+                onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+                <Alert
+                    onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+                    severity={toast.severity}
+                    variant="filled"
+                    sx={{ width: "100%" }}
+                >
+                    {toast.message}
+                </Alert>
+            </Snackbar>
         </Page>
     );
 }
+

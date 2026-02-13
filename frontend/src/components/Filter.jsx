@@ -6,35 +6,51 @@ import "../assets/css/Filter.css";
 import FilterDatePicker from "./DatePicker";
 
 function Filter({ period, onPeriodChange, desde, hasta, onDesdeChange, onHastaChange }) {
+    const periodButtonSx = (active) => ({
+        minWidth: 80,
+        fontWeight: 700,
+        borderColor: active ? "#3b82f6" : "rgba(59,130,246,0.5)",
+        color: active ? "#fff" : "#60a5fa",
+        backgroundColor: active ? "rgba(37, 99, 235, 0.85)" : "transparent",
+        "&:hover": {
+            borderColor: "#60a5fa",
+            backgroundColor: active ? "rgba(37, 99, 235, 0.95)" : "rgba(59,130,246,0.12)",
+        },
+    });
+
     return (
-        <div className="flex flex-col gap-4 items-end w-full"> 
-            <div>
+        <div className="flex flex-col gap-3 items-stretch sm:items-end w-full"> 
+            <div className="w-full sm:w-auto">
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                        <div className="color flex items-center gap-2">
+                    <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        sx={{ alignItems: { xs: "stretch", sm: "center" } }}
+                    >
+                        <div className="color flex flex-wrap items-center gap-2 w-full sm:w-auto">
                             <Button
-                                variant="outlined"
-                                className={period === "day" ? "active" : ""}
+                                variant={period === "day" ? "contained" : "outlined"}
                                 onClick={() => onPeriodChange?.("day")}
+                                sx={periodButtonSx(period === "day")}
                             >
                                 Dia
                             </Button>
                             <Button
-                                variant="outlined"
-                                className={period === "week" ? "active" : ""}
+                                variant={period === "week" ? "contained" : "outlined"}
                                 onClick={() => onPeriodChange?.("week")}
+                                sx={periodButtonSx(period === "week")}
                             >
                                 Semana
                             </Button>
                             <Button
-                                variant="outlined"
-                                className={period === "month" ? "active" : ""}
+                                variant={period === "month" ? "contained" : "outlined"}
                                 onClick={() => onPeriodChange?.("month")}
+                                sx={periodButtonSx(period === "month")}
                             >
                                 Mes
                             </Button>
                         </div>
-                        <div className="flex items-center gap-2 border-l-2 border-gray-500 ps-2">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 border-t sm:border-t-0 sm:border-l-2 border-gray-500 pt-2 sm:pt-0 sm:ps-2">
                             <FilterDatePicker label="Desde" value={desde} onChange={onDesdeChange} />
                             <FilterDatePicker label="Hasta" value={hasta} onChange={onHastaChange} />
                         </div>

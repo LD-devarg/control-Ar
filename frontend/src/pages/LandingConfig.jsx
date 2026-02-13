@@ -1,13 +1,11 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import "../assets/css/LandingConfig.css";
-import Logo from "../assets/img/logo_meta.png";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import SaveIcon from "@mui/icons-material/Save";
 import Page from "../layouts/Page";
-import { useTheme } from "@mui/material/styles";
 import Checkbox from "@mui/material/Checkbox";
 import UploadButton from "../components/UploadButton";
 import Snackbar from "@mui/material/Snackbar";
@@ -39,11 +37,28 @@ const EMPTY_FORM = {
     backgroundHorizontal: null,
 };
 
-const GRADIENT_ANGLES = [
-    { angle: 45, label: "↗" },
-    { angle: 135, label: "↘" },
-    { angle: 225, label: "↙" },
-    { angle: 315, label: "↖" },
+const cloneEmptyForm = () => ({ ...EMPTY_FORM });
+
+const FIELD_MAP = [
+    { formKey: "nombre", apiKey: "nombre", normalize: (value) => value.trim() },
+    { formKey: "url", apiKey: "url", normalize: (value) => value.trim() },
+    { formKey: "bonoActivo", apiKey: "bono", normalize: (value) => value.trim() },
+    { formKey: "titulo", apiKey: "titulo", normalize: (value) => value.trim() },
+    { formKey: "subtitulo", apiKey: "subtitulo", normalize: (value) => value.trim() },
+    { formKey: "textoBoton", apiKey: "texto_boton", normalize: (value) => value.trim() },
+    { formKey: "textoInfo", apiKey: "texto_info", normalize: (value) => value.trim() },
+    {
+        formKey: "mostrarDisclaimer",
+        apiKey: "mostrar_disclaimer",
+        normalize: (value) => String(Boolean(value)),
+    },
+    { formKey: "colorTitulo", apiKey: "color_titulo" },
+    { formKey: "colorSubtitulo", apiKey: "color_subtitulo" },
+    { formKey: "colorKeyword", apiKey: "color_keyword" },
+    { formKey: "colorBono", apiKey: "color_bono" },
+    { formKey: "colorInfo", apiKey: "color_info" },
+    { formKey: "bgType", apiKey: "bg_type" },
+    { formKey: "bgColor", apiKey: "bg_color" },
 ];
 
 const parseGradient = (value) => {
@@ -64,8 +79,8 @@ const buildGradient = (angle, from, to) =>
 function LandingConfig() {
     const [selectedLanding, setSelectedLanding] = useState(null);
     const [landingOptions, setLandingOptions] = useState([]);
-    const [form, setForm] = useState(EMPTY_FORM);
-    const [initialForm, setInitialForm] = useState(EMPTY_FORM);
+    const [form, setForm] = useState(() => cloneEmptyForm());
+    const [initialForm, setInitialForm] = useState(() => cloneEmptyForm());
     const [activo, setActivo] = useState(false);
     const [initialActivo, setInitialActivo] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -74,9 +89,7 @@ function LandingConfig() {
     const [previewDevice, setPreviewDevice] = useState("desktop");
     const [previewUrls, setPreviewUrls] = useState({ vertical: "", horizontal: "" });
     const [uploadKey, setUploadKey] = useState(0);
-    const theme = useTheme();
-    const isDarkMode = theme.palette.mode === "dark";
-    const color = isDarkMode ? "rgba(255,255,255,0.85)" : "rgba(9, 9, 9, 0.8)";
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
 
     const commonTextFieldSx = {
         "& fieldset": {
@@ -101,34 +114,17 @@ function LandingConfig() {
         },
     };
 
-    const isEditMode = Boolean(selectedLanding);
-    const isComplete =
-        form.nombre.trim() !== "" &&
-        form.url.trim() !== "" &&
-        form.bonoActivo.trim() !== "" &&
-        form.titulo.trim() !== "" &&
-        form.subtitulo.trim() !== "" &&
-        form.textoBoton.trim() !== "" &&
-        form.textoInfo.trim() !== "" &&
-        Boolean(form.backgroundVertical) &&
-        Boolean(form.backgroundHorizontal);
-    const isDirty =
-        Object.keys(form).some((key) => form[key] !== initialForm[key]) ||
-        activo !== initialActivo;
-    const primaryLabel = isEditMode ? "Guardar cambios" : "Crear";
-    const primaryDisabled = isEditMode ? !isDirty : !isComplete;
-    const previewDisabled =
-        !form.titulo.trim() &&
-        !form.subtitulo.trim() &&
-        !form.textoBoton.trim() &&
-        !form.textoInfo.trim();
+    const showToast = useCallback((severity, message) => {
+        setToast({ open: true, severity, message });
+    }, []);
 
-    const handleSelectLanding = (value) => {
+    const handleSelectLanding = useCallback((value) => {
         setSelectedLanding(value);
         setUploadKey((prev) => prev + 1);
         if (!value) {
-            setForm(EMPTY_FORM);
-            setInitialForm(EMPTY_FORM);
+            const empty = cloneEmptyForm();
+            setForm(empty);
+            setInitialForm(empty);
             setActivo(false);
             setInitialActivo(false);
             setPreviewUrls({ vertical: "", horizontal: "" });
@@ -169,7 +165,65 @@ function LandingConfig() {
             vertical: value.background_vertical || "",
             horizontal: value.background_horizontal || "",
         });
-    };
+    }, []);
+
+    const loadLandings = useCallback(async (keepId = null) => {
+        try {
+            const { data } = await apiClient.get("/landings/");
+            const options = (data || []).map((landing) => ({
+                ...landing,
+                label: landing.nombre,
+            }));
+            setLandingOptions(options);
+            if (keepId) {
+                const match = options.find((item) => item.id === keepId);
+                if (match) {
+                    handleSelectLanding(match);
+                }
+            }
+        } catch (error) {
+            const status = error?.response?.status;
+            const detail = error?.response?.data?.detail;
+            showToast("error", `Error (${status || "?"}): ${detail || "No se pudieron cargar las landings."}`);
+        }
+    }, [handleSelectLanding, showToast]);
+
+    useEffect(() => {
+        loadLandings();
+    }, [loadLandings]);
+
+    const isEditMode = Boolean(selectedLanding);
+    const currentGradient = useMemo(
+        () => buildGradient(form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo),
+        [form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo]
+    );
+    const isComplete =
+        form.nombre.trim() !== "" &&
+        form.url.trim() !== "" &&
+        form.bonoActivo.trim() !== "" &&
+        form.titulo.trim() !== "" &&
+        form.subtitulo.trim() !== "" &&
+        form.textoBoton.trim() !== "" &&
+        form.textoInfo.trim() !== "" &&
+        Boolean(form.backgroundVertical) &&
+        Boolean(form.backgroundHorizontal);
+    const isDirty = useMemo(() => {
+        const hasNewFiles = Boolean(form.backgroundVertical) || Boolean(form.backgroundHorizontal);
+        if (hasNewFiles) return true;
+        if (activo !== initialActivo) return true;
+        if (currentGradient !== initialForm.bgGradient) return true;
+        return FIELD_MAP.some(({ formKey, normalize }) => {
+            const toValue = normalize || ((value) => value);
+            return toValue(form[formKey]) !== toValue(initialForm[formKey]);
+        });
+    }, [form, initialForm, activo, initialActivo, currentGradient]);
+    const primaryLabel = isEditMode ? "Guardar cambios" : "Crear";
+    const primaryDisabled = isEditMode ? !isDirty : !isComplete;
+    const previewDisabled =
+        !form.titulo.trim() &&
+        !form.subtitulo.trim() &&
+        !form.textoBoton.trim() &&
+        !form.textoInfo.trim();
 
     const handleChange = (key) => (event) => {
         const nextValue = event.target.value;
@@ -178,36 +232,14 @@ function LandingConfig() {
 
     const handleCancel = () => {
         setSelectedLanding(null);
-        setForm(EMPTY_FORM);
-        setInitialForm(EMPTY_FORM);
+        const empty = cloneEmptyForm();
+        setForm(empty);
+        setInitialForm(empty);
         setActivo(false);
         setInitialActivo(false);
         setPreviewUrls({ vertical: "", horizontal: "" });
         setUploadKey((prev) => prev + 1);
     };
-
-    const showToast = (severity, message) => {
-        setToast({ open: true, severity, message });
-    };
-
-    const loadLandings = async (keepId = null) => {
-        const { data } = await apiClient.get("/landings/");
-        const options = (data || []).map((landing) => ({
-            ...landing,
-            label: landing.nombre,
-        }));
-        setLandingOptions(options);
-        if (keepId) {
-            const match = options.find((item) => item.id === keepId);
-            if (match) {
-                handleSelectLanding(match);
-            }
-        }
-    };
-
-    useEffect(() => {
-        loadLandings();
-    }, []);
 
     const handleSubmit = async () => {
         if (primaryDisabled || submitting) return;
@@ -218,66 +250,50 @@ function LandingConfig() {
         }
 
         const formData = new FormData();
-        const appendIfChanged = (key, value, original) => {
-            if (value !== original) {
-                formData.append(key, value);
-            }
+        const appendFields = ({ includeOnlyChanged }) => {
+            FIELD_MAP.forEach(({ formKey, apiKey, normalize }) => {
+                const toValue = normalize || ((value) => value);
+                const nextValue = toValue(form[formKey]);
+                if (!includeOnlyChanged) {
+                    formData.append(apiKey, nextValue);
+                    return;
+                }
+                const initialValue = toValue(initialForm[formKey]);
+                if (nextValue !== initialValue) {
+                    formData.append(apiKey, nextValue);
+                }
+            });
         };
-
-        if (isEditMode) {
-            appendIfChanged("nombre", form.nombre.trim(), initialForm.nombre);
-            appendIfChanged("url", form.url.trim(), initialForm.url);
-            appendIfChanged("bono", form.bonoActivo.trim(), initialForm.bonoActivo);
-            appendIfChanged("activo", String(Boolean(activo)), String(Boolean(initialActivo)));
-            appendIfChanged("titulo", form.titulo.trim(), initialForm.titulo);
-            appendIfChanged("subtitulo", form.subtitulo.trim(), initialForm.subtitulo);
-            appendIfChanged("texto_boton", form.textoBoton.trim(), initialForm.textoBoton);
-            appendIfChanged("texto_info", form.textoInfo.trim(), initialForm.textoInfo);
-            appendIfChanged("mostrar_disclaimer", String(Boolean(form.mostrarDisclaimer)), String(Boolean(initialForm.mostrarDisclaimer)));
-            appendIfChanged("color_titulo", form.colorTitulo, initialForm.colorTitulo);
-            appendIfChanged("color_subtitulo", form.colorSubtitulo, initialForm.colorSubtitulo);
-            appendIfChanged("color_keyword", form.colorKeyword, initialForm.colorKeyword);
-            appendIfChanged("color_bono", form.colorBono, initialForm.colorBono);
-            appendIfChanged("color_info", form.colorInfo, initialForm.colorInfo);
-            appendIfChanged("bg_type", form.bgType, initialForm.bgType);
-            appendIfChanged("bg_color", form.bgColor, initialForm.bgColor);
-            const nextGradient = buildGradient(form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo);
-            appendIfChanged("bg_gradient", nextGradient, initialForm.bgGradient);
+        const appendFiles = () => {
             if (form.backgroundVertical) {
                 formData.append("background_vertical", form.backgroundVertical);
             }
             if (form.backgroundHorizontal) {
                 formData.append("background_horizontal", form.backgroundHorizontal);
             }
+        };
+
+        if (isEditMode) {
+            appendFields({ includeOnlyChanged: true });
+            const nextActivo = String(Boolean(activo));
+            const prevActivo = String(Boolean(initialActivo));
+            if (nextActivo !== prevActivo) {
+                formData.append("activo", nextActivo);
+            }
+            if (currentGradient !== initialForm.bgGradient) {
+                formData.append("bg_gradient", currentGradient);
+            }
+            appendFiles();
             if ([...formData.keys()].length === 0) {
                 showToast("info", "No hay cambios para guardar.");
                 return;
             }
         } else {
             formData.append("empresa", user.empresa);
-            formData.append("nombre", form.nombre.trim());
-            formData.append("url", form.url.trim());
-            formData.append("bono", form.bonoActivo.trim());
+            appendFields({ includeOnlyChanged: false });
             formData.append("activo", String(Boolean(activo)));
-            formData.append("titulo", form.titulo.trim());
-            formData.append("subtitulo", form.subtitulo.trim());
-            formData.append("texto_boton", form.textoBoton.trim());
-            formData.append("texto_info", form.textoInfo.trim());
-            formData.append("mostrar_disclaimer", String(Boolean(form.mostrarDisclaimer)));
-            formData.append("color_titulo", form.colorTitulo);
-            formData.append("color_subtitulo", form.colorSubtitulo);
-            formData.append("color_keyword", form.colorKeyword);
-            formData.append("color_bono", form.colorBono);
-            formData.append("color_info", form.colorInfo);
-            formData.append("bg_type", form.bgType);
-            formData.append("bg_color", form.bgColor);
-            formData.append("bg_gradient", buildGradient(form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo));
-            if (form.backgroundVertical) {
-                formData.append("background_vertical", form.backgroundVertical);
-            }
-            if (form.backgroundHorizontal) {
-                formData.append("background_horizontal", form.backgroundHorizontal);
-            }
+            formData.append("bg_gradient", currentGradient);
+            appendFiles();
         }
 
         setSubmitting(true);
@@ -306,13 +322,15 @@ function LandingConfig() {
     };
 
     const previewBackground =
-        form.bgType === "gradient"
-            ? buildGradient(form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo)
-            : form.bgColor;
+        form.bgType === "gradient" ? currentGradient : form.bgColor;
+    const publicLandingUrl = selectedLanding?.token
+        ? `${origin}/landing?landing_token=${selectedLanding.token}`
+        : "";
+
     return (
         <Page title="Configuración de Landing Page">
-            <div className="flex flex-row w-full p-4 justify-center ">
-                <div className="flex flex-col items-center w-full xl:w-9/10 mb-3 rounded-xl pt-1 pb-1 px-5 bg-black shadow-lg shadow-zinc-900 dark:shadow-black/70">
+            <div className="flex flex-row w-full p-2 sm:p-4 justify-center ">
+                <div className="flex flex-col items-center w-full xl:w-9/10 mb-3 rounded-xl pt-1 pb-1 px-3 sm:px-5 bg-black shadow-lg shadow-zinc-900 dark:shadow-black/70">
                             <div className="flex flex-col gap-0 items-end w-full mt-2 text-black dark:text-white">
                                 <Autocomplete
                                     options={landingOptions}
@@ -359,8 +377,8 @@ function LandingConfig() {
                     <div className="flex flex-row font-bold text-lg items-center gap-2 ml-0 mt-1 mb-1">
                         <h2 className="text-white font-bold text-lg underline">Datos Generales</h2>
                     </div>
-                    <div className="w-full xl:w-9/10 px-5 pb-1 pt-1">
-                        <Stack direction="row" spacing={1}
+                    <div className="w-full xl:w-9/10 px-2 sm:px-5 pb-1 pt-1">
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
                         sx={{
                             mb: 1,
                         }}>
@@ -371,7 +389,7 @@ function LandingConfig() {
                                 value={form.nombre}
                                 onChange={handleChange("nombre")}
                                 sx={{...commonTextFieldSx,
-                                    width: "40%",
+                                    width: { xs: "100%", md: "40%" },
                                     fontSize: "small",
                                 }}
                             />
@@ -383,7 +401,7 @@ function LandingConfig() {
                                 onChange={handleChange("titulo")}
                                 sx={{...commonTextFieldSx,
                                     fontSize: "small",
-                                    width: "45%",
+                                    width: { xs: "100%", md: "45%" },
                                 }}
                             />
                             <TextField
@@ -393,12 +411,12 @@ function LandingConfig() {
                                 value={form.bonoActivo}
                                 onChange={handleChange("bonoActivo")}
                                 sx={{...commonTextFieldSx,
-                                    width: "15%",
+                                    width: { xs: "100%", md: "15%" },
                                     fontSize: "small",
                                 }}
                             />
                         </Stack>
-                        <Stack direction="row" spacing={1}
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
                         sx={{
                             mb: 1,
                         }}
@@ -419,7 +437,7 @@ function LandingConfig() {
                                 value={form.textoBoton}
                                 onChange={handleChange("textoBoton")}
                                 sx={{...commonTextFieldSx,
-                                    width: "25%",
+                                    width: { xs: "100%", md: "25%" },
                                     fontSize: "small",
                                 }}
                             />
@@ -430,12 +448,12 @@ function LandingConfig() {
                                 value={form.textoInfo}
                                 onChange={handleChange("textoInfo")}
                                 sx={{...commonTextFieldSx,
-                                    width: "40%",
+                                    width: { xs: "100%", md: "40%" },
                                     fontSize: "small",
                                 }}
                             />
                         </Stack>
-                        <Stack direction="row" spacing={1}
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
                         sx={{
                             mb: 1,
                         }}
@@ -447,11 +465,11 @@ function LandingConfig() {
                                 value={form.url}
                                 onChange={handleChange("url")}
                                 sx={{...commonTextFieldSx,
-                                    width: "60%",
+                                    width: { xs: "100%", md: "60%" },
                                     fontSize: "",
                                 }}
                             />
-                            <div className="flex flex-row gap-6 items-center justify-end w-full mt-2 mb-2">
+                            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center justify-end w-full mt-1 sm:mt-2 mb-2">
                                 <div className="flex items-center gap-2">
                                     <label htmlFor="Activo" className="text-white">Activo</label>
                                     <Checkbox
@@ -484,22 +502,22 @@ function LandingConfig() {
                                 </div>
                             </div>
                         </Stack>
-                            {selectedLanding?.token ? (
+                            {publicLandingUrl ? (
                                 <div className="w-full mt-2 flex items-center justify-center">
                                     <span className="text-black dark:text-white text-xs ">
                                         URL pública:{" "}
                                         <a
-                                            href={`${window.location.origin}/landing?landing_token=${selectedLanding.token}`}
+                                            href={publicLandingUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-sky-700 underline"
                                         >
-                                            {`${window.location.origin}/landing?landing_token=${selectedLanding.token}`}
+                                            {publicLandingUrl}
                                         </a>
                                     </span>
                                 </div>
                             ) : null}
-                        <Stack direction="row" spacing={1}
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
                         sx={{
                             mb: 1,
                         }}
@@ -508,7 +526,7 @@ function LandingConfig() {
                         <div className="flex w-full text-center justify-center mt-2 mb-2">
                             <h2 className="text-white font-bold text-lg underline">Recursos Visuales</h2>
                         </div>
-                        <Stack direction="row" spacing={2} className="mt-1 justify-center">
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={2} className="mt-1 justify-center">
                             <div className="flex flex-col items-center gap-2">
                                 <UploadButton
                                     key={`upload-vertical-${uploadKey}`}
@@ -584,7 +602,7 @@ function LandingConfig() {
                     </div>
                 </div>
             </div>
-            <div className="flex flex-row gap-2 items-center justify-center w-9/10 bg-black/80 dark:bg-transparent rounded-xl">
+            <div className="flex flex-wrap gap-2 items-center justify-center w-full sm:w-9/10 bg-black/80 dark:bg-transparent rounded-xl p-2">
                 <Button
                     variant="outlined"
                     startIcon={<SaveIcon />}
@@ -644,3 +662,4 @@ function LandingConfig() {
 }
 
 export default LandingConfig;
+

@@ -150,11 +150,11 @@ export default function Users() {
 
     return (
         <Page title="Usuarios">
-            <div className="flex flex-col w-full gap-6 p-6">
-                <div className="flex gap-6">
+            <div className="flex flex-col w-full gap-4 md:gap-6 p-3 md:p-6">
+                <div className="flex flex-col lg:flex-row gap-4 md:gap-6">
                     <div className="flex-1 rounded-xl bg-black/80 text-white p-4 border border-white/10">
                         <div className="font-semibold text-lg mb-3">Listado</div>
-                        <div className="flex flex-col gap-2 max-h-[60vh] overflow-auto">
+                        <div className="flex flex-col gap-2 max-h-[45vh] md:max-h-[60vh] overflow-auto">
                             {usuarios.map((user) => (
                                 <button
                                     key={user.id}
@@ -168,7 +168,7 @@ export default function Users() {
                                 >
                                     <div className="font-semibold">{user.username}</div>
                                     <div className="text-xs text-white/70">
-                                        {user.activo ? "Activo" : "Inactivo"} · #{user.id}
+                                        {user.activo ? "Activo" : "Inactivo"} - #{user.id}
                                     </div>
                                 </button>
                             ))}
@@ -177,7 +177,7 @@ export default function Users() {
                             ) : null}
                         </div>
                     </div>
-                    <div className="w-[460px] rounded-xl bg-black/80 text-white p-4 border border-white/10">
+                    <div className="w-full lg:w-[460px] rounded-xl bg-black/80 text-white p-4 border border-white/10">
                         <div className="font-semibold text-lg mb-3">
                             {selected ? "Editar usuario" : "Crear usuario"}
                         </div>
@@ -203,7 +203,7 @@ export default function Users() {
                                 }}
                                 disabled={!canCreate}
                             />
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                                 <TextField
                                     label="Nombre"
                                     value={form.first_name}
@@ -363,3 +363,5 @@ export default function Users() {
         </Page>
     );
 }
+
+

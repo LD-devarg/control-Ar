@@ -20,6 +20,8 @@ celery>=5.4
 django-celery-results>=2.5
 django-celery-beat>=2.6
 redis>=5.0
+channels>=4.1
+channels-redis>=4.2
 
 # Environment variables
 python-dotenv>=1.0

@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import Page from "../layouts/Page.jsx";
 import Filter from "../components/Filter";
@@ -10,6 +10,7 @@ import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
 import PercentOutlinedIcon from "@mui/icons-material/PercentOutlined";
 import { apiClient } from "../services/auth";
+import RecentPurchasesTable from "../components/RecentPurchasesTable.jsx";
 
 function Stats() {
   const [period, setPeriod] = useState("week");
@@ -18,33 +19,45 @@ function Stats() {
   const [usePeriod, setUsePeriod] = useState(true);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const params = useMemo(() => {
-    if (usePeriod) {
-      return { period };
-    }
-    return {
-      from: desde?.format("YYYY-MM-DD"),
-      to: hasta?.format("YYYY-MM-DD"),
-    };
-  }, [usePeriod, period, desde, hasta]);
+  const params = usePeriod
+    ? { period }
+    : {
+        from: desde?.format("YYYY-MM-DD"),
+        to: hasta?.format("YYYY-MM-DD"),
+      };
 
   useEffect(() => {
-    let mounted = true;
+    const controller = new AbortController();
+
     const load = async () => {
       setLoading(true);
+      setError("");
       try {
-        const { data: response } = await apiClient.get("/stats/", { params });
-        if (mounted) setData(response);
+        const { data: response } = await apiClient.get("/stats/", {
+          params,
+          signal: controller.signal,
+        });
+        setData(response);
+      } catch (err) {
+        if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
+          return;
+        }
+        setError("No se pudieron cargar las estadisticas.");
       } finally {
-        if (mounted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
+
     load();
+
     return () => {
-      mounted = false;
+      controller.abort();
     };
-  }, [params]);
+  }, [usePeriod, period, desde, hasta]);
 
   const onPeriodChange = (value) => {
     setPeriod(value);
@@ -61,20 +74,32 @@ function Stats() {
     setUsePeriod(false);
   };
 
-  const formatNumber = (value) =>
-    new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }).format(Number(value || 0));
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat("es-AR", {
-      style: "currency",
-      currency: "ARS",
-      maximumFractionDigits: 0,
-      minimumFractionDigits: 0,
-    }).format(Number(value || 0));
-  const formatPct = (value) =>
-    new Intl.NumberFormat("es-AR", {
-      style: "percent",
-      maximumFractionDigits: 1,
-    }).format(Number(value || 0) / 100);
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }),
+    []
+  );
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("es-AR", {
+        style: "currency",
+        currency: "ARS",
+        maximumFractionDigits: 0,
+        minimumFractionDigits: 0,
+      }),
+    []
+  );
+  const percentFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("es-AR", {
+        style: "percent",
+        maximumFractionDigits: 1,
+      }),
+    []
+  );
+
+  const formatNumber = (value) => numberFormatter.format(Number(value || 0));
+  const formatCurrency = (value) => currencyFormatter.format(Number(value || 0));
+  const formatPct = (value) => percentFormatter.format(Number(value || 0) / 100);
 
   const webVisitors = data?.web_visitors ?? 0;
   const leads = data?.leads ?? 0;
@@ -84,6 +109,69 @@ function Stats() {
   const conversionPct = data?.conversion_pct ?? 0;
   const valorCompraProm = data?.valor_compra_prom ?? 0;
   const retencionPct = data?.retencion_pct ?? 0;
+
+  const upperCards = [
+    {
+      title: "Web Visitors",
+      value: loading ? "..." : formatNumber(webVisitors),
+      sizeHeight: "h-20",
+      sizeWidth: "w-full",
+      icon: <PreviewOutlinedIcon fontSize="small" />,
+    },
+    {
+      title: "Leads",
+      value: loading ? "..." : formatNumber(leads),
+      sizeHeight: "h-20",
+      sizeWidth: "w-full",
+      icon: <PendingActionsOutlinedIcon fontSize="small" />,
+    },
+    {
+      title: "Contactos",
+      value: loading ? "..." : formatNumber(contactos),
+      sizeHeight: "h-20",
+      sizeWidth: "w-full",
+      icon: <ChatBubbleOutlineOutlinedIcon fontSize="small" />,
+    },
+    {
+      title: "Compras",
+      subtitle: loading ? "..." : formatNumber(comprasCount),
+      value: loading ? "..." : formatCurrency(comprasMonto),
+      sizeHeight: "h-20",
+      sizeWidth: "w-full",
+      icon: <ShoppingCartOutlinedIcon fontSize="small" />,
+    },
+  ];
+
+  const lowerCards = [
+    {
+      title: "% Conversion",
+      sizeHeight: "h-20",
+      sizeWidth: "w-full",
+      value: loading ? "..." : formatPct(conversionPct),
+      icon: <TrendingUpOutlinedIcon fontSize="small" />,
+    },
+    {
+      title: "Valor % de Compras",
+      sizeHeight: "h-20",
+      sizeWidth: "w-full",
+      value: loading ? "..." : formatCurrency(valorCompraProm),
+      icon: <PercentOutlinedIcon fontSize="small" />,
+    },
+    {
+      title: "Tasa de Retencion",
+      sizeHeight: "h-20",
+      sizeWidth: "w-full",
+      value: loading ? "..." : formatPct(retencionPct),
+      icon: <TrendingUpOutlinedIcon fontSize="small" />,
+    },
+    {
+      title: "ROAS",
+      sizeHeight: "h-20",
+      sizeWidth: "w-full",
+      value: "--",
+      icon: <PercentOutlinedIcon fontSize="small" />,
+    },
+  ];
 
   return (
     <Page
@@ -99,70 +187,29 @@ function Stats() {
         />
       }
     >
-      <div className="flex gap-5 w-9/10 border-b-1 justify-between border-t-1 dark:border-zinc-500 pb-4 pt-4">
-        <Card
-          title="Web Visitors"
-          value={loading ? "..." : formatNumber(webVisitors)}
-          sizeHeight={"h-20"}
-          sizeWidth={"w-45 lg:w-70"}
-          icon={<PreviewOutlinedIcon fontSize="small" />}
-        />
-        <Card
-          title="Leads"
-          value={loading ? "..." : formatNumber(leads)}
-          sizeHeight={"h-20"}
-          sizeWidth={"w-45 lg:w-70"}
-          icon={<PendingActionsOutlinedIcon fontSize="small" />}
-        />
-        <Card
-          title="Contactos"
-          value={loading ? "..." : formatNumber(contactos)}
-          sizeHeight={"h-20"}
-          sizeWidth={"w-45 lg:w-70"}
-          icon={<ChatBubbleOutlineOutlinedIcon fontSize="small" />}
-        />
-        <Card
-          title="Compras"
-          subtitle={loading ? "..." : formatNumber(comprasCount)}
-          value={loading ? "..." : formatCurrency(comprasMonto)}
-          sizeHeight={"h-20"}
-          sizeWidth={"w-45 lg:w-70"}
-          icon={<ShoppingCartOutlinedIcon fontSize="small" />}
-        />
+      {error ? (
+        <div className="w-[90%] rounded-md border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200">
+          {error}
+        </div>
+      ) : null}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 w-full md:w-[90%] border-b border-t dark:border-zinc-500 pb-4 pt-4">
+        {upperCards.map((card) => (
+          <Card key={card.title} {...card} />
+        ))}
       </div>
-      <div className="flex gap-5 w-9/10 border-b-1 justify-evenly border-t-1 dark:border-zinc-500 pb-4 pt-4">
-        <Card
-          title="% Conversion"
-          sizeHeight={"h-20"}
-          sizeWidth={"w-40 lg:w-50"}
-          value={loading ? "..." : formatPct(conversionPct)}
-          icon={<TrendingUpOutlinedIcon fontSize="small" />}
-        />
-        <Card
-          title="Valor % de Compras"
-          sizeHeight={"h-20"}
-          sizeWidth={"w-40 lg:w-50"}
-          value={loading ? "..." : formatCurrency(valorCompraProm)}
-          icon={<PercentOutlinedIcon fontSize="small" />}
-        />
-        <Card
-          title="Tasa de Retencion"
-          sizeHeight={"h-20"}
-          sizeWidth={"w-40 lg:w-50"}
-          value={loading ? "..." : formatPct(retencionPct)}
-          icon={<TrendingUpOutlinedIcon fontSize="small" />}
-        />
-        <Card
-          title="ROAS"
-          sizeHeight={"h-20"}
-          sizeWidth={"w-40 lg:w-50"}
-          value="--"
-          icon={<PercentOutlinedIcon fontSize="small" />}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-5 w-full md:w-[90%] border-b border-t dark:border-zinc-500 pb-4 pt-4">
+        {lowerCards.map((card) => (
+          <Card key={card.title} {...card} />
+        ))}
       </div>
-      <div className="flex justify-center items-stretch gap-5 w-9/10 mt-2">
-        <div className="flex items-center dark:border-zinc-500 flex-col w-full md:w-9/10 min-w-0 mb-0">
-          <div className="w-full"></div>
+      <div className="flex justify-center items-stretch gap-5 w-full md:w-[90%] mt-2">
+        <div className="flex items-center dark:border-zinc-500 flex-col w-full md:w-[90%] min-w-0 mb-0">
+          <RecentPurchasesTable
+            usePeriod={usePeriod}
+            period={period}
+            desde={desde}
+            hasta={hasta}
+          />
         </div>
       </div>
     </Page>

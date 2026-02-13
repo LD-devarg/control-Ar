@@ -72,6 +72,21 @@ export default function FormCompra() {
       await apiClient.post("/compras/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("compra:created", {
+            detail: { clienteId: selectedCliente.id, montoArs: monto, at: Date.now() },
+          })
+        );
+        try {
+          window.localStorage.setItem(
+            "compra:last-created",
+            JSON.stringify({ at: Date.now(), clienteId: selectedCliente.id })
+          );
+        } catch {
+          // ignore storage errors
+        }
+      }
       setMonto("");
       setSelectedCliente(null);
       setComprobanteFile(null);

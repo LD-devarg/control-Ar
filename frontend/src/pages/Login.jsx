@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import "../assets/css/Login.css";
 import { useTheme } from "@mui/material/styles";
 import { login } from "../services/auth";
+import { getDefaultPath } from "../services/access";
 
 function Login() {
   const navigate = useNavigate();
@@ -49,8 +50,8 @@ function Login() {
     setLoading(true);
     setError("");
     try {
-      await login(username, password);
-      navigate("/home");
+      const user = await login(username, password);
+      navigate(getDefaultPath(user));
     } catch (err) {
       setError("Usuario o contraseña inválidos.");
     } finally {
@@ -60,51 +61,54 @@ function Login() {
 
   return (
     <div className='flex flex-col justify-start items-center min-h-screen h-full bg-white dark:bg-black'>
-        <img src={isDarkMode ? LogoLight : LogoDark} className='text-center mb-5 h-50 w-50' alt="Logo Control-AR" />
-        <div className='form-login flex flex-col justify-center items-center bg-neutral-100 dark:bg-zinc-900 p-6 rounded-2xl shadow-lg w-80'>
-            <Box
-            component="form"
-            sx={{ '& .MuiTextField-root': { m: 1, width: '25ch',
+      <img src={isDarkMode ? LogoLight : LogoDark} className='text-center mb-5 h-50 w-50' alt="Logo Control-AR" />
+      <div className='form-login flex flex-col justify-center items-center bg-neutral-100 dark:bg-zinc-900 p-6 rounded-2xl shadow-lg w-80'>
+        <Box
+          component="form"
+          sx={{
+            '& .MuiTextField-root': {
+              m: 1,
+              width: '25ch',
             },
           }}
-            noValidate
-            autoComplete="off"
-            onSubmit={handleSubmit}
-            >
-            <TextField
-                required
-                sx={fieldSx}
-                id="standard-required"
-                label="Ingrese su usuario"
-                variant="standard"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-            />
-            <TextField
-                required
-                sx={fieldSx}
-                id="standard-password-input"
-                label="Ingrese su contrasena"
-                type="password"
-                autoComplete="current-password"
-                variant="standard"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-            />
-            {error ? (
-              <span className="text-xs text-red-600 mt-2">{error}</span>
-            ) : null}
-            </Box>
-        </div>
-        <Stack spacing={2} direction="row" sx={{ mt: 2 }}>
-          <Button variant="outlined" onClick={handleSubmit} disabled={loading || !username || !password}>
-            {loading ? "Ingresando..." : "Iniciar sesion"}
-          </Button>
-        </Stack>
-        <footer className='absolute bottom-2 w-full text-center flex flex-col gap-1 items-center'>
-          <p className='text-sm text-zinc-700 dark:text-gray-500'>&copy; 2026 Control-AR. Todos los derechos reservados.</p>
-          <span className='text-sm text-zinc-700 dark:text-gray-500'>Desarrollado por LD.dev</span>
-        </footer>
+          noValidate
+          autoComplete="off"
+          onSubmit={handleSubmit}
+        >
+          <TextField
+            required
+            sx={fieldSx}
+            id="standard-required"
+            label="Ingrese su usuario"
+            variant="standard"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <TextField
+            required
+            sx={fieldSx}
+            id="standard-password-input"
+            label="Ingrese su contrasena"
+            type="password"
+            autoComplete="current-password"
+            variant="standard"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {error ? (
+            <span className="text-xs text-red-600 mt-2">{error}</span>
+          ) : null}
+        </Box>
+      </div>
+      <Stack spacing={2} direction="row" sx={{ mt: 2 }}>
+        <Button variant="outlined" onClick={handleSubmit} disabled={loading || !username || !password}>
+          {loading ? "Ingresando..." : "Iniciar sesion"}
+        </Button>
+      </Stack>
+      <footer className='absolute bottom-2 w-full text-center flex flex-col gap-1 items-center'>
+        <p className='text-sm text-zinc-700 dark:text-gray-500'>&copy; 2026 Control-AR. Todos los derechos reservados.</p>
+        <span className='text-sm text-zinc-700 dark:text-gray-500'>Desarrollado por LD.dev</span>
+      </footer>
     </div>
   )
 }

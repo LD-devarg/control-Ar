@@ -16,12 +16,102 @@ import AdsClickOutlinedIcon from "@mui/icons-material/AdsClickOutlined";
 import ContactPageOutlinedIcon from "@mui/icons-material/ContactPageOutlined";
 import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
 import ButtonSidebar from "./ButtonSidebar";
-import { logout } from "../services/auth";
+import { getCurrentUser, logout } from "../services/auth";
+import { canAccessPath } from "../services/access";
 
 function Sidebar() {
   const navigate = useNavigate();
   const theme = useTheme();
   const logoSrc = theme.palette.mode === "dark" ? logoLight : logoDark;
+  const currentUser = getCurrentUser();
+
+  const sections = [
+    {
+      className: "sidebar-gestion",
+      title: "GESTIÓN",
+      items: [
+        {
+          path: "/home",
+          label: "Inicio",
+          startIcon: <OtherHousesOutlinedIcon />,
+          className: "flex items-center justify-start",
+        },
+        {
+          path: "/stats",
+          label: "Análisis",
+          startIcon: <QueryStatsOutlinedIcon />,
+        },
+        {
+          path: "/contacts",
+          label: "Agenda",
+          startIcon: <ContactPageOutlinedIcon />,
+        },
+      ],
+    },
+    {
+      className: "sidebar-recursos",
+      title: "RECURSOS",
+      items: [
+        {
+          path: "/whatsapp",
+          label: "Líneas",
+          startIcon: <WhatsAppIcon />,
+        },
+        {
+          path: "/tipo-cambio",
+          label: "Tipo de Cambio",
+          startIcon: <CurrencyExchangeIcon />,
+        },
+        {
+          path: "/landing-config",
+          label: "Landing",
+          startIcon: <WebIcon />,
+        },
+      ],
+    },
+    {
+      className: "sidebar-pauta",
+      title: "PAUTA",
+      items: [
+        {
+          path: "/pauta-database",
+          label: "Database",
+          startIcon: <CampaignOutlinedIcon />,
+        },
+        {
+          path: "/pauta-kpi",
+          label: "Rendimientos",
+          startIcon: <AdsClickOutlinedIcon />,
+        },
+      ],
+    },
+    {
+      className: "sidebar-empresa",
+      title: "EMPRESA",
+      items: [
+        {
+          path: "/empresas",
+          label: "Empresas",
+          startIcon: <CampaignOutlinedIcon />,
+        },
+        {
+          path: "/usuarios",
+          label: "Usuarios",
+          startIcon: <AdsClickOutlinedIcon />,
+        },
+        {
+          path: "/health",
+          label: "Health",
+          startIcon: <HealthAndSafetyOutlinedIcon />,
+        },
+      ],
+    },
+  ]
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canAccessPath(item.path, currentUser)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <div className="sidebar bg-neutral-200 dark:bg-neutral-900">
@@ -35,83 +125,22 @@ function Sidebar() {
 
       <div className="sidebar-body flex h-full flex-col justify-between">
         <div>
-          <div className="sidebar-gestion">
-            <h3 className="title">GESTIÓN</h3>
-            <Stack direction="column" spacing={0.5}>
-              <ButtonSidebar
-                className="flex items-center justify-start"
-                onClick={() => navigate("/home")}
-                startIcon={<OtherHousesOutlinedIcon />}
-                label="Inicio"
-              />
-              <ButtonSidebar
-                onClick={() => navigate("/stats")}
-                startIcon={<QueryStatsOutlinedIcon />}
-                label="Análisis"
-              />
-              <ButtonSidebar
-                onClick={() => navigate("/contacts")}
-                startIcon={<ContactPageOutlinedIcon />}
-                label="Agenda"
-              />
-            </Stack>
-          </div>
-
-          <div className="sidebar-recursos">
-            <h3 className="title">RECURSOS</h3>
-            <Stack>
-              <ButtonSidebar
-                onClick={() => navigate("/whatsapp")}
-                startIcon={<WhatsAppIcon />}
-                label="Líneas"
-              />
-              <ButtonSidebar
-                onClick={() => navigate("/tipo-cambio")}
-                startIcon={<CurrencyExchangeIcon />}
-                label="Tipo de Cambio"
-              />
-              <ButtonSidebar
-                onClick={() => navigate("/landing-config")}
-                startIcon={<WebIcon />}
-                label="Landing"
-              />
-            </Stack>
-          </div>
-
-          <div className="sidebar-pauta">
-            <h3 className="title">PAUTA</h3>
-            <Stack>
-              <ButtonSidebar
-              startIcon={<CampaignOutlinedIcon />}
-              label="Database"
-              onClick={() => navigate("/pauta-database")} />
-              <ButtonSidebar
-              startIcon={<AdsClickOutlinedIcon />}
-              label="Rendimientos"
-              onClick={() => navigate("/pauta-kpi")} />
-            </Stack>
-          </div>
-
-          <div className="sidebar-empresa">
-            <h3 className="title">EMPRESA</h3>
-            <Stack>
-              <ButtonSidebar
-              startIcon={<CampaignOutlinedIcon />}
-              label="Empresas"
-              onClick={() => navigate("/empresas")} />
-              <ButtonSidebar
-              startIcon={<AdsClickOutlinedIcon />}
-              label="Usuarios"
-              onClick={() => navigate("/usuarios")} />
-              <ButtonSidebar
-                onClick={() => navigate("/health")}
-                startIcon={<HealthAndSafetyOutlinedIcon />}
-                label="Health"
-              />              
-            </Stack>
-          </div>
-
-          
+          {sections.map((section) => (
+            <div key={section.title} className={section.className}>
+              <h3 className="title">{section.title}</h3>
+              <Stack direction="column" spacing={0.5}>
+                {section.items.map((item) => (
+                  <ButtonSidebar
+                    key={item.path}
+                    className={item.className || ""}
+                    onClick={() => navigate(item.path)}
+                    startIcon={item.startIcon}
+                    label={item.label}
+                  />
+                ))}
+              </Stack>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -13,6 +13,7 @@ class EmpresaSerializer(serializers.ModelSerializer):
 
 class UsuarioSerializer(serializers.ModelSerializer):
     groups = serializers.PrimaryKeyRelatedField(many=True, queryset=Group.objects.all(), required=False)
+    group_names = serializers.SerializerMethodField()
 
     password = serializers.CharField(write_only=True, required=False)
 
@@ -26,6 +27,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
             "last_name",
             "email",
             "groups",
+            "group_names",
             "is_staff",
             "is_active",
             "is_superuser",
@@ -51,6 +53,9 @@ class UsuarioSerializer(serializers.ModelSerializer):
             user.set_password(password)
             user.save(update_fields=["password"])
         return user
+
+    def get_group_names(self, obj):
+        return list(obj.groups.values_list("name", flat=True))
 
 
 class GroupSerializer(serializers.ModelSerializer):

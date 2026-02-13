@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login.jsx'
 import DesktopLayout from './layouts/DesktopLayout.jsx'
 import Home from './pages/Home.jsx'
@@ -16,6 +16,8 @@ import PautaKPI from './pages/PautaKPI.jsx'
 import Health from './pages/Health.jsx'
 import Tenant from './pages/Tenant.jsx'
 import Users from './pages/Users.jsx'
+import { canAccessPath, getDefaultPath } from './services/access'
+import { getCurrentUser } from './services/auth'
 
 const MOBILE_MAX_WIDTH = 767
 const TABLET_MAX_WIDTH = 1024
@@ -54,23 +56,40 @@ function App() {
         ? TabletLayout
         : DesktopLayout
 
+  const GuardedRoute = ({ path, element }) => {
+    const currentUser = getCurrentUser()
+    if (!currentUser) return <Navigate to="/" replace />
+    if (!canAccessPath(path, currentUser)) {
+      return <Navigate to={getDefaultPath(currentUser)} replace />
+    }
+    return element
+  }
+
+  const LoginRoute = () => {
+    const currentUser = getCurrentUser()
+    if (currentUser) {
+      return <Navigate to={getDefaultPath(currentUser)} replace />
+    }
+    return <Login />
+  }
+
   return (
     <>
       <div>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<LoginRoute />} />
           <Route element={<ActiveLayout />}>
-            <Route path="/home" element={<Home />} />
-            <Route path="/stats" element={<Stats />} />
-            <Route path="/whatsapp" element={<WhatsApp />} />
-            <Route path="/contacts" element={<Agenda />} />
-            <Route path="/landing-config" element={<LandingConfig />} />
-            <Route path="/tipo-cambio" element={<TipoCambio />} />
-            <Route path="/health" element={<Health />} />
-            <Route path="/pauta-database" element={<PautaDatabase />} />
-            <Route path="/pauta-kpi" element={<PautaKPI />} />
-            <Route path="/empresas" element={<Tenant />} />
-            <Route path="/usuarios" element={<Users />} />
+            <Route path="/home" element={<GuardedRoute path="/home" element={<Home />} />} />
+            <Route path="/stats" element={<GuardedRoute path="/stats" element={<Stats />} />} />
+            <Route path="/whatsapp" element={<GuardedRoute path="/whatsapp" element={<WhatsApp />} />} />
+            <Route path="/contacts" element={<GuardedRoute path="/contacts" element={<Agenda />} />} />
+            <Route path="/landing-config" element={<GuardedRoute path="/landing-config" element={<LandingConfig />} />} />
+            <Route path="/tipo-cambio" element={<GuardedRoute path="/tipo-cambio" element={<TipoCambio />} />} />
+            <Route path="/health" element={<GuardedRoute path="/health" element={<Health />} />} />
+            <Route path="/pauta-database" element={<GuardedRoute path="/pauta-database" element={<PautaDatabase />} />} />
+            <Route path="/pauta-kpi" element={<GuardedRoute path="/pauta-kpi" element={<PautaKPI />} />} />
+            <Route path="/empresas" element={<GuardedRoute path="/empresas" element={<Tenant />} />} />
+            <Route path="/usuarios" element={<GuardedRoute path="/usuarios" element={<Users />} />} />
           </Route>
           <Route path="/landing" element={<Landing />} />
         </Routes>

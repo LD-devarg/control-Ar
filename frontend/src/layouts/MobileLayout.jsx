@@ -23,17 +23,19 @@ import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import User from "../components/User";
 import NuevosLeads from "../components/NuevosLeads.jsx";
 import NuevoLeadAlert from "../components/NuevoLeadAlert.jsx";
-import { logout } from "../services/auth";
+import { canAccessPath } from "../services/access";
+import { getCurrentUser, logout } from "../services/auth";
 
 function MobileLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const currentUser = getCurrentUser();
 
   const showNuevosLeads = location.pathname === "/home";
 
-  const sections = useMemo(
-    () => [
+  const sections = useMemo(() => {
+    const allSections = [
       {
         title: "GESTION",
         items: [
@@ -65,9 +67,15 @@ function MobileLayout() {
           { label: "Health", icon: <HealthAndSafetyOutlinedIcon />, path: "/health" },
         ],
       },
-    ],
-    []
-  );
+    ];
+
+    return allSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => canAccessPath(item.path, currentUser)),
+      }))
+      .filter((section) => section.items.length > 0);
+  }, [currentUser]);
 
   const goTo = (path) => {
     navigate(path);

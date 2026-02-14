@@ -4,7 +4,7 @@ export default function Page ({ title, actions, children }) {
             <div className="flex w-full flex-col">
                 <div className="flex w-full">
                     <h1
-                        className="text-sm text-left text-black dark:text-stone-50 font-semibold text-shadow-xs text-shadow-white"
+                        className="text-sm text-left w-full text-black dark:text-stone-50 font-semibold text-shadow-xs text-shadow-white"
                     >
                         {title}
                     </h1>

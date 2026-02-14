@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Page from "../layouts/Page";
 import TablaPauta from "../components/TablaPauta";
+import PautaCreateModal from "../components/PautaCreateModal";
+import Button from "@mui/material/Button";
+import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 
 const COLUMN_SETS = {
     Bms: [
@@ -23,7 +26,7 @@ const COLUMN_SETS = {
         { key: "name", label: "Nombre" },
         { key: "adAccount", label: "Ad Account" },
         { key: "metaId", label: "Meta_ID" },
-        { key: "createdAt", label: "Fecha de creación" },
+        { key: "createdAt", label: "Fecha de creacion" },
         { key: "objective", label: "Objetivo" },
         { key: "status", label: "Estado" },
     ],
@@ -32,13 +35,33 @@ const COLUMN_SETS = {
         { key: "campaign", label: "Campaign" },
         { key: "metaId", label: "Meta_ID" },
         { key: "budget", label: "Presupuesto" },
-        { key: "createdAt", label: "Fecha de creación" },
-        { key: "location", label: "Ubicación" },
-        { key: "region", label: "Región" },
-        { key: "conversionSite", label: "Sitio de Conversión" },
+        { key: "createdAt", label: "Fecha de creacion" },
+        { key: "location", label: "Ubicacion" },
+        { key: "region", label: "Region" },
+        { key: "conversionSite", label: "Sitio de Conversion" },
         { key: "ageRange", label: "Rango Edad" },
         { key: "gender", label: "Sexo" },
-        { key: "targeting", label: "Segmentación" },
+        { key: "targeting", label: "Segmentacion" },
+        { key: "status", label: "Estado" },
+    ],
+    Assets: [
+        { key: "name", label: "Nombre" },
+        { key: "s3_url", label: "S3 URL" },
+        { key: "metaAssetId", label: "Meta_ID" },
+        { key: "type", label: "Tipo" },
+        { key: "status", label: "Estado" },
+    ],
+    Creatives: [
+        { key: "name", label: "Nombre" },
+        { key: "fanpage", label: "Fanpage" },
+        { key: "instagram_account", label: "Cuenta de Instagram" },
+        { key: "primary_text", label: "Texto" },
+        { key: "headline", label: "Titulo" },
+        { key: "description", label: "Descripcion" },
+        { key: "metaId", label: "Meta_ID" },
+        { key: "url_destino", label: "URL Destino" },
+        { key: "asset", label: "Asset_ID" },
+        { key: "cta", label: "CTA" },
         { key: "status", label: "Estado" },
     ],
     Ads: [
@@ -55,23 +78,27 @@ const COLUMN_SETS = {
 export default function PautaDatabase() {
     const [tab, setTab] = useState("Bms");
     const [pickerOpen, setPickerOpen] = useState(false);
+    const [createModalOpen, setCreateModalOpen] = useState(false);
     const [selectedByView, setSelectedByView] = useState({});
     const pickerRef = useRef(null);
 
-    const tabs = ["Bms", "Ad Accounts", "FanPage", "Campaigns", "Adsets", "Ads"];
+    const tabs = Object.keys(COLUMN_SETS);
     const columnsForView = COLUMN_SETS[tab] ?? COLUMN_SETS.Bms;
 
     const selectedColumns = useMemo(() => {
         const saved = selectedByView[tab];
-        if (Array.isArray(saved)) return saved;
-        return columnsForView.map((col) => col.key);
+        if (Array.isArray(saved) && saved.length > 0) return saved;
+        return columnsForView.map(({ key }) => key);
     }, [columnsForView, selectedByView, tab]);
 
     const toggleColumn = (key) => {
         setSelectedByView((prev) => {
             const current = Array.isArray(prev[tab])
                 ? prev[tab]
-                : columnsForView.map((col) => col.key);
+                : columnsForView.map(({ key: columnKey }) => columnKey);
+            if (current.length === 1 && current.includes(key)) {
+                return prev;
+            }
             const next = current.includes(key)
                 ? current.filter((item) => item !== key)
                 : [...current, key];
@@ -82,12 +109,16 @@ export default function PautaDatabase() {
     const showAll = () => {
         setSelectedByView((prev) => ({
             ...prev,
-            [tab]: columnsForView.map((col) => col.key),
+            [tab]: columnsForView.map(({ key }) => key),
         }));
     };
 
     const hideAll = () => {
-        setSelectedByView((prev) => ({ ...prev, [tab]: [] }));
+        setSelectedByView((prev) => {
+            const firstKey = columnsForView[0]?.key;
+            if (!firstKey) return prev;
+            return { ...prev, [tab]: [firstKey] };
+        });
     };
 
     useEffect(() => {
@@ -97,13 +128,39 @@ export default function PautaDatabase() {
                 setPickerOpen(false);
             }
         };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+        document.addEventListener("pointerdown", handleClickOutside);
+        return () => document.removeEventListener("pointerdown", handleClickOutside);
     }, [pickerOpen]);
 
+    const handleOpenCreateModal = () => {
+        setCreateModalOpen(true);
+    };
+
+    const handleCloseCreateModal = () => {
+        setCreateModalOpen(false);
+    };
+
+    const handleCreated = ({ type }) => {
+        setCreateModalOpen(false);
+        if (type) setTab(type);
+    };
+
     return (
-        <Page title="Base de Datos Pauta Publicitaria">
-            <div className="w-full">
+        <Page
+            title="Base de Datos Pauta Publicitaria"
+            actions={
+                <Button
+                    variant="outlined"
+                    size="medium"
+                    color="primary"
+                    startIcon={<AddOutlinedIcon />}
+                    onClick={handleOpenCreateModal}
+                >
+                    Crear
+                </Button>
+            }
+        >
+            <div className="mt-4 w-full">
                 <div className="w-full rounded-2xl border border-slate-300/40 bg-white/80 p-4 shadow-sm dark:border-zinc-700 dark:bg-neutral-900/70">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         {tabs.map((label) => {
@@ -177,6 +234,14 @@ export default function PautaDatabase() {
                     </div>
                 </div>
             </div>
+
+            <PautaCreateModal
+                open={createModalOpen}
+                onClose={handleCloseCreateModal}
+                types={tabs}
+                defaultType={tab}
+                onCreated={handleCreated}
+            />
         </Page>
     );
 }

@@ -3,7 +3,7 @@ from datetime import datetime, time, timedelta
 
 from django.db import models, transaction
 from django.db.models import Sum, Min
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -32,6 +32,7 @@ from .serializers import (
 from .servicios.calculos import calcular_compra
 from .servicios.enviador import enviar_evento_meta
 from apps.pauta.servicios.insights import fetch_meta_page_views
+from apps.pauta.models import GastoDiario
 from .realtime import publish_empresa_event
 
 def _filter_by_empresa(qs, user):
@@ -97,6 +98,54 @@ def _get_date_range(request):
 
     today = timezone.now().date()
     return today - timedelta(days=7), today
+
+
+def _get_datetime_range(request):
+    period = request.query_params.get("period")
+    from_str = request.query_params.get("from")
+    to_str = request.query_params.get("to")
+
+    start = end = None
+
+    if from_str:
+        d = parse_date(from_str)
+        if d:
+            start = timezone.make_aware(datetime.combine(d, time.min))
+    if to_str:
+        d = parse_date(to_str)
+        if d:
+            end = timezone.make_aware(datetime.combine(d, time.max))
+
+    if not start and not end and period:
+        now = timezone.now()
+        if period == "day":
+            start = now - timedelta(days=1)
+        elif period == "week":
+            start = now - timedelta(days=7)
+        elif period == "month":
+            start = now - timedelta(days=30)
+
+    return start, end
+
+
+def _get_empresa_scope_id(request):
+    user = request.user
+
+    if user.is_superuser:
+        empresa_param = request.query_params.get("empresa")
+        if empresa_param:
+            try:
+                return int(empresa_param)
+            except (TypeError, ValueError):
+                raise ValidationError("Parametro empresa invalido.")
+        if user.empresa_id:
+            return user.empresa_id
+        raise ValidationError("Empresa requerida para superusuario.")
+
+    if user.empresa_id:
+        return user.empresa_id
+
+    raise ValidationError("Empresa no disponible en el usuario actual.")
 
 
 class ClienteViewSet(viewsets.ModelViewSet):
@@ -478,19 +527,18 @@ class StatsViewSet(viewsets.ViewSet):
         return is_admin(request.user) or is_pauta(request.user) or is_operador(request.user)
 
     def list(self, request):
-        user = request.user
-        if not user.empresa_id:
-            raise ValidationError("Empresa no disponible en el usuario actual.")
-
-        empresa_id = user.empresa_id
+        empresa_id = _get_empresa_scope_id(request)
 
         visitas_qs = LandingVisit.objects.filter(empresa_id=empresa_id)
         eventos_qs = EventosMeta.objects.filter(empresa_id=empresa_id)
         compras_qs = Compra.objects.filter(empresa_id=empresa_id)
+        gastos_qs = GastoDiario.objects.filter(empresa_id=empresa_id)
 
         visitas_qs = _apply_date_filters(visitas_qs, "creado_en", request)
         eventos_qs = _apply_date_filters(eventos_qs, "creado_en", request)
         compras_qs = _apply_date_filters(compras_qs, "creado_en", request)
+        from_date, to_date = _get_date_range(request)
+        gastos_qs = gastos_qs.filter(fecha__gte=from_date, fecha__lte=to_date)
 
         web_visitors = visitas_qs.count()
         leads = eventos_qs.filter(tipo="lead").count()
@@ -502,6 +550,24 @@ class StatsViewSet(viewsets.ViewSet):
         compras_clientes = compras_qs.values("cliente_id").distinct().count()
         conversion_pct = (compras_clientes / contactos * 100) if contactos else 0
         valor_compra_prom = (compras_total / compras_count) if compras_count else 0
+
+        first_purchase_id_subquery = (
+            Compra.objects.filter(empresa_id=empresa_id, cliente_id=OuterRef("cliente_id"))
+            .order_by("creado_en", "id")
+            .values("id")[:1]
+        )
+        primeras_compras_qs = Compra.objects.filter(
+            empresa_id=empresa_id,
+            id=Subquery(first_purchase_id_subquery),
+        )
+        start_dt, end_dt = _get_datetime_range(request)
+        if start_dt:
+            primeras_compras_qs = primeras_compras_qs.filter(creado_en__gte=start_dt)
+        if end_dt:
+            primeras_compras_qs = primeras_compras_qs.filter(creado_en__lte=end_dt)
+        primeras_compras_usd = primeras_compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
+        gasto_usd = gastos_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
+        roas = (primeras_compras_usd / gasto_usd) if gasto_usd else 0
 
         firsts = (
             compras_qs.values("cliente_id")
@@ -537,6 +603,9 @@ class StatsViewSet(viewsets.ViewSet):
             "conversion_pct": conversion_pct,
             "valor_compra_prom": valor_compra_prom,
             "retencion_pct": retencion_pct,
+            "primeras_compras_usd": primeras_compras_usd,
+            "gasto_usd": gasto_usd,
+            "roas": roas,
             "base": {
                 "contactos": contactos,
                 "compras_clientes": compras_clientes,
@@ -557,8 +626,7 @@ class StatsViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["get"], url_path="nuevas-compras")
     def nuevas_compras(self, request):
         user = request.user
-        if not user.empresa_id:
-            raise ValidationError("Empresa no disponible en el usuario actual.")
+        empresa_id = _get_empresa_scope_id(request)
 
         limit_param = request.query_params.get("limit", "20")
         try:
@@ -568,7 +636,7 @@ class StatsViewSet(viewsets.ViewSet):
         limit = max(1, min(limit, 100))
 
         compras_qs = (
-            Compra.objects.filter(empresa_id=user.empresa_id)
+            Compra.objects.filter(empresa_id=empresa_id)
             .select_related("cliente", "operador")
         )
         if is_operador(user):
@@ -590,3 +658,82 @@ class StatsViewSet(viewsets.ViewSet):
             for compra in compras_qs
         ]
         return Response(data)
+
+    @action(detail=False, methods=["get"], url_path="eventos-recientes")
+    def eventos_recientes(self, request):
+        user = request.user
+        empresa_id = _get_empresa_scope_id(request)
+
+        limit_param = request.query_params.get("limit", "25")
+        try:
+            limit = int(limit_param)
+        except ValueError:
+            limit = 25
+        limit = max(1, min(limit, 100))
+
+        eventos_qs = (
+            EventosMeta.objects.filter(empresa_id=empresa_id, tipo__in=["lead", "contact"])
+            .select_related("cliente", "operador")
+        )
+        if is_operador(user):
+            eventos_qs = eventos_qs.filter(
+                (models.Q(tipo="lead") & models.Q(operador__isnull=True))
+                | (models.Q(tipo="contact") & models.Q(operador=user))
+            )
+        eventos_qs = _apply_date_filters(eventos_qs, "creado_en", request).order_by("-creado_en")[:limit]
+
+        compras_qs = (
+            Compra.objects.filter(empresa_id=empresa_id)
+            .select_related("cliente", "operador")
+        )
+        if is_operador(user):
+            compras_qs = compras_qs.filter(operador=user)
+        compras_qs = _apply_date_filters(compras_qs, "creado_en", request).order_by("-creado_en")[:limit]
+
+        feed = []
+
+        for evento in eventos_qs:
+            feed.append(
+                {
+                    "id": f"{evento.tipo}-{evento.id}",
+                    "evento": evento.tipo,
+                    "evento_label": "Lead" if evento.tipo == "lead" else "Contacto",
+                    "fecha_hora": evento.creado_en,
+                    "username": evento.cliente.username if evento.cliente else "",
+                    "nombre": evento.cliente.nombre if evento.cliente else "",
+                    "contacto": evento.cliente.contacto if evento.cliente else "",
+                    "operador": evento.operador.username if evento.operador else "",
+                    "cliente_id": evento.cliente_id,
+                }
+            )
+
+        for compra in compras_qs:
+            comprobante_url = ""
+            if compra.comprobante_archivo:
+                try:
+                    comprobante_url = compra.comprobante_archivo.url
+                except Exception:
+                    comprobante_url = ""
+            if not comprobante_url:
+                comprobante_url = compra.comprobante or ""
+
+            feed.append(
+                {
+                    "id": f"compra-{compra.id}",
+                    "evento": "compra",
+                    "evento_label": "Compra",
+                    "fecha_hora": compra.creado_en,
+                    "username": compra.cliente.username if compra.cliente else "",
+                    "nombre": compra.cliente.nombre if compra.cliente else "",
+                    "contacto": compra.cliente.contacto if compra.cliente else "",
+                    "operador": compra.operador.username if compra.operador else "",
+                    "cliente_id": compra.cliente_id,
+                    "compra_id": compra.id,
+                    "monto_ars": compra.monto_ars,
+                    "monto_usd": compra.monto_usd,
+                    "comprobante_url": comprobante_url,
+                }
+            )
+
+        feed.sort(key=lambda item: item["fecha_hora"], reverse=True)
+        return Response(feed[:limit])

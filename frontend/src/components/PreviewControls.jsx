@@ -70,12 +70,18 @@ function PreviewControlsComponent({
                     <div className="text-xs text-white/70 mb-2">Colores</div>
                     <div className="flex items-center gap-2">
                         <input
+                            id="bg-gradient-from"
+                            name="bg-gradient-from"
+                            aria-label="Color inicial del gradiente"
                             type="color"
                             value={bgGradientFrom}
                             onChange={(event) => onFormChange({ bgGradientFrom: event.target.value })}
                             className="w-10 h-8 rounded border border-white/40 bg-transparent"
                         />
                         <input
+                            id="bg-gradient-to"
+                            name="bg-gradient-to"
+                            aria-label="Color final del gradiente"
                             type="color"
                             value={bgGradientTo}
                             onChange={(event) => onFormChange({ bgGradientTo: event.target.value })}
@@ -87,6 +93,9 @@ function PreviewControlsComponent({
                 <>
                     <div className="text-xs text-white/70 mb-2">Color</div>
                     <input
+                        id="bg-solid-color"
+                        name="bg-solid-color"
+                        aria-label="Color de fondo"
                         type="color"
                         value={bgColor}
                         onChange={(event) => onFormChange({ bgColor: event.target.value })}
@@ -99,6 +108,9 @@ function PreviewControlsComponent({
             <div className="grid grid-cols-2 gap-3 text-xs">
                 <label className="flex items-center gap-2 text-white/80">
                     <input
+                        id="text-color-titulo"
+                        name="text-color-titulo"
+                        aria-label="Color del titulo"
                         type="color"
                         value={colorTitulo}
                         onChange={(event) => onFormChange({ colorTitulo: event.target.value })}
@@ -108,6 +120,9 @@ function PreviewControlsComponent({
                 </label>
                 <label className="flex items-center gap-2 text-white/80">
                     <input
+                        id="text-color-subtitulo"
+                        name="text-color-subtitulo"
+                        aria-label="Color del subtitulo"
                         type="color"
                         value={colorSubtitulo}
                         onChange={(event) => onFormChange({ colorSubtitulo: event.target.value })}
@@ -117,6 +132,9 @@ function PreviewControlsComponent({
                 </label>
                 <label className="flex items-center gap-2 text-white/80">
                     <input
+                        id="text-color-keyword"
+                        name="text-color-keyword"
+                        aria-label="Color de la keyword"
                         type="color"
                         value={colorKeyword}
                         onChange={(event) => onFormChange({ colorKeyword: event.target.value })}
@@ -126,6 +144,9 @@ function PreviewControlsComponent({
                 </label>
                 <label className="flex items-center gap-2 text-white/80">
                     <input
+                        id="text-color-bono"
+                        name="text-color-bono"
+                        aria-label="Color del bono"
                         type="color"
                         value={colorBono}
                         onChange={(event) => onFormChange({ colorBono: event.target.value })}
@@ -135,6 +156,9 @@ function PreviewControlsComponent({
                 </label>
                 <label className="flex items-center gap-2 text-white/80">
                     <input
+                        id="text-color-info"
+                        name="text-color-info"
+                        aria-label="Color del texto de info"
                         type="color"
                         value={colorInfo}
                         onChange={(event) => onFormChange({ colorInfo: event.target.value })}

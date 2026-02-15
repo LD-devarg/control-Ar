@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import "../assets/css/UploadButton.css";
 
 const MAX_SIZE_BYTES = 1024 * 1024;
 
 function UploadButton({ label = "Subir archivo", onUpload }) {
+  const inputId = useId();
   const inputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [fileInfo, setFileInfo] = useState(null);
@@ -68,6 +69,8 @@ function UploadButton({ label = "Subir archivo", onUpload }) {
       {error ? <div className="upload-dropzone-error">{error}</div> : null}
       <input
         ref={inputRef}
+        id={inputId}
+        name={inputId}
         type="file"
         accept="image/*"
         hidden

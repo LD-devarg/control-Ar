@@ -1,6 +1,8 @@
 from rest_framework import viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from .models import Empresa, Usuario
 from django.contrib.auth.models import Group
@@ -58,7 +60,14 @@ class UsuarioViewSet(viewsets.ModelViewSet):
     def has_role_permission(self, request, view):
         if request.user.is_superuser:
             return True
-        return is_admin(request.user)
+        if is_admin(request.user):
+            return True
+        if view.action == "me":
+            return True
+        if view.action == "retrieve":
+            target_id = view.kwargs.get("pk")
+            return str(target_id) == str(request.user.id)
+        return False
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -68,12 +77,24 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             return qs.filter(empresa_id=self.request.user.empresa_id)
         return qs.none()
 
+    @action(detail=False, methods=["get"], url_path="me")
+    def me(self, request):
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
         if serializer.validated_data.get("is_superuser"):
             raise ValidationError("No se puede crear un superusuario por API.")
         grupos = serializer.validated_data.get("groups") or []
         for grupo in grupos:
             _run_validation(validar_creacion_usuario, self.request.user, grupo)
+        if self.request.user.is_superuser:
+            if serializer.validated_data.get("empresa") is None:
+                raise ValidationError("Para crear usuarios, selecciona una empresa.")
+        else:
+            if self.request.user.empresa_id is None:
+                raise ValidationError("Tu usuario no tiene empresa asignada.")
+            serializer.validated_data["empresa"] = self.request.user.empresa
         serializer.save()
 
     def perform_update(self, serializer):
@@ -88,6 +109,14 @@ class UsuarioViewSet(viewsets.ModelViewSet):
                 _run_validation(validar_modificacion_usuario, self.request.user, instance, grupo)
         else:
             _run_validation(validar_modificacion_usuario, self.request.user, instance, None)
+        if self.request.user.is_superuser and not instance.is_superuser:
+            next_empresa = serializer.validated_data.get("empresa", instance.empresa)
+            if next_empresa is None:
+                raise ValidationError("Para usuarios no superusuario, empresa es obligatoria.")
+        if not self.request.user.is_superuser:
+            if self.request.user.empresa_id is None:
+                raise ValidationError("Tu usuario no tiene empresa asignada.")
+            serializer.validated_data["empresa"] = self.request.user.empresa
         serializer.save()
 
 

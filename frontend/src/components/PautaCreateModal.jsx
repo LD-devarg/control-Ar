@@ -21,6 +21,56 @@ function buildInitialForm(config) {
 
 function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated }) {
   const options = useMemo(() => types.map((item) => ({ key: item, label: item })), [types]);
+  const whiteFieldSx = useMemo(
+    () => ({
+      "& .MuiInputBase-input": {
+        color: "#ffffff",
+      },
+      "& .MuiInputBase-input::placeholder": {
+        color: "rgba(255,255,255,0.65)",
+        opacity: 1,
+      },
+      "& .MuiInputLabel-root": {
+        color: "rgba(255,255,255,0.8)",
+      },
+      "& .MuiInputLabel-root.Mui-focused": {
+        color: "#ffffff",
+      },
+      "& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline": {
+        borderColor: "rgba(255,255,255,0.7)",
+      },
+      "&:hover .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline": {
+        borderColor: "#ffffff",
+      },
+      "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+        borderColor: "#ffffff",
+      },
+      "& .MuiSvgIcon-root": {
+        color: "#ffffff",
+      },
+    }),
+    []
+  );
+
+  const whiteAutocompletePopperSx = useMemo(
+    () => ({
+      zIndex: 4000,
+      "& .MuiPaper-root": {
+        backgroundColor: "#111827",
+        color: "#ffffff",
+      },
+      "& .MuiAutocomplete-option": {
+        color: "#ffffff",
+      },
+      "& .MuiAutocomplete-option[aria-selected='true']": {
+        backgroundColor: "rgba(59,130,246,0.25)",
+      },
+      "& .MuiAutocomplete-option.Mui-focused": {
+        backgroundColor: "rgba(255,255,255,0.12)",
+      },
+    }),
+    []
+  );
 
   const [selectedType, setSelectedType] = useState(null);
   const [formValues, setFormValues] = useState({});
@@ -175,7 +225,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
               onChange={(_, value) => setSelectedType(value)}
               isOptionEqualToValue={(option, value) => option.key === value?.key}
               getOptionLabel={(option) => option?.label || ""}
-              slotProps={{ popper: { sx: { zIndex: 4000 } } }}
+              slotProps={{ popper: { sx: whiteAutocompletePopperSx } }}
               renderInput={(params) => (
                 <TextField
                   {...params}
@@ -183,6 +233,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                   placeholder="Seleccionar..."
                   fullWidth
                   size="small"
+                  sx={whiteFieldSx}
                 />
               )}
             />
@@ -210,9 +261,15 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                     onChange={(_, value) => updateField(field.name, value?.id ?? "")}
                     getOptionLabel={(option) => buildOptionLabel(option)}
                     isOptionEqualToValue={(option, value) => option.id === value?.id}
-                    slotProps={{ popper: { sx: { zIndex: 4000 } } }}
+                    slotProps={{ popper: { sx: whiteAutocompletePopperSx } }}
                     renderInput={(params) => (
-                      <TextField {...params} label={field.label} required={field.required} size="small" />
+                      <TextField
+                        {...params}
+                        label={field.label}
+                        required={field.required}
+                        size="small"
+                        sx={whiteFieldSx}
+                      />
                     )}
                   />
                 );
@@ -230,6 +287,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                     onChange={(event) => updateField(field.name, event.target.value)}
                     fullWidth
                     size="small"
+                    sx={{ ...whiteFieldSx }}
                   />
                 );
               }
@@ -244,6 +302,9 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                   onChange={(event) => updateField(field.name, event.target.value)}
                   fullWidth
                   size="small"
+                  sx={{ ...whiteFieldSx, 
+                    marginBottom: "16px !important",
+                  }}
                 />
               );
             })}
@@ -254,7 +315,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-4">
-          <Button variant="outlined" onClick={onClose}>
+          <Button variant="outlined" onClick={onClose} sx={{ borderColor: "rgba(255,255,255,0.7)", color: "#ffffff" }}>
             Cancelar
           </Button>
           <Button variant="contained" disabled={!selectedType || saving} onClick={handleSubmit}>

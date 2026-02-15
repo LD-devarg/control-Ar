@@ -7,8 +7,10 @@ import ModalConfirmacion from "../components/ModalConfirmacion.jsx";
 import ModalAgregarLinea from "../components/ModalAgregarLinea.jsx";
 import Page from "../layouts/Page.jsx";
 import { createWhatsapp, deactivateWhatsapp, fetchWhatsapps } from "../services/recursos/whatsapp";
+import { useTenant } from "../context/TenantContext";
 
 function WhatsApp() {
+    const { tenantId } = useTenant();
     const [lines, setLines] = useState([]);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [selectedLineId, setSelectedLineId] = useState(null);
@@ -46,7 +48,7 @@ function WhatsApp() {
         return () => {
             mounted = false;
         };
-    }, []);
+    }, [tenantId]);
 
     const activeLines = useMemo(() => lines.filter((line) => line.activo), [lines]);
 

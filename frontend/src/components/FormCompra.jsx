@@ -9,7 +9,8 @@ import "../assets/css/Form.css";
 import UploadButton from './UploadButton';
 import { useTheme } from '@mui/material/styles';
 import { fetchClientes } from '../services/operativo/clientes';
-import { apiClient, getCurrentUser } from '../services/auth';
+import { apiClient } from '../services/auth';
+import { useTenant } from '../context/TenantContext';
 
 export default function FormCompra() {
   const theme = useTheme();
@@ -22,7 +23,7 @@ export default function FormCompra() {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
-  const empresaId = getCurrentUser()?.empresa;
+  const { tenantId: empresaId } = useTenant();
   const fieldSx = {
     '& .MuiInputBase-input': { color },
     '& .MuiInputLabel-root': { color },
@@ -53,7 +54,7 @@ export default function FormCompra() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [empresaId]);
 
   const canSubmit = useMemo(() => {
     return Boolean(selectedCliente?.id) && Boolean(monto) && Boolean(empresaId);

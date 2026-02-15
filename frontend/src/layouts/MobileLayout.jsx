@@ -22,7 +22,9 @@ import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutl
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import User from "../components/User";
 import NuevosLeads from "../components/NuevosLeads.jsx";
+import StatsEventsAside from "../components/StatsEventsAside.jsx";
 import NuevoLeadAlert from "../components/NuevoLeadAlert.jsx";
+import TenantSelector from "../components/TenantSelector.jsx";
 import { canAccessPath } from "../services/access";
 import { getCurrentUser, logout } from "../services/auth";
 
@@ -33,6 +35,7 @@ function MobileLayout() {
   const currentUser = getCurrentUser();
 
   const showNuevosLeads = location.pathname === "/home";
+  const showEventos = location.pathname === "/stats";
 
   const sections = useMemo(() => {
     const allSections = [
@@ -97,6 +100,7 @@ function MobileLayout() {
           <span className="text-sm font-bold tracking-wide text-black dark:text-white">CONTROL AR</span>
         </div>
         <div className="flex items-center gap-1">
+          <TenantSelector />
           <NuevoLeadAlert />
           <User />
         </div>
@@ -109,6 +113,11 @@ function MobileLayout() {
         {showNuevosLeads ? (
           <div className="mt-3 min-w-0">
             <NuevosLeads />
+          </div>
+        ) : null}
+        {showEventos ? (
+          <div className="mt-3 min-w-0">
+            <StatsEventsAside />
           </div>
         ) : null}
       </main>

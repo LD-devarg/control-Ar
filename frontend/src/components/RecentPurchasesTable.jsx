@@ -3,8 +3,10 @@ import dayjs from "dayjs";
 import { apiClient } from "../services/auth";
 import { subscribeRealtimeEvents } from "../services/realtime";
 import "../assets/css/RecentPurchasesTable.css";
+import { useTenant } from "../context/TenantContext";
 
 function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
+  const { tenantId } = useTenant();
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState([]);
   const [highlightedIds, setHighlightedIds] = useState([]);
@@ -21,7 +23,7 @@ function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
             to: hasta?.format("YYYY-MM-DD"),
             limit: 20,
           },
-    [usePeriod, period, desde, hasta]
+    [usePeriod, period, desde, hasta, tenantId]
   );
 
   const arsFormatter = useMemo(
@@ -150,7 +152,7 @@ function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
   }, [triggerRefresh]);
 
   return (
-    <div className="w-full min-w-0 rounded-xl border border-white/10 bg-black/80 text-white p-4 overflow-hidden flex flex-col h-[320px]">
+    <div className="w-full min-w-0 rounded-xl border border-white/10 bg-black/80 text-white p-4 overflow-hidden flex flex-col h-[300px]">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-base font-semibold">Nuevas compras (tiempo real)</h3>
         <span className="text-xs text-white/60">

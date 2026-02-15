@@ -3,7 +3,7 @@ import { motion } from 'motion/react'
 
 function Card({ title, value, subtitle, accentClass, icon, sizeHeight, sizeWidth }) {
   return (
-    <motion.div className={`${accentClass || ''}  flex flex-col ${sizeHeight || ''} ${sizeWidth || ''} border border-gray-500 shadow-lg shadow-black bg-neutral-900 rounded-xl ps-4 pt-2` .trim()}
+    <motion.div className={`${accentClass || ''}  justify-self-start flex flex-col ${sizeHeight || ''} ${sizeWidth || ''} border border-gray-500 shadow-lg shadow-black bg-neutral-900 rounded-xl ps-4 pt-2` .trim()}
       whileHover={{ scale: 1.05 }}
       transition={{ duration: 0.2 }}
       

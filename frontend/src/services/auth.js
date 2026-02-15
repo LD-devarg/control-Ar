@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getEffectiveTenantId } from "./tenant";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
@@ -6,12 +7,27 @@ export const apiClient = axios.create({
   baseURL: API_URL,
 });
 
+function shouldSkipTenantParam(url = "") {
+  const normalized = String(url || "").toLowerCase();
+  return normalized.startsWith("/empresas/") || normalized.startsWith("/grupos/");
+}
+
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("access_token");
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  const method = String(config.method || "get").toLowerCase();
+  const tenantId = getEffectiveTenantId();
+  if (tenantId && (method === "get" || method === "delete") && !shouldSkipTenantParam(config.url)) {
+    config.params = config.params || {};
+    if (config.params.empresa === undefined) {
+      config.params.empresa = tenantId;
+    }
+  }
+
   return config;
 });
 
@@ -137,9 +153,7 @@ export function getCurrentUser() {
 }
 
 export async function fetchCurrentUser(accessToken) {
-  const payload = parseJwt(accessToken);
-  if (!payload?.user_id) return null;
-  const { data } = await axios.get(`${API_URL}/usuarios/${payload.user_id}/`, {
+  const { data } = await axios.get(`${API_URL}/usuarios/me/`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   return data;
@@ -155,6 +169,7 @@ export async function login(username, password) {
   const user = await fetchCurrentUser(data.access);
   if (user) {
     localStorage.setItem("current_user", JSON.stringify(user));
+    window.dispatchEvent(new CustomEvent("auth:user-changed"));
   }
   startTokenRefresh();
   return user;
@@ -167,5 +182,7 @@ export function logout() {
   localStorage.removeItem("clientes_cache");
   localStorage.removeItem("clientes_cache_ts");
   localStorage.removeItem("clientes_dirty");
+  localStorage.removeItem("active_tenant_id");
   stopTokenRefresh();
+  window.dispatchEvent(new CustomEvent("auth:user-changed"));
 }

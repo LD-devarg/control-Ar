@@ -1,4 +1,5 @@
-import { apiClient, getCurrentUser } from "../auth";
+import { apiClient } from "../auth";
+import { getEffectiveTenantId } from "../tenant";
 
 const CACHE_KEY = "clientes_cache";
 const DIRTY_KEY = "clientes_dirty";
@@ -34,9 +35,9 @@ export function clearClientesCache() {
 }
 
 export async function fetchClientes() {
-  const user = getCurrentUser();
-  if (!user?.empresa) {
-    throw new Error("Empresa no disponible en el usuario actual.");
+  const tenantId = getEffectiveTenantId();
+  if (!tenantId) {
+    throw new Error("Empresa no disponible para el contexto actual.");
   }
 
   const cached = readCache();
@@ -45,7 +46,7 @@ export async function fetchClientes() {
   }
 
   const { data } = await apiClient.get(`/clientes/`, {
-    params: { empresa__id: user.empresa },
+    params: { empresa__id: tenantId },
   });
   writeCache(data);
   return data;

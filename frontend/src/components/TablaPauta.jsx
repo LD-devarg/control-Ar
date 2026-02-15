@@ -144,6 +144,8 @@ export default function TablaPauta({
               className="flex items-center gap-1 rounded-full border border-slate-300/70 bg-white/70 px-2 py-1 text-xs text-slate-600 transition hover:bg-white dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               <input
+                id={`tabla-pauta-column-${view}-${col.key}`}
+                name={`tabla-pauta-column-${view}-${col.key}`}
                 type="checkbox"
                 className="accent-sky-600"
                 checked={selectedKeys.includes(col.key)}

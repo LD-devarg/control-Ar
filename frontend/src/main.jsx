@@ -6,6 +6,7 @@ import CssBaseline from '@mui/material/CssBaseline'
 import App from './App.jsx'
 import './main.css'
 import { startTokenRefresh } from './services/auth'
+import { TenantProvider } from './context/TenantContext'
 
 function Root() {
   const [mode, setMode] = useState(() =>
@@ -38,7 +39,9 @@ function Root() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
-        <App />
+        <TenantProvider>
+          <App />
+        </TenantProvider>
       </BrowserRouter>
     </ThemeProvider>
   )

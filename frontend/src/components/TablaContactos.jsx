@@ -29,12 +29,6 @@ const columns = [
     dataKey: 'username',
   },
   {
-    width: 160,
-    label: 'Cantidad de Compras',
-    dataKey: 'cant_compras',
-    numeric: true,
-  },
-  {
     width: 180,
     label: 'Monto Compra ARS',
     dataKey: 'total_compras_ars',
@@ -196,6 +190,9 @@ export default function ReactVirtualizedTable() {
       <div className="tabla-contactos-layout">
         <div className="tabla-contactos-filters">
           <input
+            id="tabla-contactos-search"
+            name="tabla-contactos-search"
+            aria-label="Buscar contactos"
             className="tabla-contactos-input"
             type="text"
             value={search}

@@ -68,7 +68,7 @@ class HealthView(APIView):
                     beat_ok = False
                 else:
                     beat_last_run = task.last_run_at
-                    beat_ok = beat_last_run >= timezone.now() - timedelta(minutes=2)
+                    beat_ok = beat_last_run >= timezone.now() - timedelta(minutes=5)
             except Exception as exc:  # pragma: no cover
                 beat_ok = False
                 beat_error = str(exc)

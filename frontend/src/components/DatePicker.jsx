@@ -16,9 +16,14 @@ export default function FilterDatePicker({ label, value, onChange }) {
           size: 'small',
           className: 'filter-date-picker',
           sx: {
+            width: { xs: '100%', sm: 'fit-content' },
+            '& .MuiInputBase-root': {
+              width: { xs: '100%', sm: 'fit-content' },
+              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
+            },
             '& .MuiPickersSectionList-root': {
               color: inputColor,
-              width: 'auto',
+              width: { xs: '100%', sm: '10ch' },
               minWidth: 0,
             },
             '& .MuiPickersOutlinedInput-notchedOutline': {
@@ -38,9 +43,6 @@ export default function FilterDatePicker({ label, value, onChange }) {
             },
             '& .MuiSvgIcon-root': {
               color: inputColor,
-            },
-            '& .MuiInputBase-root': {
-              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)',
             },
           },
         },

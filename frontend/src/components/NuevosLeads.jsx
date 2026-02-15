@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "../services/auth";
 import { subscribeRealtimeEvents } from "../services/realtime";
 import ModalBase from "./ModalBase.jsx";
+import { useTenant } from "../context/TenantContext";
 
 function formatDateTime(value) {
     if (!value) return "-";
@@ -14,6 +15,7 @@ function formatDateTime(value) {
 }
 
 function NuevosLeads() {
+    const { tenantId } = useTenant();
     const [leads, setLeads] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -40,7 +42,7 @@ function NuevosLeads() {
                 setLoading(false);
             }
         }
-    }, []);
+    }, [tenantId]);
 
     useEffect(() => {
         loadLeads();
@@ -95,13 +97,14 @@ function NuevosLeads() {
     const leadRows = useMemo(() => leads.map((lead) => ({
         ...lead,
         username: lead.cliente_username || "Sin username",
-        nombre: lead.cliente_nombre || "Sin nombre",
         fecha: formatDateTime(lead.creado_en),
     })), [leads]);
 
     return (
         <div className="flex flex-col gap-4 p-4 align-center items-center bg-white dark:bg-neutral-900 rounded-2xl shadow-xl shadow-black w-full h-full">
-            <h2 className="text-black dark:text-white text-lg text-shadow-md text-shadow-black font-semibold">NUEVOS LEADS</h2>
+            <div className="w-full">
+                <h2 className="text-black dark:text-white text-sm font-semibold text-left">NUEVOS LEADS</h2>
+            </div>
             <div className="w-full flex flex-col gap-2">
                 {loading ? <p className="text-black dark:text-white text-center">Cargando...</p> : null}
                 {error ? <p className="text-red-500 text-center">{error}</p> : null}
@@ -112,20 +115,25 @@ function NuevosLeads() {
                 ) : null}
                 <div className="flex flex-col gap-2 max-h-full overflow-y-auto px-1 py-1">
                     {leadRows.map((lead) => (
-                        <div key={lead.id} className="flex flex-col gap-1 p-3 bg-neutral-100 dark:bg-neutral-800 rounded-lg cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors">
-                            <button
-                                type="button"
-                                className="font-medium text-left text-blue-800 dark:text-blue-700 underline
-                                bg-none border-none p-0 m-0"
-                                onClick={() => handleOpen(lead)}
-                            >
-                                {lead.username}
-                            </button>
-                            <div className="flex justify-between text-sm text-neutral-600 dark:text-neutral-400">
-                                <span>{lead.nombre}</span>
+                        <button
+                            key={lead.id}
+                            type="button"
+                            onClick={() => handleOpen(lead)}
+                            className="w-full rounded-[18px] cursor-pointer bg-gradient-to-r from-white/10 via-white/5 to-transparent px-4 py-3 text-left transition-all duration-200 hover:border-white/30"
+                        >
+                            <div className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-white/65">
+                                <span>Lead</span>
                                 <span>{lead.fecha}</span>
                             </div>
-                        </div>
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="truncate text-lg font-semibold text-white">
+                                    {lead.username}
+                                </span>
+                                <span className="shrink-0 text-base font-semibold text-cyan-300">
+                                    {lead.cliente_contacto || "Sin nombre"}
+                                </span>
+                            </div>
+                        </button>
                     ))}
                 </div>
             </div>

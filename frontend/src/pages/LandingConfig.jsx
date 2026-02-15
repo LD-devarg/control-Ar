@@ -7,11 +7,13 @@ import Stack from "@mui/material/Stack";
 import SaveIcon from "@mui/icons-material/Save";
 import Page from "../layouts/Page";
 import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import UploadButton from "../components/UploadButton";
 import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
-import { apiClient, getCurrentUser } from "../services/auth";
+import { apiClient } from "../services/auth";
 import PreviewLanding from "../components/PreviewLanding";
+import { useTenant } from "../context/TenantContext";
 
 const EMPTY_FORM = {
     nombre: "",
@@ -77,6 +79,7 @@ const buildGradient = (angle, from, to) =>
     `linear-gradient(${angle}deg, ${from} 0%, ${to} 100%)`;
 
 function LandingConfig() {
+    const { tenantId } = useTenant();
     const [selectedLanding, setSelectedLanding] = useState(null);
     const [landingOptions, setLandingOptions] = useState([]);
     const [form, setForm] = useState(() => cloneEmptyForm());
@@ -190,7 +193,7 @@ function LandingConfig() {
 
     useEffect(() => {
         loadLandings();
-    }, [loadLandings]);
+    }, [loadLandings, tenantId]);
 
     const isEditMode = Boolean(selectedLanding);
     const currentGradient = useMemo(
@@ -243,8 +246,7 @@ function LandingConfig() {
 
     const handleSubmit = async () => {
         if (primaryDisabled || submitting) return;
-        const user = getCurrentUser();
-        if (!user?.empresa) {
+        if (!tenantId) {
             showToast("error", "Error (401): usuario sin empresa.");
             return;
         }
@@ -289,7 +291,7 @@ function LandingConfig() {
                 return;
             }
         } else {
-            formData.append("empresa", user.empresa);
+            formData.append("empresa", tenantId);
             appendFields({ includeOnlyChanged: false });
             formData.append("activo", String(Boolean(activo)));
             formData.append("bg_gradient", currentGradient);
@@ -470,36 +472,42 @@ function LandingConfig() {
                                 }}
                             />
                             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center justify-end w-full mt-1 sm:mt-2 mb-2">
-                                <div className="flex items-center gap-2">
-                                    <label htmlFor="Activo" className="text-white">Activo</label>
-                                    <Checkbox
-                                        label="Activo"
-                                        checked={activo}
-                                        onChange={(event) => setActivo(event.target.checked)}
-                                        sx={{
-                                            color: "rgba(255,255,255,0.85)",
-                                            "&.Mui-checked": {
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={activo}
+                                            onChange={(event) => setActivo(event.target.checked)}
+                                            inputProps={{ id: "landing-activo", name: "landing-activo" }}
+                                            sx={{
                                                 color: "rgba(255,255,255,0.85)",
-                                            },
-                                        }}
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <label htmlFor="Disclaimer" className="text-white">Disclaimer</label>
-                                    <Checkbox
-                                        label="Disclaimer"
-                                        checked={Boolean(form.mostrarDisclaimer)}
-                                        onChange={(event) =>
-                                            setForm((prev) => ({ ...prev, mostrarDisclaimer: event.target.checked }))
-                                        }
-                                        sx={{
-                                            color: "rgba(255,255,255,0.85)",
-                                            "&.Mui-checked": {
+                                                "&.Mui-checked": {
+                                                    color: "rgba(255,255,255,0.85)",
+                                                },
+                                            }}
+                                        />
+                                    }
+                                    label="Activo"
+                                    sx={{ color: "#fff", m: 0 }}
+                                />
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={Boolean(form.mostrarDisclaimer)}
+                                            onChange={(event) =>
+                                                setForm((prev) => ({ ...prev, mostrarDisclaimer: event.target.checked }))
+                                            }
+                                            inputProps={{ id: "landing-disclaimer", name: "landing-disclaimer" }}
+                                            sx={{
                                                 color: "rgba(255,255,255,0.85)",
-                                            },
-                                        }}
-                                    />
-                                </div>
+                                                "&.Mui-checked": {
+                                                    color: "rgba(255,255,255,0.85)",
+                                                },
+                                            }}
+                                        />
+                                    }
+                                    label="Disclaimer"
+                                    sx={{ color: "#fff", m: 0 }}
+                                />
                             </div>
                         </Stack>
                             {publicLandingUrl ? (

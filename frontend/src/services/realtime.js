@@ -1,4 +1,5 @@
 import { getAccessToken } from "./auth";
+import { getEffectiveTenantId } from "./tenant";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
@@ -7,12 +8,18 @@ let reconnectTimer = null;
 let reconnectAttempts = 0;
 let shouldReconnect = false;
 let activeToken = null;
+let activeTenantId = null;
+let tenantListenerAttached = false;
 const subscribers = new Set();
 
-function getWebSocketUrl(token) {
+function getWebSocketUrl(token, tenantId) {
   const base = new URL(API_URL);
   const protocol = base.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${base.host}/ws/realtime/?token=${encodeURIComponent(token)}`;
+  const params = new URLSearchParams({ token });
+  if (tenantId) {
+    params.set("empresa", String(tenantId));
+  }
+  return `${protocol}//${base.host}/ws/realtime/?${params.toString()}`;
 }
 
 function notifySubscribers(message) {
@@ -57,20 +64,22 @@ function connectRealtimeSocket() {
   if (!shouldReconnect || subscribers.size === 0) return;
 
   const token = getAccessToken();
+  const tenantId = getEffectiveTenantId();
   if (!token) return;
 
-  if (socket && socket.readyState === WebSocket.OPEN && activeToken === token) {
+  if (socket && socket.readyState === WebSocket.OPEN && activeToken === token && activeTenantId === tenantId) {
     return;
   }
-  if (socket && socket.readyState === WebSocket.CONNECTING && activeToken === token) {
+  if (socket && socket.readyState === WebSocket.CONNECTING && activeToken === token && activeTenantId === tenantId) {
     return;
   }
 
   activeToken = token;
+  activeTenantId = tenantId;
   teardownSocket();
 
   try {
-    socket = new WebSocket(getWebSocketUrl(token));
+    socket = new WebSocket(getWebSocketUrl(token, tenantId));
   } catch {
     scheduleReconnect();
     return;
@@ -105,6 +114,12 @@ function connectRealtimeSocket() {
 export function subscribeRealtimeEvents(handler) {
   subscribers.add(handler);
   shouldReconnect = true;
+
+  if (!tenantListenerAttached) {
+    window.addEventListener("tenant:changed", connectRealtimeSocket);
+    tenantListenerAttached = true;
+  }
+
   connectRealtimeSocket();
 
   return () => {
@@ -113,7 +128,11 @@ export function subscribeRealtimeEvents(handler) {
       shouldReconnect = false;
       clearReconnectTimer();
       teardownSocket();
+      activeTenantId = null;
+      if (tenantListenerAttached) {
+        window.removeEventListener("tenant:changed", connectRealtimeSocket);
+        tenantListenerAttached = false;
+      }
     }
   };
 }
-

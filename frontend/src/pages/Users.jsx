@@ -5,7 +5,9 @@ import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import MenuItem from "@mui/material/MenuItem";
 import { fetchUsuarios, createUsuario, updateUsuario, fetchGrupos } from "../services/empresas/usuarios";
+import { fetchEmpresas } from "../services/empresas/empresas";
 import { getCurrentUser } from "../services/auth";
+import { useTenant } from "../context/TenantContext";
 
 const EMPTY_FORM = {
     username: "",
@@ -15,13 +17,16 @@ const EMPTY_FORM = {
     password: "",
     activo: true,
     groupId: "",
+    empresaId: "",
 };
 
 export default function Users() {
+    const { tenantId } = useTenant();
     const [usuarios, setUsuarios] = useState([]);
     const [selected, setSelected] = useState(null);
     const [form, setForm] = useState(EMPTY_FORM);
     const [grupos, setGrupos] = useState([]);
+    const [empresas, setEmpresas] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -31,9 +36,16 @@ export default function Users() {
         setLoading(true);
         setError("");
         try {
-            const [usersData, groupsData] = await Promise.all([fetchUsuarios(), fetchGrupos()]);
+            const requests = [fetchUsuarios(), fetchGrupos()];
+            if (currentUser?.is_superuser) {
+                requests.push(fetchEmpresas());
+            }
+            const [usersData, groupsData, empresasData] = await Promise.all(requests);
             setUsuarios(usersData);
             setGrupos(groupsData);
+            if (Array.isArray(empresasData)) {
+                setEmpresas(empresasData);
+            }
             if (selected) {
                 const updated = usersData.find((item) => item.id === selected.id);
                 if (updated) {
@@ -46,6 +58,7 @@ export default function Users() {
                         password: "",
                         activo: Boolean(updated.activo),
                         groupId: (updated.groups && updated.groups[0]) || "",
+                        empresaId: updated.empresa || "",
                     });
                 }
             }
@@ -58,7 +71,7 @@ export default function Users() {
 
     useEffect(() => {
         load();
-    }, []);
+    }, [tenantId]);
 
     const groupNameById = (id) => grupos.find((g) => g.id === id)?.name;
 
@@ -85,6 +98,7 @@ export default function Users() {
             password: "",
             activo: Boolean(user?.activo),
             groupId: (user?.groups && user.groups[0]) || "",
+            empresaId: user?.empresa || "",
         });
         setError("");
     };
@@ -117,6 +131,10 @@ export default function Users() {
             setError("Selecciona un grupo.");
             return;
         }
+        if (isSuperuser && !form.empresaId) {
+            setError("Selecciona una empresa.");
+            return;
+        }
         setLoading(true);
         setError("");
         try {
@@ -128,6 +146,9 @@ export default function Users() {
                 activo: Boolean(form.activo),
                 groups: [Number(form.groupId)],
             };
+            if (isSuperuser) {
+                payload.empresa = Number(form.empresaId);
+            }
             if (form.password.trim()) {
                 payload.password = form.password.trim();
             }
@@ -296,6 +317,36 @@ export default function Users() {
                                     </MenuItem>
                                 ))}
                             </TextField>
+                            {isSuperuser ? (
+                                <TextField
+                                    select
+                                    label="Empresa"
+                                    value={form.empresaId}
+                                    onChange={handleChange("empresaId")}
+                                    fullWidth
+                                    size="small"
+                                    sx={{
+                                        "& .MuiInputBase-input": { color: "#fff" },
+                                        "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.8)" },
+                                        "& .MuiOutlinedInput-root fieldset": {
+                                            borderColor: "rgba(255,255,255,0.4)",
+                                        },
+                                        "& .MuiOutlinedInput-root:hover fieldset": {
+                                            borderColor: "rgba(255,255,255,0.7)",
+                                        },
+                                        "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+                                            borderColor: "#fff",
+                                        },
+                                    }}
+                                    disabled={!canCreate}
+                                >
+                                    {empresas.map((empresa) => (
+                                        <MenuItem key={empresa.id} value={empresa.id}>
+                                            {empresa.nombre}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
+                            ) : null}
                             <TextField
                                 label="Password"
                                 type="password"
@@ -363,5 +414,3 @@ export default function Users() {
         </Page>
     );
 }
-
-

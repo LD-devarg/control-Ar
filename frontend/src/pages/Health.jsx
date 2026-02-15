@@ -41,7 +41,7 @@ function Health() {
 
   return (
     <Page title="Health">
-      <div className="flex gap-5 w-9/10 border-b-1 justify-between border-t-1 dark:border-zinc-500 pb-4 pt-4">
+      <div className="flex mt-5 gap-5 w-9/10 justify-between border-t-1 dark:border-zinc-500 pb-4 pt-4">
         <Card
           title="Backend"
           value={loading ? "..." : formatStatus(true)}

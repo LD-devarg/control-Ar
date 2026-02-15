@@ -1,6 +1,9 @@
+from decimal import Decimal, InvalidOperation
+
 from rest_framework import serializers
 
 from .servicios.crypto import encrypt_token
+from apps.recursos.models import TipoCambio
 
 from .models import (
     BM,
@@ -97,8 +100,58 @@ class GastoDiarioSerializer(serializers.ModelSerializer):
             "monto_ars",
             "creado_en",
         ]
-        read_only_fields = ["id", "creado_en"]
+        read_only_fields = ["id", "tc", "monto_ars", "creado_en"]
 
+    def _get_tc_vigente(self):
+        return (
+            TipoCambio.objects.filter(vigente_hasta__isnull=True)
+            .order_by("-vigente_desde", "-creado_en")
+            .first()
+        )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        instance = getattr(self, "instance", None)
+
+        cuenta = attrs.get("cuenta_publicitaria") or getattr(instance, "cuenta_publicitaria", None)
+        empresa = attrs.get("empresa") or getattr(instance, "empresa", None)
+
+        if not user:
+            raise serializers.ValidationError("Usuario no disponible.")
+
+        if user.is_superuser:
+            if empresa is None and cuenta is not None:
+                empresa = cuenta.empresa
+            if empresa is None:
+                raise serializers.ValidationError("Empresa requerida.")
+        else:
+            if not user.empresa_id:
+                raise serializers.ValidationError("Empresa no disponible en el usuario actual.")
+            empresa = user.empresa
+
+        if cuenta and empresa and cuenta.empresa_id != empresa.id:
+            raise serializers.ValidationError("La cuenta publicitaria no pertenece a la empresa seleccionada.")
+
+        monto_usd = attrs.get("monto_usd")
+        if monto_usd is None and instance is not None:
+            monto_usd = instance.monto_usd
+        if monto_usd is None:
+            raise serializers.ValidationError("monto_usd requerido.")
+
+        tc_obj = self._get_tc_vigente()
+        if not tc_obj or tc_obj.valor is None:
+            raise serializers.ValidationError("No hay tipo de cambio vigente.")
+
+        try:
+            monto_decimal = Decimal(str(monto_usd))
+        except (InvalidOperation, TypeError):
+            raise serializers.ValidationError("monto_usd invalido.")
+
+        attrs["empresa"] = empresa
+        attrs["tc"] = tc_obj.valor
+        attrs["monto_ars"] = (monto_decimal * tc_obj.valor).quantize(Decimal("0.01"))
+        return attrs
 
 class CredencialesMetaSerializer(serializers.ModelSerializer):
     token_acceso_encrypted = serializers.CharField(write_only=True)

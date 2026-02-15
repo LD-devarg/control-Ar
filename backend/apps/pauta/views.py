@@ -30,8 +30,14 @@ from .serializers import (
 )
 
 
-def _filter_by_empresa(qs, user):
+def _filter_by_empresa(qs, user, request=None):
     if user.is_superuser:
+        empresa_param = request.query_params.get("empresa") if request else None
+        if empresa_param:
+            try:
+                return qs.filter(empresa_id=int(empresa_param))
+            except (TypeError, ValueError):
+                return qs.none()
         return qs
     if user.empresa_id:
         return qs.filter(empresa_id=user.empresa_id)
@@ -59,7 +65,7 @@ class BMViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
 
 
 class CuentaPublicitariaViewSet(viewsets.ModelViewSet):
@@ -71,7 +77,7 @@ class CuentaPublicitariaViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
 
 
 class CampañaViewSet(viewsets.ModelViewSet):
@@ -83,7 +89,7 @@ class CampañaViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
 
 
 class ConjuntoAnunciosViewSet(viewsets.ModelViewSet):
@@ -95,7 +101,7 @@ class ConjuntoAnunciosViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
 
 
 class AnuncioViewSet(viewsets.ModelViewSet):
@@ -107,7 +113,7 @@ class AnuncioViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
 
 
 class GastoDiarioViewSet(viewsets.ModelViewSet):
@@ -119,7 +125,7 @@ class GastoDiarioViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
 
 
 class CredencialesMetaViewSet(viewsets.ModelViewSet):
@@ -131,7 +137,7 @@ class CredencialesMetaViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
 
 
 class FanPageViewSet(viewsets.ModelViewSet):
@@ -143,7 +149,7 @@ class FanPageViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
 
 
 class InstagramAccountViewSet(viewsets.ModelViewSet):
@@ -155,7 +161,7 @@ class InstagramAccountViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
 
 
 class PautaAssetViewSet(viewsets.ModelViewSet):
@@ -167,7 +173,7 @@ class PautaAssetViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
 
 
 class CreativeViewSet(viewsets.ModelViewSet):
@@ -179,4 +185,4 @@ class CreativeViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)

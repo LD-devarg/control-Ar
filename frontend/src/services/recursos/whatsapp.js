@@ -1,19 +1,23 @@
-import { apiClient, getCurrentUser } from "../auth";
+import { apiClient } from "../auth";
+import { getEffectiveTenantId } from "../tenant";
 
 export async function fetchWhatsapps() {
-  const { data } = await apiClient.get(`/whatsapps/`);
+  const tenantId = getEffectiveTenantId();
+  const { data } = await apiClient.get(`/whatsapps/`, {
+    params: tenantId ? { empresa: tenantId } : undefined,
+  });
   return data;
 }
 
 export async function createWhatsapp(numero) {
-  const user = getCurrentUser();
-  if (!user?.empresa) {
-    throw new Error("Empresa no disponible en el usuario actual.");
+  const tenantId = getEffectiveTenantId();
+  if (!tenantId) {
+    throw new Error("Empresa no disponible para el contexto actual.");
   }
   const payload = {
     numero,
     activo: true,
-    empresa: user.empresa,
+    empresa: tenantId,
   };
   const { data } = await apiClient.post(`/whatsapps/`, payload);
   return data;

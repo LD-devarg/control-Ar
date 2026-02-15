@@ -1,4 +1,5 @@
-import { apiClient } from "../auth";
+﻿import { apiClient } from "../auth";
+import { getEffectiveTenantId } from "../tenant";
 
 export const CREATE_FORM_CONFIG = {
   Bms: {
@@ -130,6 +131,11 @@ export async function createByType(typeKey, payload) {
   if (!config?.endpoint) {
     throw new Error("Tipo no soportado para creacion directa.");
   }
-  const { data } = await apiClient.post(config.endpoint, payload);
+  const tenantId = getEffectiveTenantId();
+  const finalPayload =
+    tenantId && payload?.empresa === undefined
+      ? { ...payload, empresa: tenantId }
+      : payload;
+  const { data } = await apiClient.post(config.endpoint, finalPayload);
   return data;
 }

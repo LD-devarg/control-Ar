@@ -7,7 +7,8 @@ import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
 import "../assets/css/Form.css";
 import { useTheme } from '@mui/material/styles';
-import { apiClient, getCurrentUser } from '../services/auth';
+import { apiClient } from '../services/auth';
+import { useTenant } from '../context/TenantContext';
 
 export default function FormContacto() {
   const theme = useTheme();
@@ -18,7 +19,7 @@ export default function FormContacto() {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
-  const empresaId = getCurrentUser()?.empresa;
+  const { tenantId: empresaId } = useTenant();
   const fieldSx = {
     '& .MuiInputBase-input': { color },
     '& .MuiInputLabel-root': { color },
@@ -114,7 +115,7 @@ export default function FormContacto() {
       window.removeEventListener("leads:refresh", handleRefresh);
       window.removeEventListener("storage", handleStorage);
     };
-  }, []);
+  }, [empresaId]);
 
   const canSubmit = useMemo(() => Boolean(selectedCliente?.id) && Boolean(empresaId), [selectedCliente, empresaId]);
 

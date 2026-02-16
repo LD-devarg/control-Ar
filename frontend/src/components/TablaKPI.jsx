@@ -1,86 +1,362 @@
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import Paper from '@mui/material/Paper';
+import { useEffect, useMemo, useState } from "react";
+import ExecutiveKPIPanel from "./ExecutiveKPIPanel";
+import OperativeKPIPanel from "./OperativeKPIPanel";
+import { apiClient } from "../services/auth";
 
-function createData(name, expected, actual, diferences) {
-  return { name, expected, actual, diferences };
-}
+const LEVEL_LABELS = {
+  campaign: "Campana",
+  adset: "Adset",
+  ad: "Ad",
+};
 
-const rows = [
-  createData('ROAS', 0.8, 1.2, -0.4),
-  createData('Ratio de Conversión', 0.34, 0.4, -0.06),
-  createData('CPL', 12.8, 16.0, -3.2),
-  createData('CPC', 11.4, 10.5, -0.9),
-  createData('Promedio De Compra', 12.3, 9.5, 2.8),
+const EMPTY_OPERATIVE_DATA = {
+  campaign: [],
+  adset: [],
+  ad: [],
+};
+
+const currencyFormatter = new Intl.NumberFormat("es-AR", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+  minimumFractionDigits: 0,
+});
+
+const percentFormatter = new Intl.NumberFormat("es-AR", {
+  style: "percent",
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 2,
+});
+
+const numberFormatter = new Intl.NumberFormat("es-AR", {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 0,
+});
+
+const ALL_COLUMNS = [
+  { key: "inversion", label: "Inversion", align: "right", format: (v) => currencyFormatter.format(v) },
+  { key: "ctr", label: "CTR", align: "right", format: (v) => percentFormatter.format(v) },
+  { key: "cpc", label: "CPC", align: "right", format: (v) => currencyFormatter.format(v) },
+  { key: "cpl", label: "CPL", align: "right", format: (v) => currencyFormatter.format(v) },
+  { key: "cpa", label: "CPA", align: "right", format: (v) => currencyFormatter.format(v) },
+  { key: "roas", label: "ROAS", align: "right", format: (v) => numberFormatter.format(v) },
+  { key: "frecuencia", label: "Frecuencia", align: "right", format: (v) => numberFormatter.format(v) },
+  { key: "compras", label: "Compras", align: "right", format: (v) => numberFormatter.format(v) },
+  { key: "valor_compras", label: "Valor de compras", align: "right", format: (v) => currencyFormatter.format(v) },
+  { key: "leads", label: "Leads", align: "right", format: (v) => numberFormatter.format(v) },
+  { key: "contactos", label: "Contactos", align: "right", format: (v) => numberFormatter.format(v) },
+  { key: "web_visitors", label: "Web visitors", align: "right", format: (v) => numberFormatter.format(v) },
 ];
 
-export default function TablaKPI() {
-  return (
-    <div className='flex flex-col w-full items-stretch pt-0 pb-5 px-5 border-1 border-gray-700 bg-neutral-900 rounded-xl shadow-lg shadow-black'>
-        <h2 className="font-bold text-md my-2 text-white">Rendimientos de ventas</h2>
-        <TableContainer component={Paper} elevation={0}
-        sx={{
-          background: "transparent !important"
-        }}
-        >
-        <Table className="w-full border-collapse-separate border-spacing-0 table-fixed" size="small" aria-label="a dense table"
-        sx={{
-          '& .MuiTableCell-root': {
-            borderBottom: '1px solid rgb(41, 41, 41)',
-            fontSize: {xs: '0.875rem', md: '0.8rem'},
-          },
-          '& .MuiTableHead-root': { 
-            backgroundColor: 'rgb(0, 0, 0)',
-            borderBottom: '2px solid rgb(41, 41, 41)',
-            fontSize: {xs: '0.92rem', md: '0.875rem'},
-           },
-          '& .MuiTableRow-root:hover': { 
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-           },
-          '& .MuiTableCell-head': {
-            color: 'white',
-            fontWeight: 'bold',
-            fontSize: {xs: '0.92rem', md: '0.875rem'},
-          },
-          '& .MuiTableCell-body': {
-            color: 'white',
-            fontSize: {xs: '0.875rem', md: '0.8rem'},
-          },
+const DEFAULT_VISIBLE_COLUMNS = ["inversion", "leads", "contactos", "compras", "valor_compras", "roas"];
+const KPI_COLUMNS_STORAGE_KEY = "pauta_kpi_visible_columns";
 
-        }}
-        >
-            <colgroup>
-              <col className="w-1/2 md:w-1/3" />
-              <col className="w-1/6" />
-              <col className="w-1/6" />
-              <col className="w-1/6" />
-            </colgroup>
-            <TableHead>
-            <TableRow>
-                <TableCell >KPIs</TableCell>
-                <TableCell align="right">Expected</TableCell>
-                <TableCell align="right">Actual</TableCell>
-                <TableCell align="right">Differences</TableCell>
-            </TableRow>
-            </TableHead>
-            <TableBody>
-            {rows.map((row) => (
-                <TableRow key={row.name}>
-                <TableCell component="th" scope="row">
-                    {row.name}
-                </TableCell>
-                <TableCell align="right" type='number' >{row.expected}</TableCell>
-                <TableCell align="right" type='number' >{row.actual}</TableCell>
-                <TableCell align="right" type='number' >{row.diferences}</TableCell>
-                </TableRow>
-            ))}
-            </TableBody>
-        </Table>
-        </TableContainer>
+function compareValues(a, b, key, direction) {
+  const left = a?.[key];
+  const right = b?.[key];
+
+  if (typeof left === "string" || typeof right === "string") {
+    const result = String(left || "").localeCompare(String(right || ""), "es");
+    return direction === "asc" ? result : -result;
+  }
+
+  const result = Number(left || 0) - Number(right || 0);
+  return direction === "asc" ? result : -result;
+}
+
+const PERIOD_LABEL = { day: "Dia", week: "Semana", month: "Mes" };
+const ACCOUNT_LABEL = { all: "Todas", main: "Principal", scale: "Escala" };
+
+function fmtDate(value) {
+  if (!value) return "-";
+  if (typeof value?.format === "function") return value.format("DD/MM/YYYY");
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleDateString("es-AR");
+}
+
+function toYmd(value) {
+  if (!value) return null;
+  if (typeof value?.format === "function") return value.format("YYYY-MM-DD");
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toneFromValue(key, value) {
+  if (key === "roas") return value >= 3 ? "green" : value >= 2 ? "yellow" : "red";
+  if (key === "ctr") return value >= 0.03 ? "green" : value >= 0.02 ? "yellow" : "red";
+  if (key === "frecuencia") return value <= 2.8 ? "green" : value <= 3.5 ? "yellow" : "red";
+  if (key === "cpa" || key === "cpc" || key === "cpl") return value <= 0 ? "red" : "green";
+  return "green";
+}
+
+function mapApiToLocalShape(payload) {
+  const executiveCards = payload?.executive?.cards || {};
+  const footer = payload?.executive?.footer || {};
+  const daily = Array.isArray(payload?.executive?.daily_roas) ? payload.executive.daily_roas : [];
+
+  const cards = [
+    { key: "inversion", label: "Inversion", value: Number(executiveCards.inversion || 0), display: "USD" },
+    { key: "ingresos", label: "Ingresos", value: Number(executiveCards.ingresos || 0), display: "USD" },
+    { key: "roas", label: "ROAS", value: Number(executiveCards.roas || 0), display: "number" },
+    { key: "cpa", label: "CPA", value: Number(executiveCards.cpa || 0), display: "USD" },
+    { key: "cpc", label: "CPC", value: Number(executiveCards.cpc || 0), display: "USD" },
+    { key: "cpl", label: "CPL", value: Number(executiveCards.cpl || 0), display: "USD" },
+    { key: "frecuencia", label: "Frecuencia", value: Number(executiveCards.frecuencia || 0), display: "number" },
+    { key: "ctr", label: "CTR", value: Number(executiveCards.ctr || 0), display: "percent" },
+  ].map((card) => ({
+    ...card,
+    variation: "Dato real",
+    status: toneFromValue(card.key, card.value),
+    trend: daily.map((d) => Number(d.roas || 0)),
+  }));
+
+  const footerCards = [
+    { key: "web_visitors", label: "Web Visitors", value: Number(footer.web_visitors || 0) },
+    { key: "leads", label: "Leads", value: Number(footer.leads || 0) },
+    { key: "contactos", label: "Contactos", value: Number(footer.contactos || 0) },
+    { key: "compras", label: "Compras", value: Number(footer.compras || 0) },
+    { key: "valor_compras", label: "Valor de compras", value: Number(footer.valor_compras || 0), display: "USD" },
+    { key: "efectividad", label: "Efectividad", value: Number(footer.efectividad || 0), display: "percent" },
+  ];
+
+  return {
+    executiveCards: cards,
+    footerCards,
+    dailySeries: daily.map((d) => ({
+      day: d.day || "-",
+      roas: Number(d.roas || 0),
+    })),
+    performanceScore: Number(payload?.executive?.performance_score || 0),
+    lastSync: payload?.last_sync || {},
+    operativeData: {
+      campaign: Array.isArray(payload?.operative?.campaign) ? payload.operative.campaign : [],
+      adset: Array.isArray(payload?.operative?.adset) ? payload.operative.adset : [],
+      ad: Array.isArray(payload?.operative?.ad) ? payload.operative.ad : [],
+    },
+  };
+}
+
+export default function TablaKPI({ period = "week", account = "all", fromDate = null, toDate = null, view = "executiva", onScoreChange = null }) {
+  const [level, setLevel] = useState("campaign");
+  const [sortBy, setSortBy] = useState("roas");
+  const [sortDir, setSortDir] = useState("desc");
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState(DEFAULT_VISIBLE_COLUMNS);
+  const [remoteData, setRemoteData] = useState(null);
+  const [loadingRemote, setLoadingRemote] = useState(false);
+  const [remoteError, setRemoteError] = useState("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(KPI_COLUMNS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return;
+      const allowed = new Set(ALL_COLUMNS.map((col) => col.key));
+      const next = parsed.filter((key) => allowed.has(key));
+      if (next.length > 0) {
+        setVisibleColumnKeys(next);
+      }
+    } catch {
+      // No-op: keep defaults when storage is invalid.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(KPI_COLUMNS_STORAGE_KEY, JSON.stringify(visibleColumnKeys));
+    } catch {
+      // No-op: storage may be unavailable.
+    }
+  }, [visibleColumnKeys]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoadingRemote(true);
+      setRemoteError("");
+      try {
+        const params = {
+          period,
+          account,
+          from: toYmd(fromDate),
+          to: toYmd(toDate),
+        };
+        const { data } = await apiClient.get("/pauta-kpi/", { params });
+        if (!mounted) return;
+        const mapped = mapApiToLocalShape(data);
+        setRemoteData(mapped);
+        if (typeof onScoreChange === "function") {
+          onScoreChange(mapped.performanceScore);
+        }
+      } catch (_err) {
+        if (!mounted) return;
+        setRemoteError("No se pudieron cargar datos reales de pauta.");
+        setRemoteData(null);
+        if (typeof onScoreChange === "function") {
+          onScoreChange(0);
+        }
+      } finally {
+        if (mounted) setLoadingRemote(false);
+      }
+    };
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [period, account, fromDate, toDate, onScoreChange]);
+
+  const effectiveOperativeData = remoteData?.operativeData || EMPTY_OPERATIVE_DATA;
+  const effectiveExecutiveCards = remoteData?.executiveCards || [];
+  const effectiveFooterCards = remoteData?.footerCards || [];
+  const effectiveDailySeries = remoteData?.dailySeries || [];
+
+  const currentRows = effectiveOperativeData[level] || [];
+  const sortedRows = useMemo(() => [...currentRows].sort((a, b) => compareValues(a, b, sortBy, sortDir)), [currentRows, sortBy, sortDir]);
+
+  const avgRoas = useMemo(() => {
+    if (!sortedRows.length) return 0;
+    return sortedRows.reduce((acc, row) => acc + Number(row.roas || 0), 0) / sortedRows.length;
+  }, [sortedRows]);
+
+  const operativeColumns = useMemo(
+    () => ALL_COLUMNS.filter((col) => visibleColumnKeys.includes(col.key)),
+    [visibleColumnKeys]
+  );
+
+  const totals = useMemo(() => {
+    const totalInversion = sortedRows.reduce((acc, row) => acc + Number(row.inversion || 0), 0);
+    const totalCompras = sortedRows.reduce((acc, row) => acc + Number(row.compras || 0), 0);
+    const totalValorCompras = sortedRows.reduce((acc, row) => acc + Number(row.valor_compras || 0), 0);
+    const totalLeads = sortedRows.reduce((acc, row) => acc + Number(row.leads || 0), 0);
+    const totalContactos = sortedRows.reduce((acc, row) => acc + Number(row.contactos || 0), 0);
+    const totalWebVisitors = sortedRows.reduce((acc, row) => acc + Number(row.web_visitors || 0), 0);
+
+    const weightedCtr = totalInversion
+      ? sortedRows.reduce((acc, row) => acc + Number(row.ctr || 0) * Number(row.inversion || 0), 0) / totalInversion
+      : 0;
+    const weightedCpc = totalInversion
+      ? sortedRows.reduce((acc, row) => acc + Number(row.cpc || 0) * Number(row.inversion || 0), 0) / totalInversion
+      : 0;
+    const weightedCpl = totalInversion
+      ? sortedRows.reduce((acc, row) => acc + Number(row.cpl || 0) * Number(row.inversion || 0), 0) / totalInversion
+      : 0;
+    const cpa = totalCompras ? totalInversion / totalCompras : 0;
+    const weightedRoas = totalInversion
+      ? sortedRows.reduce((acc, row) => acc + Number(row.roas || 0) * Number(row.inversion || 0), 0) / totalInversion
+      : 0;
+    const weightedFreq = totalInversion
+      ? sortedRows.reduce((acc, row) => acc + Number(row.frecuencia || 0) * Number(row.inversion || 0), 0) / totalInversion
+      : 0;
+
+    return {
+      inversion: totalInversion,
+      ctr: weightedCtr,
+      cpc: weightedCpc,
+      cpl: weightedCpl,
+      cpa,
+      roas: weightedRoas,
+      frecuencia: weightedFreq,
+      compras: totalCompras,
+      valor_compras: totalValorCompras,
+      leads: totalLeads,
+      contactos: totalContactos,
+      web_visitors: totalWebVisitors,
+    };
+  }, [sortedRows]);
+
+  const filterSummary = useMemo(
+    () => `${PERIOD_LABEL[period] || "Semana"} | ${ACCOUNT_LABEL[account] || "Todas"} | ${fmtDate(fromDate)} - ${fmtDate(toDate)}`,
+    [period, account, fromDate, toDate]
+  );
+
+  const handleSort = (key) => {
+    if (sortBy === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortBy(key);
+    setSortDir("asc");
+  };
+
+  const toggleColumn = (key) => {
+    setVisibleColumnKeys((prev) => {
+      if (prev.includes(key)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((item) => item !== key);
+      }
+      return [...prev, key];
+    });
+  };
+
+  const showAllColumns = () => {
+    setVisibleColumnKeys(ALL_COLUMNS.map((col) => col.key));
+  };
+
+  const resetDefaultColumns = () => {
+    setVisibleColumnKeys(DEFAULT_VISIBLE_COLUMNS);
+  };
+
+  const cardByKey = useMemo(() => Object.fromEntries(effectiveExecutiveCards.map((card) => [card.key, card])), [effectiveExecutiveCards]);
+  const topCards = ["inversion", "ingresos", "roas"].map((key) => cardByKey[key]).filter(Boolean);
+  const middleCards = ["cpa", "cpc", "cpl"].map((key) => cardByKey[key]).filter(Boolean);
+  const lowerCards = ["frecuencia", "ctr"].map((key) => cardByKey[key]).filter(Boolean);
+
+  return (
+    <div className="h-full max-h-full w-full overflow-hidden rounded-xl border border-gray-700 bg-neutral-900 px-3 py-3 shadow-lg shadow-black">
+      <div className="app-scrollbar h-full w-full min-h-0 space-y-4 overflow-y-auto pr-1">
+        <div className="flex flex-row w-full">
+          <div className="text-[11px] text-white/60">{filterSummary}</div>
+        {loadingRemote ? <div className="text-xs text-cyan-300">Cargando datos reales...</div> : null}
+        {remoteError ? <div className="text-xs text-amber-300">{remoteError}</div> : null}
+        {!loadingRemote && !remoteError && remoteData?.lastSync ? (
+          <div className="app-scrollbar flex ml-4 flex-nowrap items-center gap-3 overflow-x-auto whitespace-nowrap text-[11px] text-white/55">
+            <span>
+            |  KPI sync: {remoteData.lastSync.kpi_last_run_at ? new Date(remoteData.lastSync.kpi_last_run_at).toLocaleString("es-AR") : "-"} ({remoteData.lastSync.kpi_last_status || "n/a"})
+            </span>
+            <span>
+              Estado sync: {remoteData.lastSync.estado_last_run_at ? new Date(remoteData.lastSync.estado_last_run_at).toLocaleString("es-AR") : "-"} ({remoteData.lastSync.estado_last_status || "n/a"})
+            </span>
+          </div>
+        ) : null}
+        </div>
+        {view === "operativa" ? (
+          <div className="w-full">
+            <OperativeKPIPanel
+              level={level}
+              levelLabels={LEVEL_LABELS}
+              onLevelChange={setLevel}
+              allColumns={ALL_COLUMNS}
+              columns={operativeColumns}
+              visibleColumnKeys={visibleColumnKeys}
+              onToggleColumn={toggleColumn}
+              onShowAllColumns={showAllColumns}
+              onResetDefaultColumns={resetDefaultColumns}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSort={handleSort}
+              sortedRows={sortedRows}
+              avgRoas={avgRoas}
+              totals={totals}
+            />
+          </div>
+        ) : (
+          <div className="w-full">
+            <ExecutiveKPIPanel
+              topCards={topCards}
+              middleCards={middleCards}
+              lowerCards={lowerCards}
+              footerCards={effectiveFooterCards}
+              dailySeries={effectiveDailySeries}
+              formatters={{ currencyFormatter, percentFormatter, numberFormatter }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -34,7 +34,7 @@ function TabletLayout() {
                   </div>
                 )}
                 {showEventos && (
-                  <div className="flex-[1] min-w-0 ml-4 h-full">
+                  <div className="flex-[1] min-w-0 ml-4 h-[82vh] self-start">
                     <StatsEventsAside fullHeight />
                   </div>
                 )}

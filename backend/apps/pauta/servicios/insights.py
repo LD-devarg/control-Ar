@@ -6,6 +6,7 @@ from typing import Iterable
 
 import requests
 
+from apps.empresas.models import Empresa
 from apps.pauta.models import CredencialesMeta, CuentaPublicitaria
 from apps.pauta.servicios.crypto import decrypt_token
 
@@ -42,6 +43,12 @@ def fetch_meta_page_views(
     Devuelve el total de Page Views desde Ads Insights.
     Usa acciones (action_type) y suma los tipos configurados.
     """
+    empresa = Empresa.objects.filter(id=empresa_id).only("workers_activos", "beat_activo").first()
+    if empresa and not empresa.beat_activo:
+        return {"ok": False, "error": "Beat pausado para esta empresa."}
+    if empresa and not empresa.workers_activos:
+        return {"ok": False, "error": "Workers de Meta pausados para esta empresa."}
+
     ad_account_id = _get_ad_account_id(empresa_id)
     if not ad_account_id:
         return {"ok": False, "error": "No hay cuenta publicitaria configurada."}

@@ -8,7 +8,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { createByType, fetchRemoteOptions, getCreateConfig } from "../services/pauta/create";
 
 function buildOptionLabel(item = {}) {
-  return item.nombre || item.username || item.meta_id || item.id?.toString() || "Sin etiqueta";
+  return item.nombre || item.username || item.meta_id || item.pixel_id || item.id?.toString() || "Sin etiqueta";
 }
 
 function buildInitialForm(config) {
@@ -17,6 +17,19 @@ function buildInitialForm(config) {
     acc[field.name] = "";
     return acc;
   }, {});
+}
+
+function resolveErrorMessage(errorPayload) {
+  if (!errorPayload) return null;
+  if (typeof errorPayload === "string") return errorPayload;
+  if (errorPayload.detail && typeof errorPayload.detail === "string") return errorPayload.detail;
+
+  const firstKey = Object.keys(errorPayload)[0];
+  if (!firstKey) return null;
+  const firstValue = errorPayload[firstKey];
+  if (Array.isArray(firstValue) && firstValue[0]) return `${firstKey}: ${firstValue[0]}`;
+  if (typeof firstValue === "string") return `${firstKey}: ${firstValue}`;
+  return null;
 }
 
 function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated }) {
@@ -170,7 +183,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
     try {
       payload = buildPayload();
     } catch {
-      setError("El campo Segmentacion debe ser un JSON valido.");
+      setError("Hay un campo con formato invalido.");
       return;
     }
 
@@ -180,10 +193,11 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
       setSuccess("Registro creado correctamente.");
       onCreated?.({ type: selectedType.key, data });
     } catch (requestError) {
-      const detail =
-        requestError?.response?.data?.detail ||
-        (typeof requestError?.response?.data === "string" ? requestError.response.data : null);
-      setError(detail || "No se pudo crear el registro.");
+      const message =
+        resolveErrorMessage(requestError?.response?.data) ||
+        requestError?.message ||
+        "No se pudo crear el registro.";
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -275,6 +289,31 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                 );
               }
 
+              if (field.type === "select-static") {
+                const staticOptions = Array.isArray(field.options) ? field.options : [];
+                const selectedOption = staticOptions.find((item) => item.value === formValues[field.name]) || null;
+                return (
+                  <Autocomplete
+                    key={field.name}
+                    options={staticOptions}
+                    value={selectedOption}
+                    onChange={(_, value) => updateField(field.name, value?.value ?? "")}
+                    getOptionLabel={(option) => option?.label || ""}
+                    isOptionEqualToValue={(option, value) => option.value === value?.value}
+                    slotProps={{ popper: { sx: whiteAutocompletePopperSx } }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label={field.label}
+                        required={field.required}
+                        size="small"
+                        sx={whiteFieldSx}
+                      />
+                    )}
+                  />
+                );
+              }
+
               if (field.type === "textarea") {
                 return (
                   <TextField
@@ -302,9 +341,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                   onChange={(event) => updateField(field.name, event.target.value)}
                   fullWidth
                   size="small"
-                  sx={{ ...whiteFieldSx, 
-                    marginBottom: "16px !important",
-                  }}
+                  sx={{ ...whiteFieldSx, marginBottom: "16px !important" }}
                 />
               );
             })}

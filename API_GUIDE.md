@@ -150,6 +150,7 @@ Body:
 - `GET /instagram-accounts/`
 - `GET /pauta-assets/`
 - `GET /creatives/`
+- `POST /pauta-provisioning/` (creacion encadenada campaign/adset/ad en borrador)
 
 #### Orden recomendado de creaci?n (Pauta)
 1. `POST /bms/`
@@ -160,6 +161,15 @@ Body:
 6. `POST /pauta-assets/`
 7. `POST /creatives/` (depende de fanpage y asset; instagram opcional)
 8. `POST /anuncios/` (depende de conjunto y creative)
+
+#### Provisioning a Meta (borrador / pending)
+- `POST /campa?as/`, `POST /conjuntos-anuncios/`, `POST /anuncios/`
+  - si `meta_id` viene vacio, el backend crea en Meta con estado `PAUSED` y guarda `estado=pending` local.
+- `POST /pauta-provisioning/`
+  - soporta:
+    - crear `campa?a + adsets + ads` en un solo request
+    - crear `adsets + ads` sobre campa?a existente
+    - crear `ads` sobre adset existente
 
 ## Endpoints de test
 ### Enviar evento de prueba (solo Admin/Pauta/Superuser)

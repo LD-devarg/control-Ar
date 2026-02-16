@@ -1,14 +1,56 @@
 from rest_framework import serializers
 from django.contrib.auth.models import Group
 
-from .models import Empresa, Usuario
+from .models import BEAT_TASKS_AVAILABLE, Empresa, Usuario
 
 
 class EmpresaSerializer(serializers.ModelSerializer):
+    beat_tasks_available = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Empresa
-        fields = ["id", "nombre", "activo", "creado_en"]
-        read_only_fields = ["id", "creado_en"]
+        fields = [
+            "id",
+            "nombre",
+            "activo",
+            "workers_activos",
+            "beat_activo",
+            "beat_tasks_config",
+            "beat_tasks_available",
+            "kpi_sync_last_run_at",
+            "kpi_sync_last_status",
+            "kpi_sync_last_error",
+            "estado_sync_last_run_at",
+            "estado_sync_last_status",
+            "estado_sync_last_error",
+            "creado_en",
+        ]
+        read_only_fields = [
+            "id",
+            "kpi_sync_last_run_at",
+            "kpi_sync_last_status",
+            "kpi_sync_last_error",
+            "estado_sync_last_run_at",
+            "estado_sync_last_status",
+            "estado_sync_last_error",
+            "creado_en",
+        ]
+
+    def get_beat_tasks_available(self, obj):
+        return [{"key": key, "label": label} for key, label in BEAT_TASKS_AVAILABLE.items()]
+
+    def validate_beat_tasks_config(self, value):
+        if value in (None, {}):
+            return {}
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("beat_tasks_config debe ser un objeto.")
+
+        cleaned = {}
+        for key, enabled in value.items():
+            if key not in BEAT_TASKS_AVAILABLE:
+                continue
+            cleaned[key] = bool(enabled)
+        return cleaned
 
 
 class UsuarioSerializer(serializers.ModelSerializer):

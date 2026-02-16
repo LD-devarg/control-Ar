@@ -18,7 +18,7 @@ function Card({ title, value, subtitle, accentClass, icon, sizeHeight, sizeWidth
         </div>
       </div>
       <div className='flex flex-row'>
-        {subtitle ? <span className="flex text-white mr-2 items-end text-sm md:text-base">{subtitle}</span> : null}<span className="text-blue-500 text-xl md:text-lg font-bold">{value}</span>
+        {subtitle ? <span className="flex text-white mr-2 items-end text-sm md:text-base">{subtitle}</span> : null}<span className="text-blue-500 text-lg lg:text-2xl mt-1 font-bold">{value}</span>
         <div className="flex grow justify-end items-center mr-4">
             <div className='flex items-center gap-1 text-white bg-zinc-700 px-2 py-1 rounded text-sm'>
               {icon}

@@ -1,8 +1,17 @@
 from decimal import Decimal, InvalidOperation
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from .servicios.crypto import encrypt_token
+from .servicios.meta_provisioning import (
+    MetaProvisioningError,
+    create_ad_in_meta,
+    create_adset_in_meta,
+    create_campaign_in_meta,
+    create_creative_in_meta,
+    get_meta_token_for_empresa,
+)
 from apps.recursos.models import TipoCambio
 
 from .models import (
@@ -17,6 +26,7 @@ from .models import (
     InstagramAccount,
     PautaAsset,
     Creative,
+    KPIObjetivo,
 )
 
 
@@ -27,6 +37,15 @@ class BMSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "creado_en"]
 
 
+def _resolve_empresa_for_write(attrs, instance, request_user):
+    empresa = attrs.get("empresa") or getattr(instance, "empresa", None)
+    if request_user and not request_user.is_superuser:
+        if not request_user.empresa_id:
+            raise serializers.ValidationError("Empresa no disponible en el usuario actual.")
+        empresa = request_user.empresa
+    return empresa
+
+
 class CuentaPublicitariaSerializer(serializers.ModelSerializer):
     class Meta:
         model = CuentaPublicitaria
@@ -35,6 +54,8 @@ class CuentaPublicitariaSerializer(serializers.ModelSerializer):
 
 
 class CampañaSerializer(serializers.ModelSerializer):
+    estrategia_presupuesto = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
     class Meta:
         model = Campaña
         fields = [
@@ -47,9 +68,52 @@ class CampañaSerializer(serializers.ModelSerializer):
             "fecha_inicio",
             "fecha_fin",
             "objetivo",
+            "estrategia_presupuesto",
             "creado_en",
         ]
         read_only_fields = ["id", "creado_en"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        instance = getattr(self, "instance", None)
+
+        cuenta = attrs.get("cuenta_publicitaria") or getattr(instance, "cuenta_publicitaria", None)
+        empresa = _resolve_empresa_for_write(attrs, instance, user)
+        if empresa is None and cuenta is not None:
+            empresa = cuenta.empresa
+
+        if empresa is None:
+            raise serializers.ValidationError("Empresa requerida.")
+        if not cuenta:
+            raise serializers.ValidationError("Cuenta publicitaria requerida.")
+        if cuenta.empresa_id != empresa.id:
+            raise serializers.ValidationError("La cuenta publicitaria no pertenece a la empresa seleccionada.")
+
+        attrs["empresa"] = empresa
+        return attrs
+
+    def create(self, validated_data):
+        estrategia_presupuesto = validated_data.pop("estrategia_presupuesto", "")
+        validated_data["estado"] = "pending"
+        if not validated_data.get("fecha_inicio"):
+            validated_data["fecha_inicio"] = timezone.localdate()
+        if not validated_data.get("meta_id"):
+            try:
+                token = get_meta_token_for_empresa(validated_data["empresa"].id)
+                meta_id = create_campaign_in_meta(
+                    cuenta_publicitaria=validated_data["cuenta_publicitaria"],
+                    token=token,
+                    nombre=validated_data["nombre"],
+                    objetivo=validated_data["objetivo"],
+                    estrategia_presupuesto=estrategia_presupuesto,
+                    fecha_inicio=validated_data.get("fecha_inicio"),
+                    fecha_fin=validated_data.get("fecha_fin"),
+                )
+            except MetaProvisioningError as exc:
+                raise serializers.ValidationError(f"Error creando campaña en Meta: {exc}") from exc
+            validated_data["meta_id"] = meta_id
+        return super().create(validated_data)
 
 
 class ConjuntoAnunciosSerializer(serializers.ModelSerializer):
@@ -70,6 +134,49 @@ class ConjuntoAnunciosSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "creado_en"]
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        instance = getattr(self, "instance", None)
+
+        campana = attrs.get("campaña") or getattr(instance, "campaña", None)
+        empresa = _resolve_empresa_for_write(attrs, instance, user)
+        if empresa is None and campana is not None:
+            empresa = campana.empresa
+
+        if empresa is None:
+            raise serializers.ValidationError("Empresa requerida.")
+        if not campana:
+            raise serializers.ValidationError("Campaña requerida.")
+        if campana.empresa_id != empresa.id:
+            raise serializers.ValidationError("La campaña no pertenece a la empresa seleccionada.")
+
+        attrs["empresa"] = empresa
+        return attrs
+
+    def create(self, validated_data):
+        validated_data["estado"] = "pending"
+        if not validated_data.get("fecha_inicio"):
+            validated_data["fecha_inicio"] = timezone.localdate()
+        if not validated_data.get("meta_id"):
+            campana = validated_data["campaña"]
+            try:
+                token = get_meta_token_for_empresa(validated_data["empresa"].id)
+                meta_id = create_adset_in_meta(
+                    cuenta_publicitaria=campana.cuenta_publicitaria,
+                    token=token,
+                    campaign_meta_id=campana.meta_id,
+                    nombre=validated_data["nombre"],
+                    presupuesto_diario=validated_data.get("presupuesto_diario"),
+                    segmentacion=validated_data.get("segmentacion") or {},
+                    fecha_inicio=validated_data.get("fecha_inicio"),
+                    fecha_fin=validated_data.get("fecha_fin"),
+                )
+            except MetaProvisioningError as exc:
+                raise serializers.ValidationError(f"Error creando adset en Meta: {exc}") from exc
+            validated_data["meta_id"] = meta_id
+        return super().create(validated_data)
+
 
 class AnuncioSerializer(serializers.ModelSerializer):
     class Meta:
@@ -85,6 +192,56 @@ class AnuncioSerializer(serializers.ModelSerializer):
             "creado_en",
         ]
         read_only_fields = ["id", "creado_en"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        instance = getattr(self, "instance", None)
+
+        adset = attrs.get("conjunto_anuncios") or getattr(instance, "conjunto_anuncios", None)
+        creative = attrs.get("creative") or getattr(instance, "creative", None)
+        empresa = _resolve_empresa_for_write(attrs, instance, user)
+        if empresa is None and adset is not None:
+            empresa = adset.empresa
+
+        if empresa is None:
+            raise serializers.ValidationError("Empresa requerida.")
+        if not adset:
+            raise serializers.ValidationError("Adset requerido.")
+        if not creative:
+            raise serializers.ValidationError("Creative requerido.")
+        if adset.empresa_id != empresa.id:
+            raise serializers.ValidationError("El adset no pertenece a la empresa seleccionada.")
+        if creative.empresa_id != empresa.id:
+            raise serializers.ValidationError("El creative no pertenece a la empresa seleccionada.")
+
+        attrs["empresa"] = empresa
+        return attrs
+
+    def create(self, validated_data):
+        validated_data["estado"] = "pending"
+        if not validated_data.get("meta_id"):
+            adset = validated_data["conjunto_anuncios"]
+            campana = getattr(adset, "campaña")
+            creative = validated_data["creative"]
+            try:
+                token = get_meta_token_for_empresa(validated_data["empresa"].id)
+                creative_meta_id = create_creative_in_meta(
+                    cuenta_publicitaria=campana.cuenta_publicitaria,
+                    token=token,
+                    creative=creative,
+                )
+                meta_id = create_ad_in_meta(
+                    cuenta_publicitaria=campana.cuenta_publicitaria,
+                    token=token,
+                    adset_meta_id=adset.meta_id,
+                    creative_meta_id=creative_meta_id,
+                    nombre=validated_data["nombre"],
+                )
+            except MetaProvisioningError as exc:
+                raise serializers.ValidationError(f"Error creando anuncio en Meta: {exc}") from exc
+            validated_data["meta_id"] = meta_id
+        return super().create(validated_data)
 
 
 class GastoDiarioSerializer(serializers.ModelSerializer):
@@ -153,6 +310,7 @@ class GastoDiarioSerializer(serializers.ModelSerializer):
         attrs["monto_ars"] = (monto_decimal * tc_obj.valor).quantize(Decimal("0.01"))
         return attrs
 
+
 class CredencialesMetaSerializer(serializers.ModelSerializer):
     token_acceso_encrypted = serializers.CharField(write_only=True)
 
@@ -220,3 +378,23 @@ class CreativeSerializer(serializers.ModelSerializer):
             "creado_en",
         ]
         read_only_fields = ["id", "creado_en"]
+
+
+class KPIObjetivoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KPIObjetivo
+        fields = [
+            "id",
+            "empresa",
+            "ingresos_objetivo_usd",
+            "roas_objetivo",
+            "cpa_objetivo_usd",
+            "cpc_objetivo_usd",
+            "cpl_objetivo_usd",
+            "efectividad_objetivo",
+            "frecuencia_objetivo",
+            "ctr_objetivo",
+            "creado_en",
+            "actualizado_en",
+        ]
+        read_only_fields = ["id", "creado_en", "actualizado_en"]

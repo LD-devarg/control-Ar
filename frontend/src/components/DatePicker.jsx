@@ -1,7 +1,7 @@
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { useTheme } from '@mui/material/styles';
 
-export default function FilterDatePicker({ label, value, onChange }) {
+export default function FilterDatePicker({ label, value, onChange, sx = {} }) {
   const theme = useTheme();
   const inputColor = theme.palette.mode === 'dark' ? '#f5f5f5' : '#171717';
 
@@ -44,6 +44,7 @@ export default function FilterDatePicker({ label, value, onChange }) {
             '& .MuiSvgIcon-root': {
               color: inputColor,
             },
+            ...sx,
           },
         },
       }}

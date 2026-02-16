@@ -3,3 +3,28 @@ html,
 body {
   font-family: "Roboto", sans-serif;
 }
+
+.app-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #4f5461 #1c1f28;
+}
+
+.app-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.app-scrollbar::-webkit-scrollbar-track {
+  background: #1c1f28;
+  border-radius: 8px;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb {
+  background: #4f5461;
+  border-radius: 8px;
+  border: 2px solid #1c1f28;
+}
+
+.app-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6d7383;
+}

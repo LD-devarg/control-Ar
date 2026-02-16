@@ -17,6 +17,16 @@ class ClienteSerializer(serializers.ModelSerializer):
             "cant_compras",
             "total_compras_ars",
             "total_compras_usd",
+            "first_touch_at",
+            "fbc",
+            "fbp",
+            "fbclid",
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_content",
+            "utm_term",
+            "event_source_url",
             "empresa",
         ]
         read_only_fields = [
@@ -35,6 +45,15 @@ class ClienteCreateSerializer(serializers.Serializer):
     nombre = serializers.CharField(max_length=100)
     contacto = serializers.CharField(max_length=15)
     username = serializers.CharField(max_length=50)
+    fbp = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    fbc = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    fbclid = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    utm_source = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    utm_medium = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    utm_campaign = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    utm_content = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    utm_term = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    event_source_url = serializers.URLField(max_length=1024, required=False, allow_blank=True)
 
     def validate(self, data):
         try:

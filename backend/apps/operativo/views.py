@@ -195,7 +195,11 @@ class ClienteViewSet(viewsets.ModelViewSet):
             landing=landing,
             operador=None,
             tipo="lead",
-            data={"phone": cliente.contacto},
+            data={
+                "phone": cliente.contacto,
+                "external_id": str(cliente.uuid),
+                "event_source_url": cliente.event_source_url,
+            },
             fbp=request.data.get("fbp"),
             fbc=request.data.get("fbc"),
         )
@@ -295,6 +299,15 @@ class LandingVisitViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         visit = serializer.save()
+        publish_empresa_event(
+            empresa_id=visit.empresa_id,
+            event_type="landing_visit_created",
+            payload={
+                "id": visit.id,
+                "landing_id": visit.landing_id,
+                "creado_en": visit.creado_en.isoformat(),
+            },
+        )
         output = LandingVisitSerializer(visit)
         return Response(output.data, status=status.HTTP_201_CREATED)
 
@@ -364,6 +377,9 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             "email": serializer.validated_data.get("email"),
             "phone": serializer.validated_data.get("phone"),
         }
+        cliente = Cliente.objects.filter(id=serializer.validated_data["cliente_id"]).only("id", "uuid", "fbp", "fbc").first()
+        if cliente:
+            payload["external_id"] = str(cliente.uuid)
 
         evento = EventosMeta.objects.create(
             id_evento=uuid.uuid4(),
@@ -373,8 +389,8 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             operador=operador,
             tipo=serializer.validated_data["tipo"],
             data=payload,
-            fbp=serializer.validated_data.get("fbp"),
-            fbc=serializer.validated_data.get("fbc"),
+            fbp=serializer.validated_data.get("fbp") or (cliente.fbp if cliente else None),
+            fbc=serializer.validated_data.get("fbc") or (cliente.fbc if cliente else None),
         )
 
         try:
@@ -484,6 +500,7 @@ class CompraViewSet(viewsets.ModelViewSet):
                 "value": float(compra.monto_usd) if compra.monto_usd is not None else float(monto_ars),
                 "currency": "USD",
                 "phone": cliente.contacto,
+                "external_id": str(cliente.uuid),
             }
             evento = EventosMeta.objects.create(
                 id_evento=uuid.uuid4(),
@@ -493,6 +510,8 @@ class CompraViewSet(viewsets.ModelViewSet):
                 operador=request.user,
                 tipo="purchase",
                 data=payload,
+                fbp=cliente.fbp,
+                fbc=cliente.fbc,
             )
             try:
                 enviar_evento_meta(evento, request=request)

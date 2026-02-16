@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import Page from "../layouts/Page.jsx";
 import Filter from "../components/Filter";
@@ -10,9 +10,22 @@ import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
 import PercentOutlinedIcon from "@mui/icons-material/PercentOutlined";
 import FilterListOutlinedIcon from "@mui/icons-material/FilterListOutlined";
+import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
+import AttachMoneyOutlinedIcon from '@mui/icons-material/AttachMoneyOutlined';
 import Button from "@mui/material/Button";
 import { apiClient } from "../services/auth";
+import { subscribeRealtimeEvents } from "../services/realtime";
 import { useTenant } from "../context/TenantContext";
+
+const POLL_MS = 60 * 60 * 1000;
+const TABLET_MAX_WIDTH = 1024;
+
+function isIpadDevice() {
+  const userAgent = navigator.userAgent || "";
+  const isiPadUA = /iPad/i.test(userAgent);
+  const isiPadOSDesktopUA = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  return isiPadUA || isiPadOSDesktopUA;
+}
 
 function Stats() {
   const { tenantId } = useTenant();
@@ -23,25 +36,50 @@ function Stats() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
-
-  const params = usePeriod
-    ? { period }
-    : {
-        from: desde?.format("YYYY-MM-DD"),
-        to: hasta?.format("YYYY-MM-DD"),
-      };
+  const [showResponsiveFilters, setShowResponsiveFilters] = useState(false);
+  const [isCompactViewport, setIsCompactViewport] = useState(() => {
+    if (typeof window === "undefined") return false;
+    if (isIpadDevice()) return true;
+    return window.innerWidth <= TABLET_MAX_WIDTH;
+  });
+  const activeRequestRef = useRef(null);
+  const abortTimerRef = useRef(null);
 
   useEffect(() => {
-    const controller = new AbortController();
+    if (typeof window === "undefined") return undefined;
 
-    const load = async () => {
+    const recalcViewport = () => {
+      const compact = isIpadDevice() || window.innerWidth <= TABLET_MAX_WIDTH;
+      setIsCompactViewport(compact);
+      if (!compact) {
+        setShowResponsiveFilters(false);
+      }
+    };
+
+    recalcViewport();
+    window.addEventListener("resize", recalcViewport);
+    return () => window.removeEventListener("resize", recalcViewport);
+  }, []);
+
+  const params = useMemo(
+    () =>
+      usePeriod
+        ? { period }
+        : {
+            from: desde?.format("YYYY-MM-DD"),
+            to: hasta?.format("YYYY-MM-DD"),
+          },
+    [usePeriod, period, desde, hasta, tenantId]
+  );
+
+  const loadStats = useCallback(
+    async (signal) => {
       setLoading(true);
       setError("");
       try {
         const { data: response } = await apiClient.get("/stats/", {
           params,
-          signal: controller.signal,
+          signal,
         });
         setData(response);
       } catch (err) {
@@ -50,18 +88,54 @@ function Stats() {
         }
         setError("No se pudieron cargar las estadisticas.");
       } finally {
-        if (!controller.signal.aborted) {
+        if (!signal?.aborted) {
           setLoading(false);
         }
       }
-    };
+    },
+    [params]
+  );
 
-    load();
+  const triggerRefresh = useCallback(() => {
+    if (activeRequestRef.current) {
+      activeRequestRef.current.abort();
+    }
+    if (abortTimerRef.current) {
+      clearTimeout(abortTimerRef.current);
+    }
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    loadStats(controller.signal);
+    abortTimerRef.current = setTimeout(() => controller.abort(), 15000);
+  }, [loadStats]);
+
+  useEffect(() => {
+    triggerRefresh();
+    const pollId = setInterval(() => triggerRefresh(), POLL_MS);
 
     return () => {
-      controller.abort();
+      clearInterval(pollId);
+      if (activeRequestRef.current) {
+        activeRequestRef.current.abort();
+      }
+      if (abortTimerRef.current) {
+        clearTimeout(abortTimerRef.current);
+      }
     };
-  }, [usePeriod, period, desde, hasta, tenantId]);
+  }, [triggerRefresh]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeRealtimeEvents((message) => {
+      if (
+        message?.type === "lead_created" ||
+        message?.type === "compra_created" ||
+        message?.type === "landing_visit_created"
+      ) {
+        triggerRefresh();
+      }
+    });
+    return unsubscribe;
+  }, [triggerRefresh]);
 
   const onPeriodChange = (value) => {
     setPeriod(value);
@@ -133,7 +207,7 @@ function Stats() {
       sizeHeight: "h-25",
       sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
       value: loading ? "..." : formatUsd(gastoUsd),
-      icon: <PercentOutlinedIcon fontSize="extra-small" />,
+      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
     },
     {
       title: "ROAS",
@@ -158,14 +232,14 @@ function Stats() {
       sizeHeight: "h-20",
       sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
       value: loading ? "..." : formatCurrency(valorCompraProm),
-      icon: <PercentOutlinedIcon fontSize="extra-small" />,
+      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
     },
     {
       title: "Efectividad",
       sizeHeight: "h-20",
       sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
       value: loading ? "..." : formatPct(conversionPct),
-      icon: <TrendingUpOutlinedIcon fontSize="extra-small" />,
+      icon: <PercentOutlinedIcon fontSize="extra-small" />,
     },
     {
       title: "Web Visitors",
@@ -193,7 +267,7 @@ function Stats() {
       sizeHeight: "h-20",
       sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
       value: loading ? "..." : formatPct(retencionPct),
-      icon: <TrendingUpOutlinedIcon fontSize="extra-small" />,
+      icon: <PercentOutlinedIcon fontSize="extra-small" />,
     },
 
   ];
@@ -206,13 +280,22 @@ function Stats() {
           <Button
             variant="outlined"
             size="small"
-            onClick={() => setShowMobileFilters((prev) => !prev)}
+            onClick={() => setShowResponsiveFilters((prev) => !prev)}
             startIcon={<FilterListOutlinedIcon fontSize="small" />}
-            className="sm:hidden"
+            sx={{ display: isCompactViewport ? "inline-flex" : "none" }}
           >
-            {showMobileFilters ? "Ocultar" : "Filtros"}
+            {showResponsiveFilters ? "Ocultar" : "Filtros"}
           </Button>
-          <div className="hidden sm:block">
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={triggerRefresh}
+            startIcon={<RefreshOutlinedIcon fontSize="small" />}
+            disabled={loading}
+          >
+            {loading ? "Actualizando..." : "Refresh"}
+          </Button>
+          <div className={isCompactViewport ? "hidden" : "block"}>
             <Filter
               period={period}
               onPeriodChange={onPeriodChange}
@@ -225,8 +308,8 @@ function Stats() {
         </div>
       }
     >
-      {showMobileFilters ? (
-        <div className="w-full sm:hidden">
+      {showResponsiveFilters && isCompactViewport ? (
+        <div className="w-full">
           <Filter
             period={period}
             onPeriodChange={onPeriodChange}

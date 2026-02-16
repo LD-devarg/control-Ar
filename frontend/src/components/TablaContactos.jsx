@@ -85,7 +85,7 @@ function fixedHeaderContent() {
   );
 }
 
-export default function ReactVirtualizedTable() {
+export default function TablaContactos() {
   const [search, setSearch] = React.useState('');
   const [rows, setRows] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -186,7 +186,7 @@ export default function ReactVirtualizedTable() {
   };
 
   return (
-    <Paper elevation={0} style={{ height: 500, width: '100%', color: '#e7e9ef', backgroundColor: 'transparent' }}>
+    <Paper elevation={0} style={{ height: 550, width: '100%', padding: '16px', color: '#e7e9ef', backgroundColor: 'transparent' }}>
       <div className="tabla-contactos-layout">
         <div className="tabla-contactos-filters">
           <input

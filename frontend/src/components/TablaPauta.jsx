@@ -207,7 +207,7 @@ export default function TablaPauta({
               rows.map((row, idx) => (
                 <TableRow key={row.id ?? `${view}-${idx}`}>
                   {columns.map((col) => (
-                    <TableCell key={col.key}>{row[col.key] ?? '-'}</TableCell>
+                    <TableCell key={col.key}>{getCellValue(row, col.key)}</TableCell>
                   ))}
                 </TableRow>
               ))
@@ -219,3 +219,9 @@ export default function TablaPauta({
     </div>
   );
 }
+  const getCellValue = (row, columnKey) => {
+    if (columnKey === 'budget') {
+      return row.budget ?? row.presupuesto_diario ?? '-';
+    }
+    return row[columnKey] ?? '-';
+  };

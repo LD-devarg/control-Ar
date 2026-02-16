@@ -45,6 +45,7 @@ class MetaEventBuilder:
         user_data = _clean_dict({
             "em": _sha256(payload.get("email")),
             "ph": _sha256(payload.get("phone")),
+            "external_id": _sha256(payload.get("external_id")),
             "fbp": payload.get("fbp"),
             "fbc": payload.get("fbc"),
             "client_ip_address": request.META.get("REMOTE_ADDR") if request else None,

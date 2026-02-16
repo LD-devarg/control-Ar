@@ -19,6 +19,9 @@ from apps.pauta.views import (
     InstagramAccountViewSet,
     PautaAssetViewSet,
     CreativeViewSet,
+    PautaKPIViewSet,
+    KPIObjetivoViewSet,
+    PautaProvisioningViewSet,
 )
 
 router = DefaultRouter()
@@ -44,6 +47,9 @@ router.register(r"fanpages", FanPageViewSet, basename="fanpage")
 router.register(r"instagram-accounts", InstagramAccountViewSet, basename="instagram-account")
 router.register(r"pauta-assets", PautaAssetViewSet, basename="pauta-asset")
 router.register(r"creatives", CreativeViewSet, basename="creative")
+router.register(r"pauta-kpi", PautaKPIViewSet, basename="pauta-kpi")
+router.register(r"kpi-objetivos", KPIObjetivoViewSet, basename="kpi-objetivo")
+router.register(r"pauta-provisioning", PautaProvisioningViewSet, basename="pauta-provisioning")
 
 urlpatterns = [
     path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),

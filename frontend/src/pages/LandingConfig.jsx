@@ -78,6 +78,23 @@ const parseGradient = (value) => {
 const buildGradient = (angle, from, to) =>
     `linear-gradient(${angle}deg, ${from} 0%, ${to} 100%)`;
 
+const ensureAbsoluteUrl = (value) => {
+    const raw = (value || "").trim();
+    if (!raw) return "";
+    return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+};
+
+const resolvePublicBaseUrl = (inputUrl, fallbackOrigin) => {
+    const normalized = ensureAbsoluteUrl(inputUrl);
+    if (!normalized) return fallbackOrigin;
+    try {
+        const parsed = new URL(normalized);
+        return `${parsed.origin}${parsed.pathname}`.replace(/\/+$/, "");
+    } catch {
+        return fallbackOrigin;
+    }
+};
+
 function LandingConfig() {
     const { tenantId } = useTenant();
     const [selectedLanding, setSelectedLanding] = useState(null);
@@ -325,8 +342,12 @@ function LandingConfig() {
 
     const previewBackground =
         form.bgType === "gradient" ? currentGradient : form.bgColor;
+    const publicBaseUrl = useMemo(
+        () => resolvePublicBaseUrl(form.url, origin),
+        [form.url, origin]
+    );
     const publicLandingUrl = selectedLanding?.token
-        ? `${origin}/landing?landing_token=${selectedLanding.token}`
+        ? `${publicBaseUrl}/landing?landing_token=${selectedLanding.token}`
         : "";
 
     return (

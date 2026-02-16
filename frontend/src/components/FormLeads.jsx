@@ -60,6 +60,20 @@ function getCookieValue(name) {
     return "";
 }
 
+function getTrackingParams() {
+    if (typeof window === "undefined") return {};
+    const params = new URLSearchParams(window.location.search || "");
+    const read = (key) => params.get(key) || undefined;
+    return {
+        fbclid: read("fbclid"),
+        utm_source: read("utm_source"),
+        utm_medium: read("utm_medium"),
+        utm_campaign: read("utm_campaign"),
+        utm_content: read("utm_content"),
+        utm_term: read("utm_term"),
+    };
+}
+
 export default function NuevoLead({ buttonText, infoText, whatsappNumber, landingToken, bonusText, infoColor, isPreview = false }) {
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
@@ -172,6 +186,7 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
 
         const fbp = getCookieValue("_fbp") || undefined;
         const fbc = getCookieValue("_fbc") || undefined;
+        const tracking = getTrackingParams();
         const eventSourceUrl =
             typeof window !== "undefined"
                 ? `${window.location.origin}${window.location.pathname}`
@@ -185,6 +200,7 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
             username,
             ...(fbp ? { fbp } : {}),
             ...(fbc ? { fbc } : {}),
+            ...Object.fromEntries(Object.entries(tracking).filter(([, value]) => Boolean(value))),
             ...(eventSourceUrl ? { event_source_url: eventSourceUrl } : {}),
         };
         enqueueClient(payload);

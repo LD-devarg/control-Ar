@@ -242,3 +242,78 @@ class CredencialesMeta(models.Model):
 
     class Meta:
         db_table = "pauta_credencialesmeta"
+
+
+class RendimientoPautaDiario(models.Model):
+    empresa = models.ForeignKey(
+        "empresas.Empresa",
+        on_delete=models.CASCADE,
+        related_name="rendimientos_pauta_diarios",
+    )
+    cuenta_publicitaria = models.ForeignKey(
+        "pauta.CuentaPublicitaria",
+        on_delete=models.CASCADE,
+        related_name="rendimientos_diarios",
+    )
+
+    fecha = models.DateField()
+
+    campaign_meta_id = models.CharField(max_length=100, blank=True, default="")
+    campaign_name = models.CharField(max_length=255, blank=True, default="")
+    adset_meta_id = models.CharField(max_length=100, blank=True, default="")
+    adset_name = models.CharField(max_length=255, blank=True, default="")
+    ad_meta_id = models.CharField(max_length=100)
+    ad_name = models.CharField(max_length=255, blank=True, default="")
+
+    spend_usd = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    impressions = models.BigIntegerField(default=0)
+    reach = models.BigIntegerField(default=0)
+    clicks = models.BigIntegerField(default=0)
+    ctr = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+    cpc_usd = models.DecimalField(max_digits=14, decimal_places=4, default=0)
+    frequency = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+
+    web_visitors = models.BigIntegerField(default=0)
+    leads = models.BigIntegerField(default=0)
+    contacts = models.BigIntegerField(default=0)
+    purchases = models.BigIntegerField(default=0)
+    purchase_value_usd = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "pauta_rendimientopautadiario"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["empresa", "cuenta_publicitaria", "fecha", "ad_meta_id"],
+                name="uniq_rend_pauta_diario_ad",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.fecha} {self.ad_name or self.ad_meta_id} ({self.empresa_id})"
+
+
+class KPIObjetivo(models.Model):
+    empresa = models.OneToOneField(
+        "empresas.Empresa",
+        on_delete=models.CASCADE,
+        related_name="kpi_objetivo",
+    )
+    ingresos_objetivo_usd = models.DecimalField(max_digits=14, decimal_places=2, default=1000)
+    roas_objetivo = models.DecimalField(max_digits=10, decimal_places=4, default=2)
+    cpa_objetivo_usd = models.DecimalField(max_digits=14, decimal_places=2, default=20)
+    cpc_objetivo_usd = models.DecimalField(max_digits=14, decimal_places=2, default=5)
+    cpl_objetivo_usd = models.DecimalField(max_digits=14, decimal_places=2, default=10)
+    efectividad_objetivo = models.DecimalField(max_digits=10, decimal_places=4, default=0.03)
+    frecuencia_objetivo = models.DecimalField(max_digits=10, decimal_places=4, default=3)
+    ctr_objetivo = models.DecimalField(max_digits=10, decimal_places=4, default=0.02)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "pauta_kpiobjetivo"
+
+    def __str__(self):
+        return f"KPIObjetivo({self.empresa_id})"

@@ -48,7 +48,8 @@ class EmpresaViewSet(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_update(self, serializer):
-        _run_validation(validar_nombre_empresa, serializer.validated_data.get("nombre"))
+        nombre = serializer.validated_data.get("nombre", serializer.instance.nombre)
+        _run_validation(validar_nombre_empresa, nombre)
         serializer.save()
 
 

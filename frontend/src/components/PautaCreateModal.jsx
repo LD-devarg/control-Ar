@@ -3,7 +3,11 @@ import Autocomplete from "@mui/material/Autocomplete";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
+import IconButton from "@mui/material/IconButton";
+import InputAdornment from "@mui/material/InputAdornment";
 import CloseIcon from "@mui/icons-material/Close";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import CircularProgress from "@mui/material/CircularProgress";
 import { createByType, fetchRemoteOptions, getCreateConfig } from "../services/pauta/create";
 
@@ -92,6 +96,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [showSecretByField, setShowSecretByField] = useState({});
 
   const config = selectedType ? getCreateConfig(selectedType.key) : null;
 
@@ -106,6 +111,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
   useEffect(() => {
     setFormValues(buildInitialForm(config));
     setRemoteOptions({});
+    setShowSecretByField({});
   }, [config]);
 
   useEffect(() => {
@@ -128,6 +134,10 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
 
   const updateField = (name, value) => {
     setFormValues((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const toggleShowSecret = (fieldName) => {
+    setShowSecretByField((prev) => ({ ...prev, [fieldName]: !prev[fieldName] }));
   };
 
   const validateRequired = () => {
@@ -336,11 +346,35 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                   key={field.name}
                   label={field.label}
                   required={field.required}
-                  type={field.type === "json" ? "text" : field.type}
+                  type={
+                    field.type === "json"
+                      ? "text"
+                      : field.type === "password"
+                        ? (showSecretByField[field.name] ? "text" : "password")
+                        : field.type
+                  }
                   value={formValues[field.name] ?? ""}
                   onChange={(event) => updateField(field.name, event.target.value)}
                   fullWidth
                   size="small"
+                  InputProps={
+                    field.type === "password"
+                      ? {
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                edge="end"
+                                onClick={() => toggleShowSecret(field.name)}
+                                onMouseDown={(event) => event.preventDefault()}
+                                sx={{ color: "#ffffff" }}
+                              >
+                                {showSecretByField[field.name] ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }
+                      : undefined
+                  }
                   sx={{ ...whiteFieldSx, marginBottom: "16px !important" }}
                 />
               );

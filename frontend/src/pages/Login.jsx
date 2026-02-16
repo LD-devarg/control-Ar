@@ -3,6 +3,10 @@ import Stack from "@mui/material/Stack";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
+import IconButton from "@mui/material/IconButton";
+import InputAdornment from "@mui/material/InputAdornment";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { useNavigate } from "react-router-dom";
 import "../assets/css/Login.css";
 import { useTheme } from "@mui/material/styles";
@@ -41,6 +45,7 @@ function Login() {
   };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -89,11 +94,25 @@ function Login() {
             sx={fieldSx}
             id="standard-password-input"
             label="Ingrese su contrasena"
-            type="password"
+            type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             variant="standard"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    edge="end"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    sx={{ color }}
+                  >
+                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
           {error ? (
             <span className="text-xs text-red-600 mt-2">{error}</span>

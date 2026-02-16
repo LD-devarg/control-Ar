@@ -2,6 +2,7 @@ import Page from "../layouts/Page";
 import TablaKPI from "../components/TablaKPI.jsx";
 import Button from "@mui/material/Button";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import FilterListOutlinedIcon from "@mui/icons-material/FilterListOutlined";
 import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
@@ -15,6 +16,7 @@ import PerformanceObjectivesModal from "../components/PerformanceObjectivesModal
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { apiClient } from "../services/auth";
+import { getEffectiveTenantId } from "../services/tenant";
 
 const PERIOD_OPTIONS = [
     { value: "day", label: "Dia" },
@@ -70,6 +72,8 @@ function PautaKPI() {
     const [toDate, setToDate] = useState(dayjs());
     const [showResponsiveFilters, setShowResponsiveFilters] = useState(false);
     const [performanceScore, setPerformanceScore] = useState(60);
+    const [refreshing, setRefreshing] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
     const [performanceModalOpen, setPerformanceModalOpen] = useState(false);
     const [objectiveId, setObjectiveId] = useState(null);
     const [savingObjectives, setSavingObjectives] = useState(false);
@@ -160,6 +164,30 @@ function PautaKPI() {
         });
     };
 
+    const handleRefreshSync = async () => {
+        setRefreshing(true);
+        try {
+            const tenantId = getEffectiveTenantId();
+            await apiClient.post("/pauta-kpi/refresh/", null, {
+                params: tenantId ? { empresa: tenantId } : undefined,
+            });
+            setRefreshKey((prev) => prev + 1);
+            setToast({
+                open: true,
+                severity: "success",
+                message: "Sync ejecutada. Datos de pauta actualizados.",
+            });
+        } catch (_err) {
+            setToast({
+                open: true,
+                severity: "error",
+                message: "No se pudo ejecutar la sync manual.",
+            });
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
     const handleObjectiveChange = (key, value) => {
         setObjectivesForm((prev) => ({ ...prev, [key]: value }));
     };
@@ -195,7 +223,46 @@ function PautaKPI() {
     };
 
     const filterControls = (
-        <div className="app-scrollbar flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-2 pt-2 mt-1">
+        <div className="app-scrollbar flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
+            <button
+                    type="button"
+                    onClick={() => setPerformanceModalOpen(true)}
+                    className="shrink-0 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-left hover:bg-white/5"
+                >
+                    <div className="flex items-center gap-2">
+                        <div>
+                            <p className="text-[10px] uppercase tracking-wide text-white/60">Performance score</p>
+                            <p className={`text-sm font-semibold ${scoreTone}`}>{performanceScore}/100</p>
+                        </div>
+                        <div className="relative h-9 w-9">
+                            <svg
+                                height={radialRadius * 2}
+                                width={radialRadius * 2}
+                                className="-rotate-90"
+                            >
+                                <circle
+                                    stroke="rgba(255,255,255,0.18)"
+                                    fill="transparent"
+                                    strokeWidth={radialStroke}
+                                    r={radialNormalizedRadius}
+                                    cx={radialRadius}
+                                    cy={radialRadius}
+                                />
+                                <circle
+                                    stroke={scoreBarClass === "bg-emerald-400" ? "#34d399" : scoreBarClass === "bg-amber-400" ? "#fbbf24" : "#fb7185"}
+                                    fill="transparent"
+                                    strokeLinecap="round"
+                                    strokeWidth={radialStroke}
+                                    strokeDasharray={`${radialCircumference} ${radialCircumference}`}
+                                    style={{ strokeDashoffset: radialOffset }}
+                                    r={radialNormalizedRadius}
+                                    cx={radialRadius}
+                                    cy={radialRadius}
+                                />
+                            </svg>
+                        </div>
+                    </div>
+                </button>
             <Autocomplete
                 size="small"
                 disableClearable
@@ -255,46 +322,7 @@ function PautaKPI() {
         <Page
             title="Rendimientos"
             actions={
-                <div className="app-scrollbar flex w-full flex-nowrap items-center justify-end gap-2 overflow-x-auto pb-1">
-                    <button
-                        type="button"
-                        onClick={() => setPerformanceModalOpen(true)}
-                        className="shrink-0 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-left hover:bg-white/5"
-                    >
-                        <div className="flex items-center gap-2">
-                            <div>
-                                <p className="text-[10px] uppercase tracking-wide text-white/60">Performance score</p>
-                                <p className={`text-sm font-semibold ${scoreTone}`}>{performanceScore}/100</p>
-                            </div>
-                            <div className="relative h-9 w-9">
-                                <svg
-                                    height={radialRadius * 2}
-                                    width={radialRadius * 2}
-                                    className="-rotate-90"
-                                >
-                                    <circle
-                                        stroke="rgba(255,255,255,0.18)"
-                                        fill="transparent"
-                                        strokeWidth={radialStroke}
-                                        r={radialNormalizedRadius}
-                                        cx={radialRadius}
-                                        cy={radialRadius}
-                                    />
-                                    <circle
-                                        stroke={scoreBarClass === "bg-emerald-400" ? "#34d399" : scoreBarClass === "bg-amber-400" ? "#fbbf24" : "#fb7185"}
-                                        fill="transparent"
-                                        strokeLinecap="round"
-                                        strokeWidth={radialStroke}
-                                        strokeDasharray={`${radialCircumference} ${radialCircumference}`}
-                                        style={{ strokeDashoffset: radialOffset }}
-                                        r={radialNormalizedRadius}
-                                        cx={radialRadius}
-                                        cy={radialRadius}
-                                    />
-                                </svg>
-                            </div>
-                        </div>
-                    </button>
+                <div className="app-scrollbar flex w-full flex-nowrap items-center justify-end overflow-x-auto ">
                     {isCompactViewport ? (
                         <Button
                             variant="outlined"
@@ -309,16 +337,6 @@ function PautaKPI() {
                     <div className={isCompactViewport ? "hidden" : "block"}>
                         {filterControls}
                     </div>
-                    <Button
-                        variant="outlined"
-                        size="medium"
-                        color="primary"
-                        startIcon={<AddOutlinedIcon />}
-                        onClick={() => setModalOpen(true)}
-                        className="shrink-0"
-                    >
-                        Crear gasto
-                    </Button>
                 </div>
             }
         >
@@ -334,6 +352,31 @@ function PautaKPI() {
                     fromDate={fromDate}
                     toDate={toDate}
                     view={view}
+                    refreshKey={refreshKey}
+                    headerActions={
+                        <>
+                            <Button
+                                variant="outlined"
+                                size="medium"
+                                startIcon={<RefreshOutlinedIcon fontSize="small" />}
+                                onClick={handleRefreshSync}
+                                disabled={refreshing}
+                                className="shrink-0"
+                            >
+                                {refreshing ? "Actualizando..." : "Refresh"}
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                size="medium"
+                                color="primary"
+                                startIcon={<AddOutlinedIcon />}
+                                onClick={() => setModalOpen(true)}
+                                className="shrink-0"
+                            >
+                                Crear gasto
+                            </Button>
+                        </>
+                    }
                     onScoreChange={(score) => setPerformanceScore(Number(score || 0))}
                 />
             </div>

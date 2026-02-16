@@ -5,6 +5,16 @@ import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import MenuItem from "@mui/material/MenuItem";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import Snackbar from "@mui/material/Snackbar";
+import Alert from "@mui/material/Alert";
+import IconButton from "@mui/material/IconButton";
+import InputAdornment from "@mui/material/InputAdornment";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { fetchUsuarios, createUsuario, updateUsuario, fetchGrupos } from "../services/empresas/usuarios";
 import { fetchEmpresas } from "../services/empresas/empresas";
 import { fetchOrganizaciones } from "../services/empresas/organizaciones";
@@ -34,6 +44,9 @@ export default function Users() {
     const [organizaciones, setOrganizaciones] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
+    const [showPassword, setShowPassword] = useState(false);
 
     const currentUser = useMemo(() => getCurrentUser(), []);
 
@@ -155,7 +168,7 @@ export default function Users() {
         });
     };
 
-    const handleSave = async () => {
+    const executeSave = async () => {
         if (!canCreate) {
             setError("No tenes permisos para crear o editar usuarios.");
             return;
@@ -215,8 +228,10 @@ export default function Users() {
             }
             if (selected) {
                 await updateUsuario(selected.id, payload);
+                setToast({ open: true, severity: "success", message: "Usuario actualizado correctamente." });
             } else {
                 await createUsuario(payload);
+                setToast({ open: true, severity: "success", message: "Usuario creado correctamente." });
             }
             await load();
             if (!selected) {
@@ -226,6 +241,7 @@ export default function Users() {
             const detail = err?.response?.data?.detail;
             if (detail) {
                 setError(detail);
+                setToast({ open: true, severity: "error", message: detail });
             } else {
                 const body = err?.response?.data;
                 if (body && typeof body === "object") {
@@ -233,13 +249,49 @@ export default function Users() {
                     const firstValue = body[firstKey];
                     const firstMsg = Array.isArray(firstValue) ? firstValue[0] : firstValue;
                     setError(firstMsg || "No se pudo guardar el usuario.");
+                    setToast({ open: true, severity: "error", message: firstMsg || "No se pudo guardar el usuario." });
                 } else {
                     setError("No se pudo guardar el usuario.");
+                    setToast({ open: true, severity: "error", message: "No se pudo guardar el usuario." });
                 }
             }
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSave = () => {
+        if (!canCreate) {
+            setError("No tenes permisos para crear o editar usuarios.");
+            return;
+        }
+        if (!form.username.trim()) {
+            setError("El username es obligatorio.");
+            return;
+        }
+        if (!selected && !form.password.trim()) {
+            setError("La contrasena es obligatoria para crear.");
+            return;
+        }
+        if (!form.groupId) {
+            setError("Selecciona un grupo.");
+            return;
+        }
+        if (isSuperuser) {
+            if (orgAdminGroupSelected && !form.organizacionId) {
+                setError("Selecciona una organizacion.");
+                return;
+            }
+            if (!orgAdminGroupSelected && !form.empresaId) {
+                setError("Selecciona una empresa.");
+                return;
+            }
+        } else if ((isAdminOrganizacional || isAdmin) && !form.empresaId) {
+            setError("Selecciona una empresa.");
+            return;
+        }
+        setError("");
+        setConfirmOpen(true);
     };
 
     return (
@@ -491,12 +543,26 @@ export default function Users() {
                             ) : null}
                             <TextField
                                 label="Password"
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 value={form.password}
                                 onChange={handleChange("password")}
                                 fullWidth
                                 size="small"
                                 helperText={selected ? "Dejar vacio para no cambiar." : ""}
+                                InputProps={{
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <IconButton
+                                                edge="end"
+                                                onClick={() => setShowPassword((prev) => !prev)}
+                                                onMouseDown={(event) => event.preventDefault()}
+                                                sx={{ color: "#fff" }}
+                                            >
+                                                {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ),
+                                }}
                                 sx={{
                                     "& .MuiInputBase-input": { color: "#fff" },
                                     "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.8)" },
@@ -553,6 +619,51 @@ export default function Users() {
                     </div>
                 </div>
             </div>
+            <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>{selected ? "Confirmar cambios" : "Confirmar creacion"}</DialogTitle>
+                <DialogContent>
+                    <div className="text-sm text-zinc-300">
+                        {selected
+                            ? "Se guardaran los cambios del usuario."
+                            : "Se creara un nuevo usuario con los datos cargados."}
+                    </div>
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        variant="outlined"
+                        onClick={() => setConfirmOpen(false)}
+                        disabled={loading}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={async () => {
+                            setConfirmOpen(false);
+                            await executeSave();
+                        }}
+                        disabled={loading}
+                        sx={{ backgroundColor: "#22c55e", color: "#0b0b0b", fontWeight: 700 }}
+                    >
+                        Confirmar
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Snackbar
+                open={toast.open}
+                autoHideDuration={3500}
+                onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+                <Alert
+                    onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+                    severity={toast.severity}
+                    variant="filled"
+                    sx={{ width: "100%" }}
+                >
+                    {toast.message}
+                </Alert>
+            </Snackbar>
         </Page>
     );
 }

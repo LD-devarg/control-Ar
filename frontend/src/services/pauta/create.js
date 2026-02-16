@@ -200,6 +200,15 @@ export const CREATE_FORM_CONFIG = {
       { name: "meta_id", label: "Meta ID (opcional)", type: "text", required: false },
     ],
   },
+  "Credenciales Meta": {
+    endpoint: "/credenciales-meta/",
+    fields: [
+      { name: "bm", label: "BM", type: "select-remote", source: "/bms/", required: true },
+      { name: "pixel_id", label: "Pixel ID", type: "text", required: true },
+      { name: "app_id", label: "App ID", type: "text", required: true },
+      { name: "token_acceso_encrypted", label: "Token de acceso", type: "password", required: true },
+    ],
+  },
   Assets: {
     mode: "external-pipeline",
   },

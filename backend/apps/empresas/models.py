@@ -2,8 +2,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 
 BEAT_TASKS_AVAILABLE = {
-    "sync_pauta_kpi_15m": "Sync KPI pauta (15m)",
-    "sync_pauta_estado_15m": "Sync estados pauta (15m)",
+    "sync_pauta_kpi_15m": "Sync KPI pauta (4h)",
+    "sync_pauta_estado_15m": "Sync estados pauta (4h)",
 }
 
 

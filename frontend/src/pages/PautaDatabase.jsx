@@ -83,6 +83,7 @@ export default function PautaDatabase() {
     const pickerRef = useRef(null);
 
     const tabs = Object.keys(COLUMN_SETS);
+    const createTypes = [...tabs, "Credenciales Meta"];
     const columnsForView = COLUMN_SETS[tab] ?? COLUMN_SETS.Bms;
 
     const selectedColumns = useMemo(() => {
@@ -240,7 +241,7 @@ export default function PautaDatabase() {
             <PautaCreateModal
                 open={createModalOpen}
                 onClose={handleCloseCreateModal}
-                types={tabs}
+                types={createTypes}
                 defaultType={tab}
                 onCreated={handleCreated}
             />

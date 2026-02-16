@@ -17,7 +17,7 @@ export async function fetchGrupos() {
 export async function createUsuario(payload) {
   const tenantId = getEffectiveTenantId();
   const nextPayload =
-    tenantId && payload?.empresa === undefined
+    tenantId && payload?.empresa === undefined && payload?.organizacion === undefined
       ? { ...payload, empresa: tenantId }
       : payload;
   const { data } = await apiClient.post("/usuarios/", nextPayload);

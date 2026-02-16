@@ -30,7 +30,7 @@ def validar_cupos_organizacion(organizacion, empresa_actual_id=None):
 
     usadas = Empresa.objects.filter(organizacion_id=organizacion.id).exclude(id=empresa_actual_id).count()
     if usadas >= cupos:
-        raise ValidationError(f"La organizacion '{organizacion.nombre}' alcanzo su cupo ({cupos}).")
+        raise ValidationError("No se pueden crear mas empresas para la organizacion.")
     return True
 
 

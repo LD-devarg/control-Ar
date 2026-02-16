@@ -6,6 +6,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
+from rest_framework.decorators import action
 
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
 from apps.empresas.models import Empresa
@@ -39,6 +40,8 @@ from .serializers import (
     CreativeSerializer,
     KPIObjetivoSerializer,
 )
+from .servicios.estado_sync import sync_pauta_estado_15m
+from .servicios.rendimiento_sync import sync_rendimientos_meta_diarios
 
 
 def _filter_by_empresa(qs, user, request=None):
@@ -421,6 +424,20 @@ class PautaKPIViewSet(viewsets.ViewSet):
         if period == "month":
             return today - timedelta(days=29), today
         return today - timedelta(days=6), today
+
+    @action(detail=False, methods=["post"], url_path="refresh")
+    def refresh(self, request):
+        empresa_id = resolve_request_empresa_id(request, allow_empty_for_superuser=False)
+        kpi_result = sync_rendimientos_meta_diarios(empresa_ids=[empresa_id], force=True)
+        estado_result = sync_pauta_estado_15m(empresa_ids=[empresa_id], force=True)
+        return Response(
+            {
+                "ok": True,
+                "empresa_id": empresa_id,
+                "kpi": kpi_result,
+                "estado": estado_result,
+            }
+        )
 
     @staticmethod
     def _safe_div(num, den):

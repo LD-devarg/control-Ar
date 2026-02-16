@@ -150,15 +150,15 @@ def _upsert_row(empresa: Empresa, cuenta: CuentaPublicitaria, fecha: dt.date, ro
     )
 
 
-def sync_rendimientos_meta_diarios() -> dict:
+def sync_rendimientos_meta_diarios(*, empresa_ids: list[int] | None = None, force: bool = False) -> dict:
     fecha_objetivo = timezone.localdate()
 
-    empresas = (
-        Empresa.objects
-        .filter(activo=True, workers_activos=True, beat_activo=True)
-        .only("id", "nombre", "beat_tasks_config")
-        .order_by("id")
-    )
+    empresas_qs = Empresa.objects.filter(activo=True)
+    if empresa_ids:
+        empresas_qs = empresas_qs.filter(id__in=empresa_ids)
+    if not force:
+        empresas_qs = empresas_qs.filter(workers_activos=True, beat_activo=True)
+    empresas = empresas_qs.only("id", "nombre", "beat_tasks_config").order_by("id")
 
     result = {
         "fecha": fecha_objetivo.isoformat(),
@@ -170,7 +170,7 @@ def sync_rendimientos_meta_diarios() -> dict:
     }
 
     for empresa in empresas:
-        if not _is_task_enabled_for_empresa(empresa, TASK_KEY):
+        if not force and not _is_task_enabled_for_empresa(empresa, TASK_KEY):
             continue
         try:
             cuenta = CuentaPublicitaria.objects.filter(empresa_id=empresa.id).order_by("id").first()

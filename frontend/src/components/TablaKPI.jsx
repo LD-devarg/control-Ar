@@ -4,7 +4,7 @@ import OperativeKPIPanel from "./OperativeKPIPanel";
 import { apiClient } from "../services/auth";
 
 const LEVEL_LABELS = {
-  campaign: "Campana",
+  campaign: "Campaña",
   adset: "Adset",
   ad: "Ad",
 };
@@ -141,7 +141,16 @@ function mapApiToLocalShape(payload) {
   };
 }
 
-export default function TablaKPI({ period = "week", account = "all", fromDate = null, toDate = null, view = "executiva", onScoreChange = null }) {
+export default function TablaKPI({
+  period = "week",
+  account = "all",
+  fromDate = null,
+  toDate = null,
+  view = "executiva",
+  onScoreChange = null,
+  refreshKey = 0,
+  headerActions = null,
+}) {
   const [level, setLevel] = useState("campaign");
   const [sortBy, setSortBy] = useState("roas");
   const [sortDir, setSortDir] = useState("desc");
@@ -208,7 +217,7 @@ export default function TablaKPI({ period = "week", account = "all", fromDate = 
     return () => {
       mounted = false;
     };
-  }, [period, account, fromDate, toDate, onScoreChange]);
+  }, [period, account, fromDate, toDate, onScoreChange, refreshKey]);
 
   const effectiveOperativeData = remoteData?.operativeData || EMPTY_OPERATIVE_DATA;
   const effectiveExecutiveCards = remoteData?.executiveCards || [];
@@ -309,20 +318,23 @@ export default function TablaKPI({ period = "week", account = "all", fromDate = 
   return (
     <div className="h-full max-h-full w-full overflow-hidden rounded-xl border border-gray-700 bg-neutral-900 px-3 py-3 shadow-lg shadow-black">
       <div className="app-scrollbar h-full w-full min-h-0 space-y-4 overflow-y-auto pr-1">
-        <div className="flex flex-row w-full">
-          <div className="text-[11px] text-white/60">{filterSummary}</div>
-        {loadingRemote ? <div className="text-xs text-cyan-300">Cargando datos reales...</div> : null}
-        {remoteError ? <div className="text-xs text-amber-300">{remoteError}</div> : null}
-        {!loadingRemote && !remoteError && remoteData?.lastSync ? (
-          <div className="app-scrollbar flex ml-4 flex-nowrap items-center gap-3 overflow-x-auto whitespace-nowrap text-[11px] text-white/55">
-            <span>
-            |  KPI sync: {remoteData.lastSync.kpi_last_run_at ? new Date(remoteData.lastSync.kpi_last_run_at).toLocaleString("es-AR") : "-"} ({remoteData.lastSync.kpi_last_status || "n/a"})
-            </span>
-            <span>
-              Estado sync: {remoteData.lastSync.estado_last_run_at ? new Date(remoteData.lastSync.estado_last_run_at).toLocaleString("es-AR") : "-"} ({remoteData.lastSync.estado_last_status || "n/a"})
-            </span>
+        <div className="flex w-full items-start justify-between gap-3">
+          <div className="app-scrollbar flex min-w-0 flex-nowrap items-center gap-3 overflow-x-auto whitespace-nowrap">
+            <span className="text-[11px] text-white/60">{filterSummary}</span>
+            {loadingRemote ? <span className="text-xs text-cyan-300">Cargando datos reales...</span> : null}
+            {remoteError ? <span className="text-xs text-amber-300">{remoteError}</span> : null}
+            {!loadingRemote && !remoteError && remoteData?.lastSync ? (
+              <>
+                <span className="text-[11px] text-white/55">
+                  KPI sync: {remoteData.lastSync.kpi_last_run_at ? new Date(remoteData.lastSync.kpi_last_run_at).toLocaleString("es-AR") : "-"} ({remoteData.lastSync.kpi_last_status || "n/a"})
+                </span>
+                <span className="text-[11px] text-white/55">
+                  Estado sync: {remoteData.lastSync.estado_last_run_at ? new Date(remoteData.lastSync.estado_last_run_at).toLocaleString("es-AR") : "-"} ({remoteData.lastSync.estado_last_status || "n/a"})
+                </span>
+              </>
+            ) : null}
           </div>
-        ) : null}
+          {headerActions ? <div className="flex shrink-0 items-center gap-2">{headerActions}</div> : null}
         </div>
         {view === "operativa" ? (
           <div className="w-full">

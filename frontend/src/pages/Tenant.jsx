@@ -26,6 +26,27 @@ function buildBeatTasksDraft(empresa) {
     return draft;
 }
 
+function extractApiErrorMessage(err, fallback) {
+    const detail = err?.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+
+    const body = err?.response?.data;
+    if (Array.isArray(body) && body.length) {
+        const first = body[0];
+        if (typeof first === "string" && first.trim()) return first;
+    }
+    if (body && typeof body === "object") {
+        const firstKey = Object.keys(body)[0];
+        const firstValue = body[firstKey];
+        if (Array.isArray(firstValue) && firstValue.length) {
+            const first = firstValue[0];
+            if (typeof first === "string" && first.trim()) return first;
+        }
+        if (typeof firstValue === "string" && firstValue.trim()) return firstValue;
+    }
+    return fallback;
+}
+
 export default function Tenant() {
     const currentUser = getCurrentUser();
     const isSuperuser = Boolean(currentUser?.is_superuser);
@@ -113,12 +134,12 @@ export default function Tenant() {
                 handleClear();
             }
         } catch (err) {
-            const detail = err?.response?.data?.detail;
-            setError(detail || "No se pudo guardar la empresa.");
+            const message = extractApiErrorMessage(err, "No se pudo guardar la empresa.");
+            setError(message);
             setToast({
                 open: true,
                 severity: "error",
-                message: detail || "No se pudo guardar la empresa.",
+                message,
             });
         } finally {
             setSaving(false);
@@ -144,12 +165,12 @@ export default function Tenant() {
                 message: `Workers ${updated.workers_activos ? "activados" : "pausados"} en ${updated.nombre}.`,
             });
         } catch (err) {
-            const detail = err?.response?.data?.detail;
-            setError(detail || "No se pudo actualizar workers.");
+            const message = extractApiErrorMessage(err, "No se pudo actualizar workers.");
+            setError(message);
             setToast({
                 open: true,
                 severity: "error",
-                message: detail || "No se pudo actualizar workers.",
+                message,
             });
         } finally {
             setSaving(false);
@@ -178,12 +199,12 @@ export default function Tenant() {
                 message: `Beat ${updated.beat_activo ? "activado" : "pausado"} en ${updated.nombre}.`,
             });
         } catch (err) {
-            const detail = err?.response?.data?.detail;
-            setError(detail || "No se pudo actualizar beat.");
+            const message = extractApiErrorMessage(err, "No se pudo actualizar beat.");
+            setError(message);
             setToast({
                 open: true,
                 severity: "error",
-                message: detail || "No se pudo actualizar beat.",
+                message,
             });
         } finally {
             setSaving(false);
@@ -228,11 +249,11 @@ export default function Tenant() {
                 message: `Tareas Beat actualizadas en ${updated.nombre}.`,
             });
         } catch (err) {
-            const detail = err?.response?.data?.detail;
+            const detail = extractApiErrorMessage(err, "No se pudieron actualizar las tareas Beat.");
             setToast({
                 open: true,
                 severity: "error",
-                message: detail || "No se pudieron actualizar las tareas Beat.",
+                message: detail,
             });
         } finally {
             setBeatTasksSaving(false);

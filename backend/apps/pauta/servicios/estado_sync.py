@@ -207,7 +207,7 @@ def _sync_creative(creative: Creative, token: str) -> bool:
     return False
 
 
-def sync_pauta_estado_15m() -> dict:
+def sync_pauta_estado_15m(*, empresa_ids: list[int] | None = None, force: bool = False) -> dict:
     result = {
         "run_at": timezone.now().isoformat(),
         "empresas_evaluadas": 0,
@@ -221,11 +221,16 @@ def sync_pauta_estado_15m() -> dict:
         "errores": [],
     }
 
-    empresas = Empresa.objects.filter(activo=True, workers_activos=True, beat_activo=True).order_by("id")
+    empresas_qs = Empresa.objects.filter(activo=True)
+    if empresa_ids:
+        empresas_qs = empresas_qs.filter(id__in=empresa_ids)
+    if not force:
+        empresas_qs = empresas_qs.filter(workers_activos=True, beat_activo=True)
+    empresas = empresas_qs.order_by("id")
     result["empresas_evaluadas"] = empresas.count()
 
     for empresa in empresas:
-        if not _is_task_enabled_for_empresa(empresa, TASK_KEY):
+        if not force and not _is_task_enabled_for_empresa(empresa, TASK_KEY):
             continue
         cred = CredencialesMeta.objects.filter(empresa_id=empresa.id).order_by("id").first()
         if not cred:

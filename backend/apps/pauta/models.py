@@ -2,10 +2,12 @@ from django.db import models
 
 
 class BM(models.Model):
-    empresa = models.ForeignKey(
-        "empresas.Empresa",
+    organizacion = models.ForeignKey(
+        "empresas.Organizacion",
         on_delete=models.CASCADE,
         related_name="bms",
+        null=True,
+        blank=True,
     )
     meta_id = models.CharField(max_length=100)
     nombre = models.CharField(max_length=120)
@@ -16,7 +18,7 @@ class BM(models.Model):
         db_table = "pauta_bm"
 
     def __str__(self):
-        return f"{self.nombre} ({self.empresa})"
+        return f"{self.nombre} ({self.organizacion})"
 
 
 class CuentaPublicitaria(models.Model):

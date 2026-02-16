@@ -62,6 +62,44 @@ def _has_pauta_permission(user, action: str) -> bool:
     return False
 
 
+def _get_request_organizacion_id(request):
+    user = request.user
+    empresa_param = request.query_params.get("empresa")
+
+    if empresa_param:
+        try:
+            empresa_id = int(empresa_param)
+        except (TypeError, ValueError):
+            return 0
+        if not user.is_superuser:
+            allowed_ids = set(get_user_empresa_ids(user))
+            if empresa_id not in allowed_ids:
+                return 0
+        empresa = Empresa.objects.filter(id=empresa_id).only("organizacion_id").first()
+        return int(empresa.organizacion_id or 0) if empresa else 0
+
+    if user.is_superuser:
+        return 0
+
+    if user.organizacion_id:
+        return int(user.organizacion_id)
+
+    if user.empresa_id:
+        empresa = Empresa.objects.filter(id=user.empresa_id).only("organizacion_id").first()
+        if empresa and empresa.organizacion_id:
+            return int(empresa.organizacion_id)
+
+    allowed_ids = get_user_empresa_ids(user)
+    if not allowed_ids:
+        return 0
+    empresa = (
+        Empresa.objects.filter(id__in=allowed_ids, organizacion_id__isnull=False)
+        .only("organizacion_id")
+        .first()
+    )
+    return int(empresa.organizacion_id or 0) if empresa else 0
+
+
 PERFORMANCE_WEIGHTS = {
     "ingresos": 30.0,
     "roas": 20.0,
@@ -94,7 +132,12 @@ class BMViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
+        org_id = _get_request_organizacion_id(self.request)
+        if org_id:
+            return super().get_queryset().filter(organizacion_id=org_id)
+        if self.request.user.is_superuser:
+            return super().get_queryset()
+        return super().get_queryset().none()
 
 
 class CuentaPublicitariaViewSet(viewsets.ModelViewSet):

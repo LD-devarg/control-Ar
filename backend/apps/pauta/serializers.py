@@ -3,6 +3,7 @@ from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.empresas.models import Empresa
 from apps.empresas.scope import get_user_empresa_ids
 from .servicios.crypto import encrypt_token
 from .servicios.meta_provisioning import (
@@ -32,10 +33,47 @@ from .models import (
 
 
 class BMSerializer(serializers.ModelSerializer):
+    empresa = serializers.PrimaryKeyRelatedField(
+        queryset=Empresa.objects.select_related("organizacion").all(),
+        write_only=True,
+        required=False,
+    )
+
     class Meta:
         model = BM
-        fields = ["id", "empresa", "meta_id", "nombre", "estado", "creado_en"]
+        fields = ["id", "organizacion", "empresa", "meta_id", "nombre", "estado", "creado_en"]
         read_only_fields = ["id", "creado_en"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        instance = getattr(self, "instance", None)
+
+        empresa = attrs.pop("empresa", None)
+        organizacion = attrs.get("organizacion") or getattr(instance, "organizacion", None)
+
+        if empresa:
+            if not empresa.organizacion_id:
+                raise serializers.ValidationError("La empresa seleccionada no tiene organizacion asociada.")
+            if organizacion and organizacion.id != empresa.organizacion_id:
+                raise serializers.ValidationError("La organizacion no coincide con la empresa seleccionada.")
+            organizacion = empresa.organizacion
+
+        if user and not user.is_superuser:
+            user_org_id = user.organizacion_id or getattr(getattr(user, "empresa", None), "organizacion_id", None)
+            if not user_org_id:
+                raise serializers.ValidationError("El usuario actual no tiene organizacion asociada.")
+            if organizacion and organizacion.id != user_org_id:
+                raise serializers.ValidationError("No tenes acceso a la organizacion seleccionada.")
+            organizacion = organizacion or getattr(getattr(user, "empresa", None), "organizacion", None)
+            if organizacion is None and user.organizacion_id:
+                organizacion = user.organizacion
+
+        if organizacion is None:
+            raise serializers.ValidationError("Organizacion requerida.")
+
+        attrs["organizacion"] = organizacion
+        return attrs
 
 
 def _resolve_empresa_for_write(attrs, instance, request_user):
@@ -59,6 +97,24 @@ class CuentaPublicitariaSerializer(serializers.ModelSerializer):
         model = CuentaPublicitaria
         fields = ["id", "empresa", "bm", "meta_id", "nombre", "estado", "creado_en"]
         read_only_fields = ["id", "creado_en"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        instance = getattr(self, "instance", None)
+
+        empresa = _resolve_empresa_for_write(attrs, instance, user)
+        bm = attrs.get("bm") or getattr(instance, "bm", None)
+
+        if empresa is None:
+            raise serializers.ValidationError("Empresa requerida.")
+        if not bm:
+            raise serializers.ValidationError("BM requerido.")
+        if empresa.organizacion_id != bm.organizacion_id:
+            raise serializers.ValidationError("El BM no pertenece a la organizacion de la empresa seleccionada.")
+
+        attrs["empresa"] = empresa
+        return attrs
 
 
 class CampañaSerializer(serializers.ModelSerializer):
@@ -327,6 +383,24 @@ class CredencialesMetaSerializer(serializers.ModelSerializer):
         fields = ["id", "empresa", "bm", "pixel_id", "app_id", "token_acceso_encrypted"]
         read_only_fields = ["id"]
 
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        instance = getattr(self, "instance", None)
+
+        empresa = _resolve_empresa_for_write(attrs, instance, user)
+        bm = attrs.get("bm") or getattr(instance, "bm", None)
+
+        if empresa is None:
+            raise serializers.ValidationError("Empresa requerida.")
+        if not bm:
+            raise serializers.ValidationError("BM requerido.")
+        if empresa.organizacion_id != bm.organizacion_id:
+            raise serializers.ValidationError("El BM no pertenece a la organizacion de la empresa seleccionada.")
+
+        attrs["empresa"] = empresa
+        return attrs
+
     def create(self, validated_data):
         token = validated_data.pop("token_acceso_encrypted")
         validated_data["token_acceso_encrypted"] = encrypt_token(token)
@@ -344,6 +418,24 @@ class FanPageSerializer(serializers.ModelSerializer):
         model = FanPage
         fields = ["id", "empresa", "bm", "meta_id", "nombre", "estado", "creado_en"]
         read_only_fields = ["id", "creado_en"]
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        instance = getattr(self, "instance", None)
+
+        empresa = _resolve_empresa_for_write(attrs, instance, user)
+        bm = attrs.get("bm") or getattr(instance, "bm", None)
+
+        if empresa is None:
+            raise serializers.ValidationError("Empresa requerida.")
+        if not bm:
+            raise serializers.ValidationError("BM requerido.")
+        if empresa.organizacion_id != bm.organizacion_id:
+            raise serializers.ValidationError("El BM no pertenece a la organizacion de la empresa seleccionada.")
+
+        attrs["empresa"] = empresa
+        return attrs
 
 
 class InstagramAccountSerializer(serializers.ModelSerializer):

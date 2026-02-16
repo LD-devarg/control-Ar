@@ -9,7 +9,11 @@ export const apiClient = axios.create({
 
 function shouldSkipTenantParam(url = "") {
   const normalized = String(url || "").toLowerCase();
-  return normalized.startsWith("/empresas/") || normalized.startsWith("/grupos/");
+  return (
+    normalized.startsWith("/empresas/") ||
+    normalized.startsWith("/organizaciones/") ||
+    normalized.startsWith("/grupos/")
+  );
 }
 
 apiClient.interceptors.request.use((config) => {

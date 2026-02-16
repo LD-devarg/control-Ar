@@ -84,16 +84,31 @@ Para purchase (con value):
 ## Endpoints privados (requieren auth)
 
 ### Empresas
+- `GET /organizaciones/`
+- `POST /organizaciones/`
+- `PATCH /organizaciones/:id/`
+- `DELETE /organizaciones/:id/`
 - `GET /empresas/`
 - `POST /empresas/`
 - `PATCH /empresas/:id/`
 - `DELETE /empresas/:id/`
+- Reglas de negocio:
+  - Si una empresa se asigna a una `organizacion`, se valida cupo (`organizacion.cupos`).
+  - No se puede crear/mover una empresa a una organizacion inactiva.
+  - Si la organizacion ya alcanzo su cupo, la API responde `400` con mensaje de validacion.
+- `GET /usuario-empresa-accesos/`
+- `POST /usuario-empresa-accesos/`
+- `PATCH /usuario-empresa-accesos/:id/`
+- `DELETE /usuario-empresa-accesos/:id/`
 
 ### Usuarios
 - `GET /usuarios/`
 - `POST /usuarios/`
 - `PATCH /usuarios/:id/`
 - `DELETE /usuarios/:id/`
+
+Notas:
+- Para superuser, al crear/editar usuarios de grupo `Pauta` se puede enviar `empresas_permitidas_ids` (array de ids de empresas) para habilitar selector multitenant.
 
 ### Clientes
 - `GET /clientes/?empresa__id=<id>`

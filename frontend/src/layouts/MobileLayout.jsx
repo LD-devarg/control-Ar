@@ -19,6 +19,7 @@ import WebIcon from "@mui/icons-material/Web";
 import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import AdsClickOutlinedIcon from "@mui/icons-material/AdsClickOutlined";
 import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
+import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import User from "../components/User";
 import NuevosLeads from "../components/NuevosLeads.jsx";
@@ -65,6 +66,7 @@ function MobileLayout() {
       {
         title: "EMPRESA",
         items: [
+          { label: "Organizaciones", icon: <ApartmentOutlinedIcon />, path: "/organizaciones" },
           { label: "Empresas", icon: <CampaignOutlinedIcon />, path: "/empresas" },
           { label: "Usuarios", icon: <AdsClickOutlinedIcon />, path: "/usuarios" },
           { label: "Health", icon: <HealthAndSafetyOutlinedIcon />, path: "/health" },

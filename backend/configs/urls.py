@@ -3,7 +3,13 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from apps.empresas.views import EmpresaViewSet, UsuarioViewSet, GroupViewSet
+from apps.empresas.views import (
+    EmpresaViewSet,
+    OrganizacionViewSet,
+    UsuarioViewSet,
+    UsuarioEmpresaAccesoViewSet,
+    GroupViewSet,
+)
 from apps.operativo.views import ClienteViewSet, EventosMetaViewSet, LandingViewSet, CompraViewSet, LandingVisitViewSet, StatsViewSet
 from apps.operativo.health import HealthView
 from apps.recursos.views import WhatsAppViewSet, TipoCambioViewSet
@@ -25,7 +31,9 @@ from apps.pauta.views import (
 )
 
 router = DefaultRouter()
+router.register(r"organizaciones", OrganizacionViewSet, basename="organizacion")
 router.register(r"empresas", EmpresaViewSet, basename="empresa")
+router.register(r"usuario-empresa-accesos", UsuarioEmpresaAccesoViewSet, basename="usuario-empresa-acceso")
 router.register(r"usuarios", UsuarioViewSet, basename="usuario")
 router.register(r"grupos", GroupViewSet, basename="grupo")
 router.register(r"clientes", ClienteViewSet, basename="cliente")

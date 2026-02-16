@@ -1,6 +1,7 @@
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
+import MenuItem from "@mui/material/MenuItem";
 
 const textFieldSx = {
     "& .MuiInputBase-input": { color: "#fff" },
@@ -27,10 +28,14 @@ const secondaryButtonSx = { borderColor: "#fff", color: "#fff" };
 export default function EmpresaForm({
     selected,
     nombre,
+    organizacionId,
+    organizaciones = [],
+    showOrganizacionField = false,
     activo,
     error,
     saving,
     onNombreChange,
+    onOrganizacionIdChange,
     onActivoChange,
     onSave,
     onClear,
@@ -48,6 +53,23 @@ export default function EmpresaForm({
                 size="small"
                 sx={textFieldSx}
             />
+            {showOrganizacionField ? (
+                <TextField
+                    select
+                    label="Organizacion"
+                    value={organizacionId}
+                    onChange={(e) => onOrganizacionIdChange(e.target.value)}
+                    fullWidth
+                    size="small"
+                    sx={{ ...textFieldSx, mt: 2 }}
+                >
+                    {organizaciones.map((org) => (
+                        <MenuItem key={org.id} value={org.id}>
+                            {org.nombre}
+                        </MenuItem>
+                    ))}
+                </TextField>
+            ) : null}
             <div className="flex items-center gap-2 mt-3">
                 <Checkbox
                     checked={activo}

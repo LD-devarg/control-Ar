@@ -14,6 +14,16 @@ export function isSuperuser(user = getStoredUser()) {
   return Boolean(user?.is_superuser);
 }
 
+export function isPauta(user = getStoredUser()) {
+  const groups = Array.isArray(user?.group_names) ? user.group_names : [];
+  return groups.some((name) => String(name).toLowerCase() === "pauta");
+}
+
+export function isAdminOrganizacional(user = getStoredUser()) {
+  const groups = Array.isArray(user?.group_names) ? user.group_names : [];
+  return groups.some((name) => String(name).toLowerCase() === "admin organizacional");
+}
+
 export function getUserEmpresa(user = getStoredUser()) {
   const value = user?.empresa;
   if (value === null || value === undefined || value === "") return null;
@@ -43,7 +53,7 @@ export function clearActiveTenant() {
 export function getEffectiveTenantId() {
   const user = getStoredUser();
   if (!user) return null;
-  if (isSuperuser(user)) {
+  if (isSuperuser(user) || isPauta(user) || isAdminOrganizacional(user)) {
     return getActiveTenantId();
   }
   return getUserEmpresa(user);
@@ -58,4 +68,3 @@ export function mergeEmpresaParam(params = {}, paramName = "empresa") {
     [paramName]: tenantId,
   };
 }
-

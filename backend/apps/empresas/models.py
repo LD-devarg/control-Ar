@@ -8,6 +8,13 @@ BEAT_TASKS_AVAILABLE = {
 
 
 class Empresa(models.Model):
+    organizacion = models.ForeignKey(
+        "empresas.Organizacion",
+        on_delete=models.CASCADE,
+        related_name="empresas",
+        null=True,
+        blank=True,
+    )
     nombre = models.CharField(max_length=255)
     activo = models.BooleanField(default=True)
     workers_activos = models.BooleanField(default=False)
@@ -28,7 +35,26 @@ class Empresa(models.Model):
         return self.nombre
 
 
+class Organizacion(models.Model):
+    nombre = models.CharField(max_length=255)
+    cupos = models.PositiveIntegerField(default=1)
+    activo = models.BooleanField(default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "empresas_organizacion"
+
+    def __str__(self):
+        return self.nombre
+
+
 class Usuario(AbstractUser):
+    organizacion = models.ForeignKey(
+        "empresas.Organizacion",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
     empresa = models.ForeignKey(
         "empresas.Empresa",
         on_delete=models.CASCADE,
@@ -43,3 +69,30 @@ class Usuario(AbstractUser):
 
     def __str__(self):
         return self.username
+
+
+class UsuarioEmpresaAcceso(models.Model):
+    usuario = models.ForeignKey(
+        "empresas.Usuario",
+        on_delete=models.CASCADE,
+        related_name="accesos_empresa",
+    )
+    empresa = models.ForeignKey(
+        "empresas.Empresa",
+        on_delete=models.CASCADE,
+        related_name="accesos_usuario",
+    )
+    activo = models.BooleanField(default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "empresas_usuario_empresa_acceso"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "empresa"],
+                name="uniq_usuario_empresa_acceso",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.usuario_id}-{self.empresa_id}"

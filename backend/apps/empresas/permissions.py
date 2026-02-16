@@ -8,7 +8,11 @@ def user_in_group(user, name: str) -> bool:
 
 
 def is_admin(user) -> bool:
-    return user_in_group(user, "Admin")
+    return user_in_group(user, "Admin") or is_admin_organizacional(user)
+
+
+def is_admin_organizacional(user) -> bool:
+    return user_in_group(user, "Admin Organizacional")
 
 
 def is_operador(user) -> bool:

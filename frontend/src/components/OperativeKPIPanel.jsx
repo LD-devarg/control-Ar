@@ -114,7 +114,7 @@ export default function OperativeKPIPanel({
         </div>
       </div>
 
-      <div className="app-scrollbar w-full flex-1 min-h-0 overflow-x-auto overflow-y-auto">
+      <div className="app-scrollbar w-full flex-1 min-h-[55vh]  overflow-x-auto overflow-y-auto">
         <TableContainer component={Paper} elevation={0} sx={{ background: "transparent !important" }}>
           <Table
             size="small"

@@ -9,6 +9,7 @@ from rest_framework.exceptions import ValidationError
 
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
 from apps.empresas.models import Empresa
+from apps.empresas.scope import filter_queryset_by_empresa, get_user_empresa_ids, resolve_request_empresa_id
 from .models import (
     BM,
     CuentaPublicitaria,
@@ -41,17 +42,9 @@ from .serializers import (
 
 
 def _filter_by_empresa(qs, user, request=None):
-    if user.is_superuser:
-        empresa_param = request.query_params.get("empresa") if request else None
-        if empresa_param:
-            try:
-                return qs.filter(empresa_id=int(empresa_param))
-            except (TypeError, ValueError):
-                return qs.none()
-        return qs
-    if user.empresa_id:
-        return qs.filter(empresa_id=user.empresa_id)
-    return qs.none()
+    if not request:
+        return qs.none()
+    return filter_queryset_by_empresa(qs, request, field_name="empresa_id")
 
 
 def _has_pauta_permission(user, action: str) -> bool:
@@ -236,9 +229,20 @@ class KPIObjetivoViewSet(viewsets.ModelViewSet):
         if self.request.user.is_superuser:
             serializer.save()
             return
-        if not self.request.user.empresa_id:
+        empresa_id = self.request.data.get("empresa")
+        allowed = get_user_empresa_ids(self.request.user)
+        if empresa_id:
+            try:
+                empresa_id = int(empresa_id)
+            except (TypeError, ValueError):
+                raise ValidationError("Empresa invalida.")
+            if empresa_id not in allowed:
+                raise ValidationError("No tenes acceso a la empresa seleccionada.")
+            serializer.save(empresa_id=empresa_id)
+            return
+        if not allowed:
             raise ValidationError("Empresa no disponible para el usuario actual.")
-        serializer.save(empresa_id=self.request.user.empresa_id)
+        serializer.save(empresa_id=allowed[0])
 
 
 class PautaProvisioningViewSet(viewsets.ViewSet):
@@ -391,15 +395,10 @@ class PautaKPIViewSet(viewsets.ViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def _empresa_id(self, request):
-        if request.user.is_superuser:
-            empresa_param = request.query_params.get("empresa")
-            if empresa_param:
-                try:
-                    return int(empresa_param)
-                except (TypeError, ValueError):
-                    return None
+        try:
+            return resolve_request_empresa_id(request, allow_empty_for_superuser=True) or None
+        except ValidationError:
             return None
-        return request.user.empresa_id
 
     def _date_range(self, request):
         from_param = request.query_params.get("from")
@@ -504,6 +503,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 "impressions",
                 "reach",
                 "clicks",
+                "link_clicks",
                 "web_visitors",
                 "leads",
                 "contacts",
@@ -521,6 +521,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
             "impressions": 0.0,
             "reach": 0.0,
             "clicks": 0.0,
+            "link_clicks": 0.0,
             "web_visitors": 0.0,
             "leads": 0.0,
             "contactos": 0.0,
@@ -535,6 +536,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
             impressions = float(row["impressions"] or 0)
             reach = float(row["reach"] or 0)
             clicks = float(row["clicks"] or 0)
+            link_clicks = float(row["link_clicks"] or 0)
             web_visitors = float(row["web_visitors"] or 0)
             leads = float(row["leads"] or 0)
             contactos = float(row["contacts"] or 0)
@@ -545,6 +547,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
             totals["impressions"] += impressions
             totals["reach"] += reach
             totals["clicks"] += clicks
+            totals["link_clicks"] += link_clicks
             totals["web_visitors"] += web_visitors
             totals["leads"] += leads
             totals["contactos"] += contactos
@@ -575,6 +578,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
                         "impressions": 0.0,
                         "reach": 0.0,
                         "clicks": 0.0,
+                        "link_clicks": 0.0,
                         "web_visitors": 0.0,
                         "leads": 0.0,
                         "contactos": 0.0,
@@ -586,6 +590,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 item["impressions"] += impressions
                 item["reach"] += reach
                 item["clicks"] += clicks
+                item["link_clicks"] += link_clicks
                 item["web_visitors"] += web_visitors
                 item["leads"] += leads
                 item["contactos"] += contactos
@@ -598,12 +603,13 @@ class PautaKPIViewSet(viewsets.ViewSet):
             contactos = item["contactos"]
             compras = item["compras"]
             impressions = item["impressions"]
-            clicks = item["clicks"]
+            link_clicks = item["link_clicks"]
             reach = item["reach"]
             return {
                 **item,
-                "ctr": self._safe_div(clicks, impressions),
+                "ctr": self._safe_div(link_clicks, impressions),
                 "cpc": self._safe_div(inversion, contactos),
+                "cpc_click": self._safe_div(inversion, link_clicks),
                 "cpl": self._safe_div(inversion, leads),
                 "cpa": self._safe_div(inversion, compras),
                 "roas": self._safe_div(ingresos, inversion),
@@ -623,7 +629,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
         contactos = totals["contactos"]
         compras = totals["compras"]
         impressions = totals["impressions"]
-        clicks = totals["clicks"]
+        link_clicks = totals["link_clicks"]
         reach = totals["reach"]
         web_visitors = totals["web_visitors"]
 
@@ -634,9 +640,10 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 "roas": self._safe_div(ing, inv),
                 "cpa": self._safe_div(inv, compras),
                 "cpc": self._safe_div(inv, contactos),
+                "cpc_click": self._safe_div(inv, link_clicks),
                 "cpl": self._safe_div(inv, leads),
                 "frecuencia": self._safe_div(impressions, reach),
-                "ctr": self._safe_div(clicks, impressions),
+                "ctr": self._safe_div(link_clicks, impressions),
             },
             "footer": {
                 "web_visitors": web_visitors,

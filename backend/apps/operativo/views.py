@@ -16,6 +16,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
+from apps.empresas.scope import filter_queryset_by_empresa, resolve_request_empresa_id
 from apps.empresas.models import Empresa
 from apps.recursos.servicios.whatsapp_rotacion import seleccionar_numero_whatsapp
 from .models import Cliente, EventosMeta, Landing, Compra, LandingVisit
@@ -34,14 +35,6 @@ from .servicios.enviador import enviar_evento_meta
 from apps.pauta.servicios.insights import fetch_meta_page_views
 from apps.pauta.models import GastoDiario
 from .realtime import publish_empresa_event
-
-def _filter_by_empresa(qs, user):
-    if user.is_superuser:
-        return qs
-    if user.empresa_id:
-        return qs.filter(empresa_id=user.empresa_id)
-    return qs.none()
-
 
 def _apply_date_filters(qs, field: str, request):
     period = request.query_params.get("period")
@@ -129,23 +122,7 @@ def _get_datetime_range(request):
 
 
 def _get_empresa_scope_id(request):
-    user = request.user
-
-    if user.is_superuser:
-        empresa_param = request.query_params.get("empresa")
-        if empresa_param:
-            try:
-                return int(empresa_param)
-            except (TypeError, ValueError):
-                raise ValidationError("Parametro empresa invalido.")
-        if user.empresa_id:
-            return user.empresa_id
-        raise ValidationError("Empresa requerida para superusuario.")
-
-    if user.empresa_id:
-        return user.empresa_id
-
-    raise ValidationError("Empresa no disponible en el usuario actual.")
+    return resolve_request_empresa_id(request, allow_empty_for_superuser=False)
 
 
 class ClienteViewSet(viewsets.ModelViewSet):
@@ -167,7 +144,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
         return False
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -242,7 +219,7 @@ class LandingViewSet(viewsets.ModelViewSet):
         return is_admin(request.user) or is_pauta(request.user)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
 
     def perform_create(self, serializer):
         empresa = getattr(self.request.user, "empresa", None)
@@ -288,7 +265,7 @@ class LandingVisitViewSet(viewsets.ModelViewSet):
         return is_admin(request.user) or is_pauta(request.user) or is_operador(request.user)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -331,7 +308,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         return False
 
     def get_queryset(self):
-        qs = _filter_by_empresa(super().get_queryset(), self.request.user)
+        qs = filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
         user = self.request.user
         if user.is_authenticated and is_operador(user):
             qs = qs.filter(
@@ -456,7 +433,7 @@ class CompraViewSet(viewsets.ModelViewSet):
         return False
 
     def get_queryset(self):
-        qs = _filter_by_empresa(super().get_queryset(), self.request.user)
+        qs = filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
         user = self.request.user
         if user.is_authenticated and is_operador(user):
             qs = qs.filter(operador=user)

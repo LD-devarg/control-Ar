@@ -26,7 +26,7 @@ class Cliente(models.Model):
     cant_compras = models.IntegerField(default=0)
     total_compras_ars = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_compras_usd = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    first_touch_at = models.DateTimeField(auto_now_add=True)
+    first_touch_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     fbc = models.CharField(max_length=255, null=True, blank=True)
     fbp = models.CharField(max_length=255, null=True, blank=True)
     fbclid = models.CharField(max_length=255, null=True, blank=True)

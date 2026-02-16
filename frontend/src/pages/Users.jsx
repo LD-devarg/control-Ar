@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Page from "../layouts/Page";
+import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
 import Checkbox from "@mui/material/Checkbox";
 import MenuItem from "@mui/material/MenuItem";
 import { fetchUsuarios, createUsuario, updateUsuario, fetchGrupos } from "../services/empresas/usuarios";
 import { fetchEmpresas } from "../services/empresas/empresas";
+import { fetchOrganizaciones } from "../services/empresas/organizaciones";
 import { getCurrentUser } from "../services/auth";
 import { useTenant } from "../context/TenantContext";
 
@@ -18,6 +20,8 @@ const EMPTY_FORM = {
     activo: true,
     groupId: "",
     empresaId: "",
+    organizacionId: "",
+    empresasPermitidasIds: [],
 };
 
 export default function Users() {
@@ -27,6 +31,7 @@ export default function Users() {
     const [form, setForm] = useState(EMPTY_FORM);
     const [grupos, setGrupos] = useState([]);
     const [empresas, setEmpresas] = useState([]);
+    const [organizaciones, setOrganizaciones] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -37,14 +42,24 @@ export default function Users() {
         setError("");
         try {
             const requests = [fetchUsuarios(), fetchGrupos()];
-            if (currentUser?.is_superuser) {
+            const isAdminOrg = Boolean(
+                Array.isArray(currentUser?.group_names) &&
+                currentUser.group_names.some((name) => String(name).toLowerCase() === "admin organizacional")
+            );
+            if (currentUser?.is_superuser || isAdminOrg) {
                 requests.push(fetchEmpresas());
             }
-            const [usersData, groupsData, empresasData] = await Promise.all(requests);
+            if (currentUser?.is_superuser) {
+                requests.push(fetchOrganizaciones());
+            }
+            const [usersData, groupsData, empresasData, organizacionesData] = await Promise.all(requests);
             setUsuarios(usersData);
             setGrupos(groupsData);
             if (Array.isArray(empresasData)) {
                 setEmpresas(empresasData);
+            }
+            if (Array.isArray(organizacionesData)) {
+                setOrganizaciones(organizacionesData);
             }
             if (selected) {
                 const updated = usersData.find((item) => item.id === selected.id);
@@ -59,6 +74,10 @@ export default function Users() {
                         activo: Boolean(updated.activo),
                         groupId: (updated.groups && updated.groups[0]) || "",
                         empresaId: updated.empresa || "",
+                        organizacionId: updated.organizacion || "",
+                        empresasPermitidasIds: Array.isArray(updated.empresas_permitidas)
+                            ? updated.empresas_permitidas.map((item) => Number(item.id))
+                            : [],
                     });
                 }
             }
@@ -74,19 +93,28 @@ export default function Users() {
     }, [tenantId]);
 
     const groupNameById = (id) => grupos.find((g) => g.id === id)?.name;
+    const empresaNameById = (id) => empresas.find((item) => Number(item.id) === Number(id))?.nombre;
 
     const isSuperuser = Boolean(currentUser?.is_superuser);
+    const isAdminOrganizacional = Boolean(
+        Array.isArray(currentUser?.group_names) &&
+        currentUser.group_names.some((name) => String(name).toLowerCase() === "admin organizacional")
+    );
     const isAdmin = Boolean(currentUser?.groups?.some((id) => groupNameById(id) === "Admin"));
 
     const allowedGroupNames = isSuperuser
-        ? ["Admin", "Operador", "Pauta"]
-        : isAdmin
+        ? ["Admin Organizacional", "Admin", "Operador", "Pauta"]
+        : isAdminOrganizacional
+            ? ["Admin", "Operador", "Pauta"]
+            : isAdmin
             ? ["Operador", "Pauta"]
             : [];
 
     const allowedGroups = grupos.filter((g) => allowedGroupNames.includes(g.name));
 
-    const canCreate = isSuperuser || isAdmin;
+    const canCreate = isSuperuser || isAdmin || isAdminOrganizacional;
+    const pautaGroupSelected = groupNameById(Number(form.groupId)) === "Pauta";
+    const orgAdminGroupSelected = groupNameById(Number(form.groupId)) === "Admin Organizacional";
 
     const handleSelect = (user) => {
         setSelected(user);
@@ -99,6 +127,10 @@ export default function Users() {
             activo: Boolean(user?.activo),
             groupId: (user?.groups && user.groups[0]) || "",
             empresaId: user?.empresa || "",
+            organizacionId: user?.organizacion || "",
+            empresasPermitidasIds: Array.isArray(user?.empresas_permitidas)
+                ? user.empresas_permitidas.map((item) => Number(item.id))
+                : [],
         });
         setError("");
     };
@@ -111,7 +143,16 @@ export default function Users() {
 
     const handleChange = (key) => (event) => {
         const value = key === "activo" ? event.target.checked : event.target.value;
-        setForm((prev) => ({ ...prev, [key]: value }));
+        setForm((prev) => {
+            const next = { ...prev, [key]: value };
+            if (key === "groupId" && groupNameById(Number(value)) !== "Pauta") {
+                next.empresasPermitidasIds = [];
+            }
+            if (key === "groupId" && groupNameById(Number(value)) === "Admin Organizacional") {
+                next.empresaId = "";
+            }
+            return next;
+        });
     };
 
     const handleSave = async () => {
@@ -131,7 +172,16 @@ export default function Users() {
             setError("Selecciona un grupo.");
             return;
         }
-        if (isSuperuser && !form.empresaId) {
+        if (isSuperuser) {
+            if (orgAdminGroupSelected && !form.organizacionId) {
+                setError("Selecciona una organizacion.");
+                return;
+            }
+            if (!orgAdminGroupSelected && !form.empresaId) {
+                setError("Selecciona una empresa.");
+                return;
+            }
+        } else if ((isAdminOrganizacional || isAdmin) && !form.empresaId) {
             setError("Selecciona una empresa.");
             return;
         }
@@ -147,7 +197,18 @@ export default function Users() {
                 groups: [Number(form.groupId)],
             };
             if (isSuperuser) {
+                payload.organizacion = form.organizacionId ? Number(form.organizacionId) : null;
+                if (!orgAdminGroupSelected) {
+                    payload.empresa = Number(form.empresaId);
+                }
+                if (pautaGroupSelected) {
+                    payload.empresas_permitidas_ids = (form.empresasPermitidasIds || []).map((item) => Number(item));
+                }
+            } else if (isAdminOrganizacional) {
                 payload.empresa = Number(form.empresaId);
+                if (pautaGroupSelected) {
+                    payload.empresas_permitidas_ids = (form.empresasPermitidasIds || []).map((item) => Number(item));
+                }
             }
             if (form.password.trim()) {
                 payload.password = form.password.trim();
@@ -163,7 +224,19 @@ export default function Users() {
             }
         } catch (err) {
             const detail = err?.response?.data?.detail;
-            setError(detail || "No se pudo guardar el usuario.");
+            if (detail) {
+                setError(detail);
+            } else {
+                const body = err?.response?.data;
+                if (body && typeof body === "object") {
+                    const firstKey = Object.keys(body)[0];
+                    const firstValue = body[firstKey];
+                    const firstMsg = Array.isArray(firstValue) ? firstValue[0] : firstValue;
+                    setError(firstMsg || "No se pudo guardar el usuario.");
+                } else {
+                    setError("No se pudo guardar el usuario.");
+                }
+            }
         } finally {
             setLoading(false);
         }
@@ -189,7 +262,8 @@ export default function Users() {
                                 >
                                     <div className="font-semibold">{user.username}</div>
                                     <div className="text-xs text-white/70">
-                                        {user.activo ? "Activo" : "Inactivo"} - #{user.id}
+                                        {user.activo ? "Activo" : "Inactivo"} -{" "}
+                                        {user.empresa ? (empresaNameById(user.empresa) || `#${user.empresa}`) : "Sin empresa"}
                                     </div>
                                 </button>
                             ))}
@@ -317,7 +391,37 @@ export default function Users() {
                                     </MenuItem>
                                 ))}
                             </TextField>
-                            {isSuperuser ? (
+                            {isSuperuser && orgAdminGroupSelected ? (
+                                <TextField
+                                    select
+                                    label="Organizacion"
+                                    value={form.organizacionId}
+                                    onChange={handleChange("organizacionId")}
+                                    fullWidth
+                                    size="small"
+                                    sx={{
+                                        "& .MuiInputBase-input": { color: "#fff" },
+                                        "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.8)" },
+                                        "& .MuiOutlinedInput-root fieldset": {
+                                            borderColor: "rgba(255,255,255,0.4)",
+                                        },
+                                        "& .MuiOutlinedInput-root:hover fieldset": {
+                                            borderColor: "rgba(255,255,255,0.7)",
+                                        },
+                                        "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+                                            borderColor: "#fff",
+                                        },
+                                    }}
+                                    disabled={!canCreate}
+                                >
+                                    {organizaciones.map((org) => (
+                                        <MenuItem key={org.id} value={org.id}>
+                                            {org.nombre}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
+                            ) : null}
+                            {(isSuperuser || isAdminOrganizacional || isAdmin) && !orgAdminGroupSelected ? (
                                 <TextField
                                     select
                                     label="Empresa"
@@ -346,6 +450,44 @@ export default function Users() {
                                         </MenuItem>
                                     ))}
                                 </TextField>
+                            ) : null}
+                            {(isSuperuser || isAdminOrganizacional) && pautaGroupSelected ? (
+                                <Autocomplete
+                                    multiple
+                                    options={empresas}
+                                    getOptionLabel={(option) => option?.nombre || `Empresa #${option?.id}`}
+                                    value={empresas.filter((item) =>
+                                        (form.empresasPermitidasIds || []).includes(Number(item.id))
+                                    )}
+                                    onChange={(_, values) =>
+                                        setForm((prev) => ({
+                                            ...prev,
+                                            empresasPermitidasIds: values.map((item) => Number(item.id)),
+                                        }))
+                                    }
+                                    disableCloseOnSelect
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Empresas que puede controlar"
+                                            size="small"
+                                            sx={{
+                                                "& .MuiInputBase-input": { color: "#fff" },
+                                                "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.8)" },
+                                                "& .MuiOutlinedInput-root fieldset": {
+                                                    borderColor: "rgba(255,255,255,0.4)",
+                                                },
+                                                "& .MuiOutlinedInput-root:hover fieldset": {
+                                                    borderColor: "rgba(255,255,255,0.7)",
+                                                },
+                                                "& .MuiOutlinedInput-root.Mui-focused fieldset": {
+                                                    borderColor: "#fff",
+                                                },
+                                            }}
+                                        />
+                                    )}
+                                    disabled={!canCreate}
+                                />
                             ) : null}
                             <TextField
                                 label="Password"
@@ -405,7 +547,7 @@ export default function Users() {
                         </div>
                         {!canCreate ? (
                             <div className="text-xs text-white/60 mt-2">
-                                Solo Admin o Superusuario pueden crear usuarios.
+                                Solo Admin, Admin Organizacional o Superusuario pueden crear usuarios.
                             </div>
                         ) : null}
                     </div>

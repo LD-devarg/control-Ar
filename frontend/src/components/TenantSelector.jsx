@@ -6,11 +6,11 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { useTenant } from "../context/TenantContext";
 
 export default function TenantSelector() {
-  const { isSuperuser, tenantId, tenantOptions, setTenantId, loading } = useTenant();
+  const { canSelectTenant, tenantId, tenantOptions, setTenantId, loading } = useTenant();
   const hasCurrentOption = tenantOptions.some((item) => String(item.id) === String(tenantId));
   const selectValue = hasCurrentOption ? String(tenantId) : "";
 
-  if (!isSuperuser) return null;
+  if (!canSelectTenant) return null;
 
   return (
     <FormControl

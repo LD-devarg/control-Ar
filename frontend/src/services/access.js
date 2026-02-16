@@ -2,11 +2,24 @@ import { getCurrentUser } from "./auth";
 
 const ROLE_SUPERUSER = "superuser";
 const ROLE_ADMIN = "admin";
+const ROLE_ADMIN_ORGANIZACIONAL = "admin_organizacional";
 const ROLE_OPERADOR = "operador";
 const ROLE_PAUTA = "pauta";
 
 const ROLE_ALLOWED_PATHS = {
   [ROLE_SUPERUSER]: "all",
+  [ROLE_ADMIN_ORGANIZACIONAL]: [
+    "/home",
+    "/stats",
+    "/contacts",
+    "/whatsapp",
+    "/tipo-cambio",
+    "/landing-config",
+    "/pauta-database",
+    "/pauta-kpi",
+    "/empresas",
+    "/usuarios",
+  ],
   [ROLE_ADMIN]: ["/home", "/stats", "/contacts", "/whatsapp", "/tipo-cambio", "/usuarios"],
   [ROLE_OPERADOR]: ["/home", "/whatsapp"],
   [ROLE_PAUTA]: ["/landing-config", "/pauta-database", "/pauta-kpi"],
@@ -14,6 +27,7 @@ const ROLE_ALLOWED_PATHS = {
 
 const ROLE_DEFAULT_PATH = {
   [ROLE_SUPERUSER]: "/home",
+  [ROLE_ADMIN_ORGANIZACIONAL]: "/home",
   [ROLE_ADMIN]: "/home",
   [ROLE_OPERADOR]: "/home",
   [ROLE_PAUTA]: "/landing-config",
@@ -47,6 +61,7 @@ export function resolveUserRole(user = getCurrentUser()) {
   if (Boolean(user.is_superuser)) return ROLE_SUPERUSER;
 
   const groupNames = readGroupNames(user);
+  if (groupNames.includes("admin organizacional")) return ROLE_ADMIN_ORGANIZACIONAL;
   if (groupNames.includes("admin")) return ROLE_ADMIN;
   if (groupNames.includes("operador")) return ROLE_OPERADOR;
   if (groupNames.includes("pauta")) return ROLE_PAUTA;

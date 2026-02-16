@@ -16,6 +16,7 @@ import PautaKPI from './pages/PautaKPI.jsx'
 import Health from './pages/Health.jsx'
 import Tenant from './pages/Tenant.jsx'
 import Users from './pages/Users.jsx'
+import Organizaciones from './pages/Organizaciones.jsx'
 import { canAccessPath, getDefaultPath } from './services/access'
 import { getCurrentUser } from './services/auth'
 
@@ -89,6 +90,7 @@ function App() {
             <Route path="/pauta-database" element={<GuardedRoute path="/pauta-database" element={<PautaDatabase />} />} />
             <Route path="/pauta-kpi" element={<GuardedRoute path="/pauta-kpi" element={<PautaKPI />} />} />
             <Route path="/empresas" element={<GuardedRoute path="/empresas" element={<Tenant />} />} />
+            <Route path="/organizaciones" element={<GuardedRoute path="/organizaciones" element={<Organizaciones />} />} />
             <Route path="/usuarios" element={<GuardedRoute path="/usuarios" element={<Users />} />} />
           </Route>
           <Route path="/landing" element={<Landing />} />

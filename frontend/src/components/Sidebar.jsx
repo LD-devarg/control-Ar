@@ -13,6 +13,7 @@ import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import AdsClickOutlinedIcon from "@mui/icons-material/AdsClickOutlined";
 import ContactPageOutlinedIcon from "@mui/icons-material/ContactPageOutlined";
 import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
+import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
 import { getCurrentUser, logout } from "../services/auth";
 import { canAccessPath } from "../services/access";
 
@@ -51,6 +52,7 @@ function Sidebar() {
     {
       title: "EMPRESA",
       items: [
+        { path: "/organizaciones", label: "Organizaciones", Icon: ApartmentOutlinedIcon },
         { path: "/empresas", label: "Empresas", Icon: CampaignOutlinedIcon },
         { path: "/usuarios", label: "Usuarios", Icon: AdsClickOutlinedIcon },
         { path: "/health", label: "Health", Icon: HealthAndSafetyOutlinedIcon },
@@ -72,8 +74,8 @@ function Sidebar() {
         type="button"
         onClick={() => navigate(path)}
         className={[
-          "relative flex h-10 w-full items-center overflow-hidden rounded-[10px] text-left transition-all duration-200",
-          expanded ? "justify-start px-3" : "justify-center px-0",
+          "relative flex h-9 w-full items-center overflow-hidden rounded-[10px] text-left transition-all duration-200",
+          expanded ? "justify-start px-2.5" : "justify-center px-0",
           active
             ? "bg-neutral-900 shadow-[inset_-2px_0_0_rgba(45,124,255,0.9),inset_-20px_0_24px_rgba(45,124,255,0.25)]"
             : "hover:bg-neutral-900 hover:shadow-[inset_-2px_0_0_rgba(45,124,255,0.9),inset_-20px_0_24px_rgba(45,124,255,0.25)]",
@@ -85,7 +87,7 @@ function Sidebar() {
         />
         <span
           className={[
-            "ml-2 whitespace-nowrap font-['Roboto'] text-base font-medium leading-none transition-all duration-200",
+            "ml-2 whitespace-nowrap font-['Roboto'] text-[15px] font-medium leading-none transition-all duration-200",
             active ? "text-white" : "text-slate-500 dark:text-slate-400",
             expanded ? "max-w-[165px] opacity-100" : "max-w-0 opacity-0",
           ].join(" ")}
@@ -101,14 +103,14 @@ function Sidebar() {
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
       className={[
-        "flex h-dvh min-h-svh shrink-0 flex-col overflow-hidden border-r border-zinc-700/70 bg-neutral-200 px-2 py-2.5 text-white transition-[width] duration-200 dark:bg-neutral-900",
+        "flex h-dvh min-h-svh shrink-0 flex-col overflow-hidden border-r border-zinc-700/70 bg-neutral-200 px-2 py-2 text-white transition-[width] duration-200 dark:bg-neutral-900",
         expanded ? "w-[188px]" : "w-20",
       ].join(" ")}
     >
-      <div className={["flex items-center border-b border-zinc-600/70 pb-2", expanded ? "justify-start" : "justify-center"].join(" ")}>
+      <div className={["flex items-center border-b border-zinc-600/70 pb-1.5", expanded ? "justify-start" : "justify-center"].join(" ")}>
         <img
           src={logoSrc}
-          className={["h-10 w-10 shrink-0 transition-all duration-200", expanded ? "mr-2" : "mr-0"].join(" ")}
+          className={["h-9 w-9 shrink-0 transition-all duration-200", expanded ? "mr-2" : "mr-0"].join(" ")}
           alt="Control-AR Logo"
         />
         <span
@@ -122,13 +124,13 @@ function Sidebar() {
         </span>
       </div>
 
-      <div className="mt-1 flex h-full flex-col justify-between">
-        <div className="space-y-2.5">
+      <div className="mt-1 flex h-full min-h-0 flex-col">
+        <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1">
           {sections.map((section) => (
-            <div key={section.title} className="space-y-1">
+            <div key={section.title} className="space-y-0.5">
               <h3
                 className={[
-                  "h-5 overflow-hidden whitespace-nowrap font-['Roboto'] text-sm font-normal text-zinc-500 transition-all duration-200",
+                  "h-4 overflow-hidden whitespace-nowrap font-['Roboto'] text-xs font-normal text-zinc-500 transition-all duration-200",
                   expanded ? "max-w-[165px] opacity-100" : "max-w-0 opacity-0",
                 ].join(" ")}
               >
@@ -139,7 +141,7 @@ function Sidebar() {
           ))}
         </div>
 
-        <div className="mt-2 border-t border-zinc-600/70 pt-2">
+        <div className="mt-1 border-t border-zinc-600/70 pt-1.5">
           <button
             type="button"
             onClick={() => {
@@ -147,15 +149,15 @@ function Sidebar() {
               navigate("/");
             }}
             className={[
-              "relative flex h-10 w-full items-center overflow-hidden rounded-[10px] transition-all duration-200",
-              expanded ? "justify-start px-3" : "justify-center px-0",
+              "relative flex h-9 w-full items-center overflow-hidden rounded-[10px] transition-all duration-200",
+              expanded ? "justify-start px-2.5" : "justify-center px-0",
               "hover:bg-neutral-900 hover:shadow-[inset_-2px_0_0_rgba(45,124,255,0.9),inset_-20px_0_24px_rgba(45,124,255,0.25)]",
             ].join(" ")}
           >
             <LogoutOutlinedIcon sx={{ fontSize: 20 }} className="shrink-0 text-slate-500 dark:text-slate-400" />
             <span
               className={[
-                "ml-2 whitespace-nowrap font-['Roboto'] text-base font-medium leading-none text-slate-500 dark:text-slate-400 transition-all duration-200",
+                "ml-2 whitespace-nowrap font-['Roboto'] text-[15px] font-medium leading-none text-slate-500 dark:text-slate-400 transition-all duration-200",
                 expanded ? "max-w-[165px] opacity-100" : "max-w-0 opacity-0",
               ].join(" ")}
             >

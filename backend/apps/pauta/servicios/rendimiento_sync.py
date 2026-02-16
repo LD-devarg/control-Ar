@@ -33,6 +33,7 @@ PURCHASE_ACTIONS = {
     "offsite_conversion.fb_pixel_purchase",
 }
 WEB_VISITOR_ACTIONS = {"landing_page_view", "page_view"}
+LINK_CLICK_ACTIONS = {"link_click", "inline_link_click", "outbound_click"}
 TASK_KEY = "sync_pauta_kpi_15m"
 
 
@@ -82,7 +83,7 @@ def _fetch_insights_rows(ad_account_id: str, token: str, day: dt.date) -> list[d
     params = {
         "fields": (
             "account_id,account_name,campaign_id,campaign_name,adset_id,adset_name,"
-            "ad_id,ad_name,spend,impressions,reach,clicks,ctr,cpc,frequency,actions,action_values"
+            "ad_id,ad_name,spend,impressions,reach,clicks,actions,action_values"
         ),
         "level": "ad",
         "time_range": json.dumps({"since": day.isoformat(), "until": day.isoformat()}),
@@ -125,15 +126,20 @@ def _upsert_row(empresa: Empresa, cuenta: CuentaPublicitaria, fecha: dt.date, ro
         "impressions": _to_int(row.get("impressions"), 0),
         "reach": _to_int(row.get("reach"), 0),
         "clicks": _to_int(row.get("clicks"), 0),
-        "ctr": _to_decimal(row.get("ctr"), "0"),
-        "cpc_usd": _to_decimal(row.get("cpc"), "0"),
-        "frequency": _to_decimal(row.get("frequency"), "0"),
+        "link_clicks": _sum_actions(row.get("actions"), LINK_CLICK_ACTIONS),
         "web_visitors": _sum_actions(row.get("actions"), WEB_VISITOR_ACTIONS),
         "leads": _sum_actions(row.get("actions"), LEAD_ACTIONS),
         "contacts": _sum_actions(row.get("actions"), CONTACT_ACTIONS),
         "purchases": _sum_actions(row.get("actions"), PURCHASE_ACTIONS),
         "purchase_value_usd": _sum_action_values(row.get("action_values"), PURCHASE_ACTIONS),
     }
+    impressions = defaults["impressions"]
+    reach = defaults["reach"]
+    link_clicks = defaults["link_clicks"]
+    spend_usd = defaults["spend_usd"]
+    defaults["ctr"] = (Decimal(link_clicks) / Decimal(impressions)) if impressions else Decimal("0")
+    defaults["cpc_usd"] = (spend_usd / Decimal(link_clicks)) if link_clicks else Decimal("0")
+    defaults["frequency"] = (Decimal(impressions) / Decimal(reach)) if reach else Decimal("0")
 
     return RendimientoPautaDiario.objects.update_or_create(
         empresa=empresa,

@@ -3,18 +3,26 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db import models
 
-from .models import Empresa, Usuario
+from .models import Empresa, Organizacion, Usuario, UsuarioEmpresaAcceso
 from django.contrib.auth.models import Group
-from .serializers import EmpresaSerializer, UsuarioSerializer, GroupSerializer
+from .serializers import (
+    EmpresaSerializer,
+    OrganizacionSerializer,
+    UsuarioSerializer,
+    UsuarioEmpresaAccesoSerializer,
+    GroupSerializer,
+)
 from .servicios.validaciones_empresa import (
     validar_usuario_superusuario,
     validar_nombre_empresa,
+    validar_cupos_organizacion,
     validar_creacion_usuario,
     validar_borrado_usuario,
     validar_modificacion_usuario,
 )
-from .permissions import RoleBasedPermission, is_admin
+from .permissions import RoleBasedPermission, is_admin, is_admin_organizacional
 
 
 def _run_validation(fn, *args, **kwargs):
@@ -38,19 +46,80 @@ class EmpresaViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         if self.request.user.is_superuser:
             return qs
+        if is_admin_organizacional(self.request.user):
+            org_id = self.request.user.organizacion_id
+            if not org_id:
+                return qs.none()
+            return qs.filter(organizacion_id=org_id)
         if self.request.user.empresa_id:
             return qs.filter(id=self.request.user.empresa_id)
         return qs.none()
 
     def perform_create(self, serializer):
-        _run_validation(validar_usuario_superusuario, self.request.user)
+        if not (self.request.user.is_superuser or is_admin_organizacional(self.request.user)):
+            _run_validation(validar_usuario_superusuario, self.request.user)
         _run_validation(validar_nombre_empresa, serializer.validated_data.get("nombre"))
+        organizacion = serializer.validated_data.get("organizacion")
+        if is_admin_organizacional(self.request.user):
+            user_org = self.request.user.organizacion
+            if not user_org:
+                raise ValidationError("El admin organizacional no tiene organizacion asignada.")
+            if organizacion and organizacion.id != user_org.id:
+                raise ValidationError("Solo podes crear empresas en tu organizacion.")
+            organizacion = user_org
+        _run_validation(validar_cupos_organizacion, organizacion)
+        serializer.validated_data["organizacion"] = organizacion
         serializer.save()
 
     def perform_update(self, serializer):
         nombre = serializer.validated_data.get("nombre", serializer.instance.nombre)
+        organizacion = serializer.validated_data.get("organizacion", serializer.instance.organizacion)
+        if is_admin_organizacional(self.request.user):
+            user_org = self.request.user.organizacion
+            if not user_org:
+                raise ValidationError("El admin organizacional no tiene organizacion asignada.")
+            if serializer.instance.organizacion_id != user_org.id:
+                raise ValidationError("No tenes acceso a esta empresa.")
+            if organizacion and organizacion.id != user_org.id:
+                raise ValidationError("No podes mover empresas fuera de tu organizacion.")
+            organizacion = user_org
         _run_validation(validar_nombre_empresa, nombre)
+        _run_validation(validar_cupos_organizacion, organizacion, serializer.instance.id)
+        serializer.validated_data["organizacion"] = organizacion
         serializer.save()
+
+
+class OrganizacionViewSet(viewsets.ModelViewSet):
+    queryset = Organizacion.objects.all()
+    serializer_class = OrganizacionSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        return request.user.is_superuser
+
+
+class UsuarioEmpresaAccesoViewSet(viewsets.ModelViewSet):
+    queryset = UsuarioEmpresaAcceso.objects.select_related("usuario", "empresa").all()
+    serializer_class = UsuarioEmpresaAccesoSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        return is_admin(request.user)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        if is_admin_organizacional(self.request.user):
+            org_id = self.request.user.organizacion_id
+            if not org_id:
+                return qs.none()
+            return qs.filter(empresa__organizacion_id=org_id)
+        if self.request.user.empresa_id:
+            return qs.filter(empresa_id=self.request.user.empresa_id)
+        return qs.none()
 
 
 class UsuarioViewSet(viewsets.ModelViewSet):
@@ -73,7 +142,27 @@ class UsuarioViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         if self.request.user.is_superuser:
+            empresa_param = self.request.query_params.get("empresa")
+            if empresa_param:
+                try:
+                    return qs.filter(empresa_id=int(empresa_param))
+                except (TypeError, ValueError):
+                    return qs.none()
             return qs
+        if is_admin_organizacional(self.request.user):
+            org_id = self.request.user.organizacion_id
+            if not org_id:
+                return qs.none()
+            scoped = qs.filter(is_superuser=False).filter(
+                models.Q(organizacion_id=org_id) | models.Q(empresa__organizacion_id=org_id)
+            )
+            empresa_param = self.request.query_params.get("empresa")
+            if empresa_param:
+                try:
+                    return scoped.filter(empresa_id=int(empresa_param))
+                except (TypeError, ValueError):
+                    return qs.none()
+            return scoped
         if self.request.user.empresa_id:
             return qs.filter(empresa_id=self.request.user.empresa_id)
         return qs.none()
@@ -90,8 +179,27 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         for grupo in grupos:
             _run_validation(validar_creacion_usuario, self.request.user, grupo)
         if self.request.user.is_superuser:
-            if serializer.validated_data.get("empresa") is None:
+            target_groups = serializer.validated_data.get("groups") or []
+            target_group_names = {group.name for group in target_groups}
+            is_org_admin_target = "Admin Organizacional" in target_group_names
+            if is_org_admin_target:
+                if serializer.validated_data.get("organizacion") is None:
+                    raise ValidationError("Para Admin Organizacional, organizacion es obligatoria.")
+            elif serializer.validated_data.get("empresa") is None:
                 raise ValidationError("Para crear usuarios, selecciona una empresa.")
+        elif is_admin_organizacional(self.request.user):
+            if self.request.user.organizacion_id is None:
+                raise ValidationError("Tu usuario no tiene organizacion asignada.")
+            serializer.validated_data["organizacion"] = self.request.user.organizacion
+            target_groups = serializer.validated_data.get("groups") or []
+            target_group_names = {group.name for group in target_groups}
+            if "Admin Organizacional" in target_group_names:
+                raise ValidationError("No podes crear usuarios de tipo Admin Organizacional.")
+            empresa = serializer.validated_data.get("empresa")
+            if empresa is None:
+                raise ValidationError("Selecciona una empresa.")
+            if empresa.organizacion_id != self.request.user.organizacion_id:
+                raise ValidationError("La empresa seleccionada no pertenece a tu organizacion.")
         else:
             if self.request.user.empresa_id is None:
                 raise ValidationError("Tu usuario no tiene empresa asignada.")
@@ -102,7 +210,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         if serializer.validated_data.get("is_superuser"):
             raise ValidationError("No se puede asignar superusuario por API.")
-        if not (self.request.user.is_superuser or self.request.user.groups.filter(name="Admin").exists()):
+        if not (self.request.user.is_superuser or is_admin(self.request.user)):
             raise ValidationError("No tenes permisos para modificar usuarios.")
         grupos = serializer.validated_data.get("groups") or []
         if grupos:
@@ -112,9 +220,31 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             _run_validation(validar_modificacion_usuario, self.request.user, instance, None)
         if self.request.user.is_superuser and not instance.is_superuser:
             next_empresa = serializer.validated_data.get("empresa", instance.empresa)
-            if next_empresa is None:
+            next_groups = serializer.validated_data.get("groups", instance.groups.all())
+            next_group_names = {group.name for group in next_groups}
+            is_org_admin_target = "Admin Organizacional" in next_group_names
+            if is_org_admin_target:
+                next_org = serializer.validated_data.get("organizacion", instance.organizacion)
+                if next_org is None:
+                    raise ValidationError("Para Admin Organizacional, organizacion es obligatoria.")
+            elif next_empresa is None:
                 raise ValidationError("Para usuarios no superusuario, empresa es obligatoria.")
-        if not self.request.user.is_superuser:
+        if is_admin_organizacional(self.request.user):
+            if self.request.user.organizacion_id is None:
+                raise ValidationError("Tu usuario no tiene organizacion asignada.")
+            next_groups = serializer.validated_data.get("groups", instance.groups.all())
+            next_group_names = {group.name for group in next_groups}
+            if "Admin Organizacional" in next_group_names:
+                raise ValidationError("No podes asignar grupo Admin Organizacional.")
+            next_empresa = serializer.validated_data.get("empresa", instance.empresa)
+            if next_empresa is None:
+                raise ValidationError("Empresa obligatoria.")
+            if next_empresa.organizacion_id != self.request.user.organizacion_id:
+                raise ValidationError("La empresa seleccionada no pertenece a tu organizacion.")
+            if instance.organizacion_id and instance.organizacion_id != self.request.user.organizacion_id:
+                raise ValidationError("No tenes acceso a este usuario.")
+            serializer.validated_data["organizacion"] = self.request.user.organizacion
+        elif not self.request.user.is_superuser:
             if self.request.user.empresa_id is None:
                 raise ValidationError("Tu usuario no tiene empresa asignada.")
             serializer.validated_data["empresa"] = self.request.user.empresa

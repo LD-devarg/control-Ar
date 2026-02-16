@@ -3,6 +3,7 @@ from decimal import Decimal, InvalidOperation
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.empresas.scope import get_user_empresa_ids
 from .servicios.crypto import encrypt_token
 from .servicios.meta_provisioning import (
     MetaProvisioningError,
@@ -40,9 +41,16 @@ class BMSerializer(serializers.ModelSerializer):
 def _resolve_empresa_for_write(attrs, instance, request_user):
     empresa = attrs.get("empresa") or getattr(instance, "empresa", None)
     if request_user and not request_user.is_superuser:
-        if not request_user.empresa_id:
+        allowed_ids = get_user_empresa_ids(request_user)
+        if not allowed_ids:
             raise serializers.ValidationError("Empresa no disponible en el usuario actual.")
-        empresa = request_user.empresa
+        if empresa is not None:
+            if empresa.id not in allowed_ids:
+                raise serializers.ValidationError("No tenes acceso a la empresa seleccionada.")
+        else:
+            empresa = request_user.empresa or None
+            if empresa is None:
+                empresa = None
     return empresa
 
 

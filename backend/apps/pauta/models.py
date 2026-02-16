@@ -269,6 +269,7 @@ class RendimientoPautaDiario(models.Model):
     impressions = models.BigIntegerField(default=0)
     reach = models.BigIntegerField(default=0)
     clicks = models.BigIntegerField(default=0)
+    link_clicks = models.BigIntegerField(default=0)
     ctr = models.DecimalField(max_digits=10, decimal_places=4, default=0)
     cpc_usd = models.DecimalField(max_digits=14, decimal_places=4, default=0)
     frequency = models.DecimalField(max_digits=10, decimal_places=4, default=0)

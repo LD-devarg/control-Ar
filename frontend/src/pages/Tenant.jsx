@@ -12,6 +12,8 @@ import {
     createEmpresa,
     updateEmpresa,
 } from "../services/empresas/empresas";
+import { fetchOrganizaciones } from "../services/empresas/organizaciones";
+import { getCurrentUser } from "../services/auth";
 
 function buildBeatTasksDraft(empresa) {
     const tasks = Array.isArray(empresa?.beat_tasks_available) ? empresa.beat_tasks_available : [];
@@ -25,9 +27,13 @@ function buildBeatTasksDraft(empresa) {
 }
 
 export default function Tenant() {
+    const currentUser = getCurrentUser();
+    const isSuperuser = Boolean(currentUser?.is_superuser);
     const [empresas, setEmpresas] = useState([]);
+    const [organizaciones, setOrganizaciones] = useState([]);
     const [selected, setSelected] = useState(null);
     const [nombre, setNombre] = useState("");
+    const [organizacionId, setOrganizacionId] = useState("");
     const [activo, setActivo] = useState(true);
     const [listLoading, setListLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -41,14 +47,19 @@ export default function Tenant() {
         setListLoading(true);
         setError("");
         try {
-            const data = await fetchEmpresas();
-            setEmpresas(data);
+            const requests = [fetchEmpresas()];
+            if (isSuperuser) requests.push(fetchOrganizaciones());
+            const [empresasData, organizacionesData] = await Promise.all(requests);
+            setEmpresas(empresasData);
+            if (Array.isArray(organizacionesData)) {
+                setOrganizaciones(organizacionesData);
+            }
         } catch (err) {
             setError("No se pudieron cargar las empresas.");
         } finally {
             setListLoading(false);
         }
-    }, []);
+    }, [isSuperuser]);
 
     useEffect(() => {
         load();
@@ -57,6 +68,7 @@ export default function Tenant() {
     const handleSelect = (empresa) => {
         setSelected(empresa);
         setNombre(empresa?.nombre || "");
+        setOrganizacionId(empresa?.organizacion || "");
         setActivo(Boolean(empresa?.activo));
         setError("");
     };
@@ -64,6 +76,7 @@ export default function Tenant() {
     const handleClear = () => {
         setSelected(null);
         setNombre("");
+        setOrganizacionId("");
         setActivo(true);
         setError("");
     };
@@ -74,24 +87,27 @@ export default function Tenant() {
             setError("El nombre es obligatorio.");
             return;
         }
+        if (isSuperuser && !organizacionId) {
+            setError("Selecciona una organizacion.");
+            return;
+        }
         setSaving(true);
         setError("");
         try {
+            const payload = {
+                nombre: trimmedNombre,
+                activo,
+                ...(isSuperuser ? { organizacion: Number(organizacionId) } : {}),
+            };
             if (selected) {
-                const updated = await updateEmpresa(selected.id, {
-                    nombre: trimmedNombre,
-                    activo,
-                });
+                const updated = await updateEmpresa(selected.id, payload);
                 setEmpresas((prev) =>
                     prev.map((item) => (item.id === updated.id ? updated : item))
                 );
                 handleSelect(updated);
                 setToast({ open: true, severity: "success", message: "Empresa actualizada." });
             } else {
-                const created = await createEmpresa({
-                    nombre: trimmedNombre,
-                    activo,
-                });
+                const created = await createEmpresa(payload);
                 setEmpresas((prev) => [created, ...prev]);
                 setToast({ open: true, severity: "success", message: "Empresa creada." });
                 handleClear();
@@ -290,10 +306,14 @@ export default function Tenant() {
                     <EmpresaForm
                         selected={selected}
                         nombre={nombre}
+                        organizacionId={organizacionId}
+                        organizaciones={organizaciones}
+                        showOrganizacionField={isSuperuser}
                         activo={activo}
                         error={error}
                         saving={saving}
                         onNombreChange={setNombre}
+                        onOrganizacionIdChange={setOrganizacionId}
                         onActivoChange={setActivo}
                         onSave={handleSave}
                         onClear={handleClear}

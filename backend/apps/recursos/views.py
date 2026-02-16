@@ -2,16 +2,9 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
+from apps.empresas.scope import filter_queryset_by_empresa
 from .models import WhatsApp, TipoCambio
 from .serializers import WhatsAppSerializer, TipoCambioSerializer
-
-
-def _filter_by_empresa(qs, user):
-    if user.is_superuser:
-        return qs
-    if user.empresa_id:
-        return qs.filter(empresa_id=user.empresa_id)
-    return qs.none()
 
 
 class WhatsAppViewSet(viewsets.ModelViewSet):
@@ -31,7 +24,7 @@ class WhatsAppViewSet(viewsets.ModelViewSet):
         return False
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user)
+        return filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
 
 
 class TipoCambioViewSet(viewsets.ModelViewSet):

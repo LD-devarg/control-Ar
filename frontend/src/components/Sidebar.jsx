@@ -74,8 +74,8 @@ function Sidebar() {
         type="button"
         onClick={() => navigate(path)}
         className={[
-          "relative flex h-9 w-full items-center overflow-hidden rounded-[10px] text-left transition-all duration-200",
-          expanded ? "justify-start px-2.5" : "justify-center px-0",
+          "relative flex h-9 items-center overflow-hidden rounded-[10px] text-left transition-all duration-200",
+          expanded ? "w-full justify-start px-2.5" : "mx-auto w-11 justify-center px-0",
           active
             ? "bg-neutral-900 shadow-[inset_-2px_0_0_rgba(45,124,255,0.9),inset_-20px_0_24px_rgba(45,124,255,0.25)]"
             : "hover:bg-neutral-900 hover:shadow-[inset_-2px_0_0_rgba(45,124,255,0.9),inset_-20px_0_24px_rgba(45,124,255,0.25)]",
@@ -125,13 +125,13 @@ function Sidebar() {
       </div>
 
       <div className="mt-1 flex h-full min-h-0 flex-col">
-        <div className="flex-1 min-h-0 space-y-1.5 overflow-y-auto pr-1">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pl-2 pr-1">
           {sections.map((section) => (
             <div key={section.title} className="space-y-0.5">
               <h3
                 className={[
                   "h-4 overflow-hidden whitespace-nowrap font-['Roboto'] text-xs font-normal text-zinc-500 transition-all duration-200",
-                  expanded ? "max-w-[165px] opacity-100" : "max-w-0 opacity-0",
+                  expanded ? "max-w-[165px] opacity-100" : "max-w-[165px] opacity-0 pointer-events-none",
                 ].join(" ")}
               >
                 {section.title}

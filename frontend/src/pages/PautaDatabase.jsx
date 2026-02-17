@@ -4,6 +4,8 @@ import TablaPauta from "../components/TablaPauta";
 import PautaCreateModal from "../components/PautaCreateModal";
 import Button from "@mui/material/Button";
 import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
+import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
+import { apiClient } from "../services/auth";
 
 const COLUMN_SETS = {
     Bms: [
@@ -80,6 +82,9 @@ export default function PautaDatabase() {
     const [pickerOpen, setPickerOpen] = useState(false);
     const [createModalOpen, setCreateModalOpen] = useState(false);
     const [selectedByView, setSelectedByView] = useState({});
+    const [rowsByView, setRowsByView] = useState({});
+    const [loadingData, setLoadingData] = useState(false);
+    const [error, setError] = useState("");
     const pickerRef = useRef(null);
 
     const tabs = Object.keys(COLUMN_SETS);
@@ -133,6 +138,160 @@ export default function PautaDatabase() {
         return () => document.removeEventListener("pointerdown", handleClickOutside);
     }, [pickerOpen]);
 
+    const unwrapList = (payload) => {
+        if (Array.isArray(payload)) return payload;
+        if (Array.isArray(payload?.results)) return payload.results;
+        return [];
+    };
+
+    const loadRows = async () => {
+        setLoadingData(true);
+        setError("");
+        try {
+            const [
+                bmsRes,
+                adAccountsRes,
+                fanpagesRes,
+                campaignsRes,
+                adsetsRes,
+                assetsRes,
+                creativesRes,
+                adsRes,
+            ] = await Promise.all([
+                apiClient.get("/bms/"),
+                apiClient.get("/cuentas-publicitarias/"),
+                apiClient.get("/fanpages/"),
+                apiClient.get("/campaÃ±as/"),
+                apiClient.get("/conjuntos-anuncios/"),
+                apiClient.get("/pauta-assets/"),
+                apiClient.get("/creatives/"),
+                apiClient.get("/anuncios/"),
+            ]);
+
+            const bms = unwrapList(bmsRes?.data);
+            const adAccounts = unwrapList(adAccountsRes?.data);
+            const fanpages = unwrapList(fanpagesRes?.data);
+            const campaigns = unwrapList(campaignsRes?.data);
+            const adsets = unwrapList(adsetsRes?.data);
+            const assets = unwrapList(assetsRes?.data);
+            const creatives = unwrapList(creativesRes?.data);
+            const ads = unwrapList(adsRes?.data);
+
+            const bmNameById = Object.fromEntries(bms.map((item) => [item.id, item.nombre]));
+            const adAccountNameById = Object.fromEntries(adAccounts.map((item) => [item.id, item.nombre]));
+            const campaignNameById = Object.fromEntries(campaigns.map((item) => [item.id, item.nombre]));
+            const adsetNameById = Object.fromEntries(adsets.map((item) => [item.id, item.nombre]));
+            const fanpageNameById = Object.fromEntries(fanpages.map((item) => [item.id, item.nombre]));
+            const instagramNameById = Object.fromEntries(
+                unwrapList((await apiClient.get("/instagram-accounts/"))?.data).map((item) => [
+                    item.id,
+                    item.username || item.nombre || `#${item.id}`,
+                ])
+            );
+            const assetNameById = Object.fromEntries(
+                assets.map((item) => [item.id, item.nombre || item.meta_asset_id || `#${item.id}`])
+            );
+
+            setRowsByView({
+                Bms: bms.map((item) => ({
+                    id: item.id,
+                    name: item.nombre,
+                    metaId: item.meta_id,
+                    status: item.estado,
+                })),
+                "Ad Accounts": adAccounts.map((item) => ({
+                    id: item.id,
+                    name: item.nombre,
+                    bm: bmNameById[item.bm] || `#${item.bm}`,
+                    metaId: item.meta_id,
+                    status: item.estado,
+                })),
+                FanPage: fanpages.map((item) => ({
+                    id: item.id,
+                    name: item.nombre,
+                    metaId: item.meta_id,
+                    status: item.estado,
+                })),
+                Campaigns: campaigns.map((item) => ({
+                    id: item.id,
+                    name: item.nombre,
+                    adAccount: adAccountNameById[item.cuenta_publicitaria] || `#${item.cuenta_publicitaria}`,
+                    metaId: item.meta_id,
+                    createdAt: item.creado_en ? new Date(item.creado_en).toLocaleString("es-AR") : "-",
+                    objective: item.objetivo,
+                    status: item.estado,
+                })),
+                Adsets: adsets.map((item) => {
+                    const campaignId = item["campaÃ±a"];
+                    const targeting = item.segmentacion?.targeting || {};
+                    const genders = Array.isArray(targeting.genders)
+                        ? targeting.genders.map((value) => (value === 1 ? "Hombre" : value === 2 ? "Mujer" : value)).join(", ")
+                        : "Todos";
+                    return {
+                        id: item.id,
+                        name: item.nombre,
+                        campaign: campaignNameById[campaignId] || `#${campaignId}`,
+                        metaId: item.meta_id,
+                        budget: item.presupuesto_diario,
+                        createdAt: item.creado_en ? new Date(item.creado_en).toLocaleString("es-AR") : "-",
+                        location: targeting?.geo_locations?.countries?.join(", ") || "-",
+                        region: "-",
+                        conversionSite: item.segmentacion?.destination_type || "-",
+                        ageRange:
+                            targeting.age_min && targeting.age_max
+                                ? `${targeting.age_min}-${targeting.age_max}`
+                                : "-",
+                        gender: genders,
+                        targeting: JSON.stringify(targeting),
+                        status: item.estado,
+                    };
+                }),
+                Assets: assets.map((item) => ({
+                    id: item.id,
+                    name: item.nombre || item.meta_asset_id || `Asset #${item.id}`,
+                    s3_url: item.s3_url,
+                    metaAssetId: item.meta_asset_id,
+                    type: item.tipo,
+                    status: item.estado,
+                })),
+                Creatives: creatives.map((item) => ({
+                    id: item.id,
+                    name: item.nombre,
+                    fanpage: fanpageNameById[item.fanpage] || `#${item.fanpage}`,
+                    instagram_account: item.instagram_account
+                        ? instagramNameById[item.instagram_account] || `#${item.instagram_account}`
+                        : "-",
+                    primary_text: item.primary_text,
+                    headline: item.headline,
+                    description: item.descripcion,
+                    metaId: item.meta_id,
+                    url_destino: item.url_destino,
+                    asset: assetNameById[item.asset] || `#${item.asset}`,
+                    cta: item.cta,
+                    status: "-",
+                })),
+                Ads: ads.map((item) => ({
+                    id: item.id,
+                    name: item.nombre,
+                    adset: adsetNameById[item.conjunto_anuncios] || `#${item.conjunto_anuncios}`,
+                    metaId: item.meta_id,
+                    text: "-",
+                    title: "-",
+                    image: "-",
+                    status: item.estado,
+                })),
+            });
+        } catch {
+            setError("No se pudieron cargar los datos de pauta.");
+        } finally {
+            setLoadingData(false);
+        }
+    };
+
+    useEffect(() => {
+        loadRows();
+    }, []);
+
     const handleOpenCreateModal = () => {
         setCreateModalOpen(true);
     };
@@ -144,25 +303,39 @@ export default function PautaDatabase() {
     const handleCreated = ({ type }) => {
         setCreateModalOpen(false);
         if (type) setTab(type);
+        loadRows();
     };
 
     return (
         <Page
             title="Base de Datos Pauta Publicitaria"
             actions={
-                <Button
-                    variant="outlined"
-                    size="medium"
-                    color="primary"
-                    startIcon={<AddOutlinedIcon />}
-                    onClick={handleOpenCreateModal}
-                >
-                    Crear
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outlined"
+                        size="medium"
+                        color="primary"
+                        startIcon={<RefreshOutlinedIcon />}
+                        onClick={loadRows}
+                        disabled={loadingData}
+                    >
+                        {loadingData ? "Actualizando..." : "Refresh"}
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        size="medium"
+                        color="primary"
+                        startIcon={<AddOutlinedIcon />}
+                        onClick={handleOpenCreateModal}
+                    >
+                        Crear
+                    </Button>
+                </div>
             }
         >
             <div className="mt-4 w-full">
                 <div className="w-full rounded-2xl border border-slate-300/40 bg-white/80 p-4 shadow-sm dark:border-zinc-700 dark:bg-neutral-900/70">
+                    {error ? <div className="mb-3 text-sm text-red-500">{error}</div> : null}
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         {tabs.map((label) => {
                             const active = tab === label;
@@ -233,7 +406,12 @@ export default function PautaDatabase() {
                     </div>
 
                     <div className="mt-4">
-                        <TablaPauta view={tab} visibleColumns={selectedColumns} enableColumnPicker={false} />
+                        <TablaPauta
+                            view={tab}
+                            rowsByView={rowsByView}
+                            visibleColumns={selectedColumns}
+                            enableColumnPicker={false}
+                        />
                     </div>
                 </div>
             </div>

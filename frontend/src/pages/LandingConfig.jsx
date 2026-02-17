@@ -629,6 +629,44 @@ function LandingConfig() {
                         </Stack>
                         <div className="w-full gap-2 mt-4 mb-4 items-end flex justify-end">
                             <Button
+                                variant="outlined"
+                                startIcon={<SaveIcon />}
+                                disabled={primaryDisabled || submitting}
+                                onClick={handleSubmit}
+                                sx={{
+                                    borderColor: "#fff",
+                                    color: "#fff",
+                                    "&:hover": {
+                                        borderColor: "#fff",
+                                    },
+                                    "&.Mui-disabled": {
+                                        borderColor: "rgba(255,255,255,0.4)",
+                                        color: "rgba(255,255,255,0.4)",
+                                    },
+                                }}
+                            >
+                                {submitting ? "Guardando..." : primaryLabel}
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                onClick={handleCancel}
+                                sx={{
+                                    borderColor: "#ef4444",
+                                    color: "#ef4444",
+                                    "&:hover": {
+                                        borderColor: "#dc2626",
+                                        color: "#dc2626",
+                                        backgroundColor: "rgba(239, 68, 68, 0.08)",
+                                    },
+                                    "&.Mui-disabled": {
+                                        borderColor: "rgba(239, 68, 68, 0.4)",
+                                        color: "rgba(239, 68, 68, 0.4)",
+                                    },
+                                }}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
                             variant="outlined"
                             className="mr-2"
                             sx={{
@@ -652,46 +690,6 @@ function LandingConfig() {
                         />
                     </div>
                 </div>
-            </div>
-            <div className="flex flex-wrap gap-2 items-center justify-center w-full sm:w-9/10 bg-black/80 dark:bg-transparent rounded-xl p-2">
-                <Button
-                    variant="outlined"
-                    startIcon={<SaveIcon />}
-                    disabled={primaryDisabled || submitting}
-                    onClick={handleSubmit}
-                    sx={{
-                        borderColor: "#fff",
-                        color: "#fff",
-                        "&:hover": {
-                            borderColor: "#fff",
-                        },
-                        "&.Mui-disabled": {
-                            borderColor: "rgba(255,255,255,0.4)",
-                            color: "rgba(255,255,255,0.4)",
-                        },
-                    }}
-                >
-                    {submitting ? "Guardando..." : primaryLabel}
-                </Button>
-                <Button
-                    variant="outlined"
-                    onClick={handleCancel}
-                    sx={{
-                        borderColor: "#ef4444",
-                        color: "#ef4444",
-                        "&:hover": {
-                            borderColor: "#dc2626",
-                            color: "#dc2626",
-                            backgroundColor: "rgba(239, 68, 68, 0.08)",
-                        },
-                        "&.Mui-disabled": {
-                            borderColor: "rgba(239, 68, 68, 0.4)",
-                            color: "rgba(239, 68, 68, 0.4)",
-                        },
-                    }}
-                >
-                    Cancelar
-                </Button>
             </div>
             <Snackbar
                 open={toast.open}

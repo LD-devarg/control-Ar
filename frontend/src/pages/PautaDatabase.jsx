@@ -161,7 +161,7 @@ export default function PautaDatabase() {
                 apiClient.get("/bms/"),
                 apiClient.get("/cuentas-publicitarias/"),
                 apiClient.get("/fanpages/"),
-                apiClient.get("/campaÃ±as/"),
+                apiClient.get("/campañas/"),
                 apiClient.get("/conjuntos-anuncios/"),
                 apiClient.get("/pauta-assets/"),
                 apiClient.get("/creatives/"),
@@ -222,7 +222,7 @@ export default function PautaDatabase() {
                     status: item.estado,
                 })),
                 Adsets: adsets.map((item) => {
-                    const campaignId = item["campaÃ±a"];
+                    const campaignId = item["campaña"];
                     const targeting = item.segmentacion?.targeting || {};
                     const genders = Array.isArray(targeting.genders)
                         ? targeting.genders.map((value) => (value === 1 ? "Hombre" : value === 2 ? "Mujer" : value)).join(", ")

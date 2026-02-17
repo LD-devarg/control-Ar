@@ -83,7 +83,7 @@ export const CREATE_FORM_CONFIG = {
     ],
   },
   Campaigns: {
-    endpoint: "/campañas/",
+    endpoint: "/campanas/",
     fields: [
       {
         name: "cuenta_publicitaria",
@@ -117,7 +117,7 @@ export const CREATE_FORM_CONFIG = {
         name: "campaña",
         label: "Campaña",
         type: "select-remote",
-        source: "/campañas/",
+        source: "/campanas/",
         required: true,
       },
       { name: "nombre", label: "Nombre", type: "text", required: true },

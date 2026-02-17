@@ -161,7 +161,7 @@ export default function PautaDatabase() {
                 apiClient.get("/bms/"),
                 apiClient.get("/cuentas-publicitarias/"),
                 apiClient.get("/fanpages/"),
-                apiClient.get("/campañas/"),
+                apiClient.get("/campanas/"),
                 apiClient.get("/conjuntos-anuncios/"),
                 apiClient.get("/pauta-assets/"),
                 apiClient.get("/creatives/"),

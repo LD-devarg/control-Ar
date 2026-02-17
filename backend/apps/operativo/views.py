@@ -237,7 +237,10 @@ class LandingViewSet(viewsets.ModelViewSet):
         if not token:
             raise ValidationError("landing_token requerido")
         landing = get_object_or_404(Landing, token=token, activo=True)
-        numero = seleccionar_numero_whatsapp(landing.empresa_id)
+        try:
+            numero = seleccionar_numero_whatsapp(landing.empresa_id)
+        except ValueError as exc:
+            return Response({"detail": str(exc), "numero": ""}, status=status.HTTP_404_NOT_FOUND)
         return Response({"numero": numero})
 
     @action(detail=False, methods=["get"], permission_classes=[AllowAny], url_path="public")

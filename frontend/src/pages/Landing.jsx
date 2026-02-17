@@ -91,25 +91,6 @@ export default function Landing() {
 
         window.fbq("init", pixelId);
         window.fbq("track", "PageView");
-
-        let noscript = document.getElementById("fb-pixel-noscript");
-        if (!noscript) {
-            noscript = document.createElement("noscript");
-            noscript.id = "fb-pixel-noscript";
-            document.body.appendChild(noscript);
-        }
-        noscript.innerHTML = "";
-        const img = document.createElement("img");
-        img.height = 1;
-        img.width = 1;
-        img.style.display = "none";
-        img.src = `https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`;
-        noscript.appendChild(img);
-        return () => {
-            if (noscript?.parentNode) {
-                noscript.parentNode.removeChild(noscript);
-            }
-        };
     }, [landing]);
 
     useEffect(() => {
@@ -161,6 +142,7 @@ export default function Landing() {
     const subtitleText = landing?.subtitulo || "REGISTRATE AHORA Y DUPLICAMOS TU PRIMER DEPÓSITO";
     const buttonText = landing?.texto_boton || "JUGÁ AHORA";
     const infoText = landing?.texto_info || "🤳Atención personalizada las 24hs.";
+    const whatsappTemplate = landing?.texto_whatsapp || "";
     const bgDesktop = landing?.background_horizontal || null;
     const bgMobile = landing?.background_vertical || null;
     const bgType = landing?.bg_type || "gradient";
@@ -288,6 +270,7 @@ export default function Landing() {
                     whatsappNumber={whatsappNumber}
                     buttonText={buttonText}
                     infoText={infoText}
+                    whatsappTemplate={whatsappTemplate}
                     infoColor={colorInfo}
                 />
                 {landing?.mostrar_disclaimer !== false ? (

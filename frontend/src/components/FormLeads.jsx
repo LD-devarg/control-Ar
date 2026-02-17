@@ -35,6 +35,15 @@ function buildWhatsappUrl(number, text) {
     return `https://wa.me/${number}?text=${encoded}`;
 }
 
+function renderWhatsappMessage(template, variables) {
+    const fallback = "Hola vengo por el bono del {{bono}} mi username es {{username}}";
+    const source = (template || fallback).trim() || fallback;
+    return source.replace(/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g, (_, key) => {
+        const value = variables[key];
+        return value === undefined || value === null ? "" : String(value);
+    });
+}
+
 function loadQueue() {
     try {
         const raw = localStorage.getItem(QUEUE_KEY);
@@ -74,7 +83,16 @@ function getTrackingParams() {
     };
 }
 
-export default function NuevoLead({ buttonText, infoText, whatsappNumber, landingToken, bonusText, infoColor, isPreview = false }) {
+export default function NuevoLead({
+    buttonText,
+    infoText,
+    whatsappNumber,
+    landingToken,
+    bonusText,
+    whatsappTemplate = "",
+    infoColor,
+    isPreview = false,
+}) {
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
     const [error, setError] = useState("");
@@ -91,13 +109,21 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
 
     const finalButtonText = buttonText || "JUGÁ AHORA";
     const finalInfoText = infoText || "🤳Atención personalizada las 24hs.";
-    const messageText = `Hola vengo por el bono del ${bonusText || "100%"} mi username es ${username}`;
+    const messageText = useMemo(
+        () =>
+            renderWhatsappMessage(whatsappTemplate, {
+                bono: bonusText || "100%",
+                username,
+                nombre: trimmedName,
+                contacto: phoneDigits,
+            }),
+        [whatsappTemplate, bonusText, username, trimmedName, phoneDigits]
+    );
     const whatsappUrl = useMemo(() => buildWhatsappUrl(whatsappNumber, messageText), [whatsappNumber, messageText]);
 
     const isNameValid = trimmedName.length > 1;
     const isPhoneValid = phoneDigits.length >= 10;
     const canSubmit =
-        Boolean(whatsappNumber) &&
         Boolean(landingToken) &&
         Boolean(username) &&
         isNameValid &&
@@ -179,7 +205,13 @@ export default function NuevoLead({ buttonText, infoText, whatsappNumber, landin
                 setError("Ingresá un nombre válido.");
             } else if (!isPhoneValid) {
                 setError("Ingresá un número válido (mínimo 10 dígitos).");
+            } else if (!landingToken) {
+                setError("Landing inválida o sin token.");
             }
+            return;
+        }
+        if (!whatsappNumber) {
+            setError("No hay líneas de WhatsApp activas para esta empresa.");
             return;
         }
         setError("");

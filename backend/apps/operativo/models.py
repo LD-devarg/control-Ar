@@ -65,6 +65,7 @@ class Landing(models.Model):
     subtitulo = models.CharField(max_length=255, null=True, blank=True)
     texto_boton = models.CharField(max_length=100, null=True, blank=True)
     texto_info = models.CharField(max_length=255, null=True, blank=True)
+    texto_whatsapp = models.TextField(blank=True, default="")
     mostrar_disclaimer = models.BooleanField(default=True)
     color_titulo = models.CharField(max_length=20, default="#ffffff")
     color_subtitulo = models.CharField(max_length=20, default="#ffffff")

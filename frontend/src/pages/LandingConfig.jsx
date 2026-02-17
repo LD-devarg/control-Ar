@@ -23,6 +23,7 @@ const EMPTY_FORM = {
     subtitulo: "",
     textoBoton: "",
     textoInfo: "",
+    textoWhatsapp: "",
     mostrarDisclaimer: true,
     colorTitulo: "#ffffff",
     colorSubtitulo: "#ffffff",
@@ -49,6 +50,7 @@ const FIELD_MAP = [
     { formKey: "subtitulo", apiKey: "subtitulo", normalize: (value) => value.trim() },
     { formKey: "textoBoton", apiKey: "texto_boton", normalize: (value) => value.trim() },
     { formKey: "textoInfo", apiKey: "texto_info", normalize: (value) => value.trim() },
+    { formKey: "textoWhatsapp", apiKey: "texto_whatsapp", normalize: (value) => value.trim() },
     {
         formKey: "mostrarDisclaimer",
         apiKey: "mostrar_disclaimer",
@@ -159,6 +161,7 @@ function LandingConfig() {
             subtitulo: value.subtitulo || "",
             textoBoton: value.texto_boton || "",
             textoInfo: value.texto_info || "",
+            textoWhatsapp: value.texto_whatsapp || "",
             mostrarDisclaimer: value.mostrar_disclaimer ?? EMPTY_FORM.mostrarDisclaimer,
             colorTitulo: value.color_titulo || EMPTY_FORM.colorTitulo,
             colorSubtitulo: value.color_subtitulo || EMPTY_FORM.colorSubtitulo,
@@ -473,6 +476,25 @@ function LandingConfig() {
                                 sx={{...commonTextFieldSx,
                                     width: { xs: "100%", md: "40%" },
                                     fontSize: "small",
+                                }}
+                            />
+                        </Stack>
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
+                        sx={{
+                            mb: 1,
+                        }}
+                        >
+                            <TextField
+                                label="Texto WhatsApp"
+                                variant="outlined"
+                                size="small"
+                                fullWidth
+                                value={form.textoWhatsapp}
+                                onChange={handleChange("textoWhatsapp")}
+                                helperText="Variables permitidas: {{bono}}, {{username}}, {{nombre}}, {{contacto}}"
+                                sx={{
+                                    ...commonTextFieldSx,
+                                    "& .MuiFormHelperText-root": { color: "rgba(255,255,255,0.65)" },
                                 }}
                             />
                         </Stack>

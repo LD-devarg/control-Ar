@@ -1,4 +1,5 @@
 from rest_framework import serializers
+import re
 
 from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit
 from apps.pauta.models import CredencialesMeta
@@ -105,6 +106,20 @@ class LandingSerializer(serializers.ModelSerializer):
             value = f"https://{value}"
         return value
 
+    def validate_texto_whatsapp(self, value):
+        if not value:
+            return value
+        allowed = {"bono", "username", "nombre", "contacto"}
+        found = set(re.findall(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}", value))
+        invalid = sorted(item for item in found if item not in allowed)
+        if invalid:
+            allowed_text = ", ".join(sorted(allowed))
+            invalid_text = ", ".join(invalid)
+            raise serializers.ValidationError(
+                f"Variables no permitidas: {invalid_text}. Usa solo: {allowed_text}."
+            )
+        return value
+
     class Meta:
         model = Landing
         fields = [
@@ -118,6 +133,7 @@ class LandingSerializer(serializers.ModelSerializer):
             "subtitulo",
             "texto_boton",
             "texto_info",
+            "texto_whatsapp",
             "mostrar_disclaimer",
             "color_titulo",
             "color_subtitulo",

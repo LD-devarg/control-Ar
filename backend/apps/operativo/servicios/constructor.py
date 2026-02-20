@@ -1,6 +1,7 @@
 import uuid
 import time
 import hashlib
+import re
 
 
 EVENT_NAME_MAP = {
@@ -13,7 +14,21 @@ EVENT_NAME_MAP = {
 def _sha256(value: str | None) -> str | None:
     if not value:
         return None
-    return hashlib.sha256(value.strip().lower().encode("utf-8")).hexdigest()
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _normalize_email(value: str | None) -> str | None:
+    if not value:
+        return None
+    normalized = value.strip().lower()
+    return normalized or None
+
+
+def _normalize_phone(value: str | None) -> str | None:
+    if not value:
+        return None
+    digits = re.sub(r"\D+", "", value)
+    return digits or None
 
 
 def _clean_dict(data: dict) -> dict:
@@ -43,9 +58,9 @@ class MetaEventBuilder:
         # user_data
         # -------------------------
         user_data = _clean_dict({
-            "em": _sha256(payload.get("email")),
-            "ph": _sha256(payload.get("phone")),
-            "external_id": _sha256(payload.get("external_id")),
+            "em": _sha256(_normalize_email(payload.get("email"))),
+            "ph": _sha256(_normalize_phone(payload.get("phone"))),
+            "external_id": _sha256(payload.get("external_id").strip().lower() if payload.get("external_id") else None),
             "fbp": payload.get("fbp"),
             "fbc": payload.get("fbc"),
             "client_ip_address": request.META.get("REMOTE_ADDR") if request else None,

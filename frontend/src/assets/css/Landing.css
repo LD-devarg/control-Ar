@@ -2,13 +2,54 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
     color: #ffffff;
     font-family: 'Roboto', sans-serif;
     background: var(--landing-bg-gradient, linear-gradient(135deg, #c129a3 0%, #b700ff 100%));
 }
 
+.landing-ticker {
+    width: 100%;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.9);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.9);
+}
+
+.landing-ticker-track {
+    display: inline-flex;
+    white-space: nowrap;
+    min-width: max-content;
+    animation: landingTickerMove 60s linear infinite;
+}
+
+.landing-ticker-item {
+    padding-right: 1.5rem;
+    font-size: 0.95rem;
+    color: #f8fafc;
+}
+
+.landing-ticker-item::after {
+    content: "|";
+    margin-left: 1.5rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+@keyframes landingTickerMove {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(-50%);
+    }
+}
+
 .landing-container {
+    position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -16,13 +57,43 @@
     max-width: 1200px;
     border-radius: 50px;
     box-shadow: 20px 20px 30px rgba(0, 0, 0, 0.5);
-    background-image: var(--landing-bg-desktop, url('/fondo_landing_desktop.png')); /* desde public */
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
     margin-top: 1rem;
     margin-bottom: 1rem;
     height: 100vh;
+}
+
+.landing-bg-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+}
+
+.landing-content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.landing-fade-in {
+    animation: landingFadeIn 420ms ease-out both;
+}
+
+.landing-bono-pulse {
+    animation: landingPulse 1.4s ease-in-out infinite;
+}
+
+.landing-form-fallback {
+    width: min(80%, 420px);
+    height: 300px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.35);
+    margin: 1rem 0;
 }
 
 .landing-title-container {
@@ -58,15 +129,11 @@
 
 @media (max-width: 768px) {
     .landing-container {
-        width: 90%;
-        height: auto;
-        height: 80%;
+        width: 95%;
+        height: calc(100dvh - 40px - 32px - 1rem);
         margin-top: 0.5rem;
         margin-bottom: 0.5rem;
         border-radius: 30px;
-        background-image: var(--landing-bg-mobile, url('/fondo_landing_mobile.png')); /* desde public */
-        background-size: cover;
-        background-position: center top;
     }
 
     .landing-container h1 {
@@ -77,4 +144,45 @@
         font-size: 1.2rem;
     }
     
+}
+
+@media (max-width: 403px) {
+    .landing-container {
+        width: 95%;
+        height: calc(100dvh - 40px - 32px - 0.6rem);
+        margin-top: 0.3rem;
+        margin-bottom: 0.3rem;
+        border-radius: 20px;
+    }
+
+    .landing-container h1 {
+        font-size: 1.5rem;
+    }
+
+    .landing-container h2 {
+        font-size: 1rem;
+    }
+}
+
+@keyframes landingFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes landingPulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
 }

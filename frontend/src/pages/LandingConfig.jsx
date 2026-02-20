@@ -25,6 +25,7 @@ const EMPTY_FORM = {
     textoInfo: "",
     textoWhatsapp: "",
     mostrarDisclaimer: true,
+    mostrarTicker: true,
     colorTitulo: "#ffffff",
     colorSubtitulo: "#ffffff",
     colorKeyword: "#ffe600",
@@ -54,6 +55,11 @@ const FIELD_MAP = [
     {
         formKey: "mostrarDisclaimer",
         apiKey: "mostrar_disclaimer",
+        normalize: (value) => String(Boolean(value)),
+    },
+    {
+        formKey: "mostrarTicker",
+        apiKey: "mostrar_ticker",
         normalize: (value) => String(Boolean(value)),
     },
     { formKey: "colorTitulo", apiKey: "color_titulo" },
@@ -163,6 +169,7 @@ function LandingConfig() {
             textoInfo: value.texto_info || "",
             textoWhatsapp: value.texto_whatsapp || "",
             mostrarDisclaimer: value.mostrar_disclaimer ?? EMPTY_FORM.mostrarDisclaimer,
+            mostrarTicker: value.mostrar_ticker ?? EMPTY_FORM.mostrarTicker,
             colorTitulo: value.color_titulo || EMPTY_FORM.colorTitulo,
             colorSubtitulo: value.color_subtitulo || EMPTY_FORM.colorSubtitulo,
             colorKeyword: value.color_keyword || EMPTY_FORM.colorKeyword,
@@ -551,6 +558,25 @@ function LandingConfig() {
                                     label="Disclaimer"
                                     sx={{ color: "#fff", m: 0 }}
                                 />
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={Boolean(form.mostrarTicker)}
+                                            onChange={(event) =>
+                                                setForm((prev) => ({ ...prev, mostrarTicker: event.target.checked }))
+                                            }
+                                            inputProps={{ id: "landing-ticker", name: "landing-ticker" }}
+                                            sx={{
+                                                color: "rgba(255,255,255,0.85)",
+                                                "&.Mui-checked": {
+                                                    color: "rgba(255,255,255,0.85)",
+                                                },
+                                            }}
+                                        />
+                                    }
+                                    label="Barra ganadores"
+                                    sx={{ color: "#fff", m: 0 }}
+                                />
                             </div>
                         </Stack>
                             {publicLandingUrl ? (
@@ -711,4 +737,3 @@ function LandingConfig() {
 }
 
 export default LandingConfig;
-

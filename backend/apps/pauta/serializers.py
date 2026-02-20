@@ -119,6 +119,7 @@ class CuentaPublicitariaSerializer(serializers.ModelSerializer):
 
 class CampañaSerializer(serializers.ModelSerializer):
     estrategia_presupuesto = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    create_meta_draft = serializers.BooleanField(write_only=True, required=False, default=True)
 
     class Meta:
         model = Campaña
@@ -133,6 +134,7 @@ class CampañaSerializer(serializers.ModelSerializer):
             "fecha_fin",
             "objetivo",
             "estrategia_presupuesto",
+            "create_meta_draft",
             "creado_en",
         ]
         read_only_fields = ["id", "creado_en"]
@@ -159,10 +161,11 @@ class CampañaSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         estrategia_presupuesto = validated_data.pop("estrategia_presupuesto", "")
+        create_meta_draft = validated_data.pop("create_meta_draft", True)
         validated_data["estado"] = "pending"
         if not validated_data.get("fecha_inicio"):
             validated_data["fecha_inicio"] = timezone.localdate()
-        if not validated_data.get("meta_id"):
+        if not validated_data.get("meta_id") and create_meta_draft:
             try:
                 token = get_meta_token_for_empresa(validated_data["empresa"].id)
                 meta_id = create_campaign_in_meta(
@@ -177,10 +180,14 @@ class CampañaSerializer(serializers.ModelSerializer):
             except MetaProvisioningError as exc:
                 raise serializers.ValidationError(f"Error creando campaña en Meta: {exc}") from exc
             validated_data["meta_id"] = meta_id
+        if not validated_data.get("meta_id"):
+            validated_data["meta_id"] = ""
         return super().create(validated_data)
 
 
 class ConjuntoAnunciosSerializer(serializers.ModelSerializer):
+    create_meta_draft = serializers.BooleanField(write_only=True, required=False, default=True)
+
     class Meta:
         model = ConjuntoAnuncios
         fields = [
@@ -194,6 +201,7 @@ class ConjuntoAnunciosSerializer(serializers.ModelSerializer):
             "segmentacion",
             "fecha_inicio",
             "fecha_fin",
+            "create_meta_draft",
             "creado_en",
         ]
         read_only_fields = ["id", "creado_en"]
@@ -219,11 +227,14 @@ class ConjuntoAnunciosSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        create_meta_draft = validated_data.pop("create_meta_draft", True)
         validated_data["estado"] = "pending"
         if not validated_data.get("fecha_inicio"):
             validated_data["fecha_inicio"] = timezone.localdate()
-        if not validated_data.get("meta_id"):
+        if not validated_data.get("meta_id") and create_meta_draft:
             campana = validated_data["campaña"]
+            if not campana.meta_id:
+                raise serializers.ValidationError("La campaña no tiene meta_id. No se puede crear borrador en Meta.")
             try:
                 token = get_meta_token_for_empresa(validated_data["empresa"].id)
                 meta_id = create_adset_in_meta(
@@ -239,10 +250,14 @@ class ConjuntoAnunciosSerializer(serializers.ModelSerializer):
             except MetaProvisioningError as exc:
                 raise serializers.ValidationError(f"Error creando adset en Meta: {exc}") from exc
             validated_data["meta_id"] = meta_id
+        if not validated_data.get("meta_id"):
+            validated_data["meta_id"] = ""
         return super().create(validated_data)
 
 
 class AnuncioSerializer(serializers.ModelSerializer):
+    create_meta_draft = serializers.BooleanField(write_only=True, required=False, default=True)
+
     class Meta:
         model = Anuncio
         fields = [
@@ -253,6 +268,7 @@ class AnuncioSerializer(serializers.ModelSerializer):
             "meta_id",
             "nombre",
             "estado",
+            "create_meta_draft",
             "creado_en",
         ]
         read_only_fields = ["id", "creado_en"]
@@ -283,11 +299,14 @@ class AnuncioSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        create_meta_draft = validated_data.pop("create_meta_draft", True)
         validated_data["estado"] = "pending"
-        if not validated_data.get("meta_id"):
+        if not validated_data.get("meta_id") and create_meta_draft:
             adset = validated_data["conjunto_anuncios"]
             campana = getattr(adset, "campaña")
             creative = validated_data["creative"]
+            if not adset.meta_id:
+                raise serializers.ValidationError("El adset no tiene meta_id. No se puede crear borrador en Meta.")
             try:
                 token = get_meta_token_for_empresa(validated_data["empresa"].id)
                 creative_meta_id = create_creative_in_meta(

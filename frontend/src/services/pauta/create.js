@@ -265,6 +265,31 @@ function normalizeAdsetPayload(payload) {
   return next;
 }
 
+function applyMetaDraftToProvisioning(payload, createMetaDraft) {
+  const flag = Boolean(createMetaDraft);
+  const next = { ...payload };
+
+  if (next.campana && typeof next.campana === "object") {
+    next.campana = { ...next.campana, create_meta_draft: flag };
+  }
+
+  if (Array.isArray(next.adsets)) {
+    next.adsets = next.adsets.map((adset) => {
+      const adsetNext = { ...adset, create_meta_draft: flag };
+      if (Array.isArray(adsetNext.ads)) {
+        adsetNext.ads = adsetNext.ads.map((ad) => ({ ...ad, create_meta_draft: flag }));
+      }
+      return adsetNext;
+    });
+  }
+
+  if (Array.isArray(next.ads)) {
+    next.ads = next.ads.map((ad) => ({ ...ad, create_meta_draft: flag }));
+  }
+
+  return next;
+}
+
 export async function fetchRemoteOptions(fields = []) {
   const remoteFields = fields.filter((field) => field.type === "select-remote");
   if (remoteFields.length === 0) return {};
@@ -280,15 +305,22 @@ export async function fetchRemoteOptions(fields = []) {
   return next;
 }
 
-export async function createByType(typeKey, payload) {
+export async function createByType(typeKey, payload, options = {}) {
   const config = getCreateConfig(typeKey);
   if (!config?.endpoint) {
     throw new Error("Tipo no soportado para creacion directa.");
   }
 
+  const shouldAttachMetaDraftFlag = ["Campaigns", "Adsets", "Ads"].includes(typeKey);
+  const createMetaDraft = options.createMetaDraft ?? true;
+
   let normalizedPayload = { ...payload };
   if (typeKey === "Adsets") {
     normalizedPayload = normalizeAdsetPayload(normalizedPayload);
+  }
+
+  if (shouldAttachMetaDraftFlag) {
+    normalizedPayload.create_meta_draft = Boolean(createMetaDraft);
   }
 
   const tenantId = getEffectiveTenantId();
@@ -298,5 +330,23 @@ export async function createByType(typeKey, payload) {
       : normalizedPayload;
 
   const { data } = await apiClient.post(config.endpoint, finalPayload);
+  return data;
+}
+
+export function normalizeAdsetForCreate(payload) {
+  return normalizeAdsetPayload(payload);
+}
+
+export async function createProvisioningStructure(payload, options = {}) {
+  const createMetaDraft = options.createMetaDraft ?? true;
+  const tenantId = getEffectiveTenantId();
+
+  const withTenant =
+    tenantId && payload?.empresa === undefined
+      ? { ...payload, empresa: tenantId }
+      : { ...payload };
+
+  const finalPayload = applyMetaDraftToProvisioning(withTenant, createMetaDraft);
+  const { data } = await apiClient.post("/pauta-provisioning/", finalPayload);
   return data;
 }

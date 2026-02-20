@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from .storages import PrivateMediaStorage, PublicMediaStorage
 
 
 TIPO_EVENTO_CHOICES = [
@@ -67,6 +68,7 @@ class Landing(models.Model):
     texto_info = models.CharField(max_length=255, null=True, blank=True)
     texto_whatsapp = models.TextField(blank=True, default="")
     mostrar_disclaimer = models.BooleanField(default=True)
+    mostrar_ticker = models.BooleanField(default=True)
     color_titulo = models.CharField(max_length=20, default="#ffffff")
     color_subtitulo = models.CharField(max_length=20, default="#ffffff")
     color_keyword = models.CharField(max_length=20, default="#ffe600")
@@ -82,8 +84,18 @@ class Landing(models.Model):
         empresa_id = instance.empresa_id or "unknown"
         return f"landings/{empresa_id}/{filename}"
 
-    background_vertical = models.ImageField(upload_to=_landing_upload_to, null=True, blank=True)
-    background_horizontal = models.ImageField(upload_to=_landing_upload_to, null=True, blank=True)
+    background_vertical = models.ImageField(
+        upload_to=_landing_upload_to,
+        storage=PublicMediaStorage(),
+        null=True,
+        blank=True,
+    )
+    background_horizontal = models.ImageField(
+        upload_to=_landing_upload_to,
+        storage=PublicMediaStorage(),
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         db_table = "operativo_landing"
@@ -166,7 +178,12 @@ class Compra(models.Model):
 
     monto_ars = models.DecimalField(max_digits=10, decimal_places=2)
     comprobante = models.CharField(max_length=255, null=True, blank=True)
-    comprobante_archivo = models.FileField(upload_to=_comprobante_upload_to, null=True, blank=True)
+    comprobante_archivo = models.FileField(
+        upload_to=_comprobante_upload_to,
+        storage=PrivateMediaStorage(),
+        null=True,
+        blank=True,
+    )
     creado_en = models.DateTimeField(auto_now_add=True)
     monto_usd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     tc = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)

@@ -135,6 +135,7 @@ class LandingSerializer(serializers.ModelSerializer):
             "texto_info",
             "texto_whatsapp",
             "mostrar_disclaimer",
+            "mostrar_ticker",
             "color_titulo",
             "color_subtitulo",
             "color_keyword",

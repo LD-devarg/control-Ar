@@ -1,13 +1,27 @@
 ﻿import "../assets/css/Landing.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { motion } from "motion/react";
-import NuevoLead from "../components/FormLeads";
-import DisclaimerLanding from "../components/DisclaimerLanding";
+const NuevoLead = lazy(() => import("../components/FormLeads"));
+const DisclaimerLanding = lazy(() => import("../components/DisclaimerLanding"));
 
 function normalizeWhatsappNumber(rawNumber) {
     if (!rawNumber) return "";
     return String(rawNumber).replace(/\D/g, "");
+}
+
+function buildFakeWinner() {
+    const names = [
+        "Juan", "Analia", "Carlos", "Micaela", "Diego", "Lucia", "Facundo", "Rocio",
+        "Marcos", "Sofia", "Nicolas", "Camila", "Matias", "Florencia", "Gonzalo", "Valentina", "Federico", "Vanesa", "Cristian", "Agustina", "Alejandro", "Natalia",
+    ];
+    const surnames = [
+        "S", "P", "R", "M", "G", "T", "L", "F", "V", "C", "A", "N",
+    ];
+    const name = names[Math.floor(Math.random() * names.length)];
+    const surnameInitial = surnames[Math.floor(Math.random() * surnames.length)];
+    const amount = Math.floor(Math.random() * 700000) + 30000;
+    const formattedAmount = new Intl.NumberFormat("es-AR").format(amount);
+    return `💰 ${name} ${surnameInitial}. ganó $${formattedAmount} 🎉`;
 }
 
 export default function Landing() {
@@ -22,6 +36,15 @@ export default function Landing() {
         const params = new URLSearchParams(window.location.search);
         return params.get("landing_token");
     }, []);
+    const fakeWinners = useMemo(() => Array.from({ length: 12 }, () => buildFakeWinner()), []);
+
+    const resolveBackgroundUrl = (desktopUrl, mobileUrl) => {
+        if (!desktopUrl && !mobileUrl) return "";
+        const mediaNarrow = window.matchMedia("(max-width: 768px)");
+        const mediaPortrait = window.matchMedia("(orientation: portrait)");
+        const useMobile = mediaNarrow.matches || mediaPortrait.matches;
+        return useMobile ? (mobileUrl || desktopUrl || "") : (desktopUrl || mobileUrl || "");
+    };
 
     useEffect(() => {
         let mounted = true;
@@ -72,25 +95,33 @@ export default function Landing() {
         if (pixelLoadedRef.current === pixelId) return;
         pixelLoadedRef.current = pixelId;
 
-        if (!window.fbq) {
-            window.fbq = function () {
-                window.fbq.callMethod
-                    ? window.fbq.callMethod.apply(window.fbq, arguments)
-                    : window.fbq.queue.push(arguments);
-            };
-            window.fbq.queue = [];
-            window.fbq.version = "2.0";
-            window.fbq.loaded = true;
+        const loadPixel = () => {
+            if (!window.fbq) {
+                window.fbq = function () {
+                    window.fbq.callMethod
+                        ? window.fbq.callMethod.apply(window.fbq, arguments)
+                        : window.fbq.queue.push(arguments);
+                };
+                window.fbq.queue = [];
+                window.fbq.version = "2.0";
+                window.fbq.loaded = true;
 
-            const script = document.createElement("script");
-            script.async = true;
-            script.src = "https://connect.facebook.net/en_US/fbevents.js";
-            script.id = "fb-pixel-script";
-            document.head.appendChild(script);
+                const script = document.createElement("script");
+                script.async = true;
+                script.src = "https://connect.facebook.net/en_US/fbevents.js";
+                script.id = "fb-pixel-script";
+                document.head.appendChild(script);
+            }
+
+            window.fbq("init", pixelId);
+            window.fbq("track", "PageView");
+        };
+
+        if (typeof window.requestIdleCallback === "function") {
+            window.requestIdleCallback(loadPixel, { timeout: 1500 });
+        } else {
+            window.setTimeout(loadPixel, 500);
         }
-
-        window.fbq("init", pixelId);
-        window.fbq("track", "PageView");
     }, [landing]);
 
     useEffect(() => {
@@ -138,7 +169,7 @@ export default function Landing() {
     }, [token]);
 
     const titleText = landing?.titulo || "BONO DE BIENVENIDA";
-    const bonusText = landing?.bono || "100%";
+    const bonusText = landing?.bono || "🎁 100% 🎁";
     const subtitleText = landing?.subtitulo || "REGISTRATE AHORA Y DUPLICAMOS TU PRIMER DEPÓSITO";
     const buttonText = landing?.texto_boton || "JUGÁ AHORA";
     const infoText = landing?.texto_info || "🤳Atención personalizada las 24hs.";
@@ -154,6 +185,7 @@ export default function Landing() {
     const colorKeyword = landing?.color_keyword || "#ffe600";
     const colorBono = landing?.color_bono || "#ffe600";
     const colorInfo = landing?.color_info || "#ffffff";
+    const showTicker = landing?.mostrar_ticker !== false;
     const keyword = "DUPLICAMOS";
     const renderSubtitle = () => {
         if (!subtitleText) return null;
@@ -179,58 +211,38 @@ export default function Landing() {
             return undefined;
         }
 
-        let cancelled = false;
         const mediaNarrow = window.matchMedia("(max-width: 768px)");
         const mediaPortrait = window.matchMedia("(orientation: portrait)");
 
-        const pickUrl = () => {
-            const useMobile = mediaNarrow.matches || mediaPortrait.matches;
-            return useMobile ? bgMobile : bgDesktop;
+        const syncBackground = () => {
+            const nextUrl = resolveBackgroundUrl(bgDesktop, bgMobile);
+            setBgUrl(nextUrl);
+            setBgReady(Boolean(nextUrl));
         };
 
-        const preload = () => {
-            const nextUrl = pickUrl();
-            if (!nextUrl) {
-                setBgUrl("");
-                setBgReady(false);
-                return;
-            }
-            let preloadLink = document.getElementById("landing-bg-preload");
-            if (!preloadLink) {
-                preloadLink = document.createElement("link");
-                preloadLink.id = "landing-bg-preload";
-                preloadLink.rel = "preload";
-                preloadLink.as = "image";
-                document.head.appendChild(preloadLink);
-            }
-            preloadLink.href = nextUrl;
-            const img = new Image();
-            img.onload = () => {
-                if (!cancelled) {
-                    setBgUrl(nextUrl);
-                    setBgReady(true);
-                }
-            };
-            img.onerror = () => {
-                if (!cancelled) {
-                    setBgUrl("");
-                    setBgReady(false);
-                }
-            };
-            img.src = nextUrl;
-        };
-
-        preload();
-        const handleChange = () => preload();
+        syncBackground();
+        const handleChange = () => syncBackground();
         mediaNarrow.addEventListener("change", handleChange);
         mediaPortrait.addEventListener("change", handleChange);
 
         return () => {
-            cancelled = true;
             mediaNarrow.removeEventListener("change", handleChange);
             mediaPortrait.removeEventListener("change", handleChange);
         };
     }, [bgDesktop, bgMobile, hasBgImage]);
+
+    useEffect(() => {
+        if (!bgUrl) return;
+        let preloadLink = document.getElementById("landing-bg-preload");
+        if (!preloadLink) {
+            preloadLink = document.createElement("link");
+            preloadLink.id = "landing-bg-preload";
+            preloadLink.rel = "preload";
+            preloadLink.as = "image";
+            document.head.appendChild(preloadLink);
+        }
+        preloadLink.href = bgUrl;
+    }, [bgUrl]);
 
     const layoutBackground =
         bgType === "gradient"
@@ -242,48 +254,69 @@ export default function Landing() {
             className="landing-layout"
             style={{ "--landing-bg-gradient": layoutBackground }}
         >
+            {showTicker ? (
+                <div className="landing-ticker">
+                    <div className="landing-ticker-track" aria-live="off">
+                        {[...fakeWinners, ...fakeWinners].map((item, index) => (
+                            <span key={`${item}-${index}`} className="landing-ticker-item">
+                                {item}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
             <section
                 className="landing-container"
                 style={{
                     background: bgType === "gradient" ? bgGradient : bgColor,
-                    ...(bgReady && bgUrl ? { backgroundImage: `url('${bgUrl}')` } : {}),
                 }}
             >
-                <div className="landing-title-container">
-                    <motion.h1
-                    className="mt-5"
-                    initial= {{ opacity: 0 }}
-                    animate={{ opacity: 1 , scale: [1, 1.2, 1] }}
-                    transition={{ duration: 1 }}
-                    style={{ color: colorTitulo }}
-                    >{titleText}</motion.h1>
-                    <motion.span className="landing-bono"
-                    animate={{ opacity: 1, scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }}
-                    transition={{ duration: 1, repeat: 10, repeatDelay: 1 }}
-                    style={{ color: colorBono }}
-                    > {bonusText} </motion.span>
-                    <h2 className="font-bold" style={{ color: colorSubtitulo }}>{renderSubtitle()}</h2>
-                </div>
-                <NuevoLead
-                    landingToken={token}
-                    bonusText={bonusText}
-                    whatsappNumber={whatsappNumber}
-                    buttonText={buttonText}
-                    infoText={infoText}
-                    whatsappTemplate={whatsappTemplate}
-                    infoColor={colorInfo}
-                />
-                {landing?.mostrar_disclaimer !== false ? (
-                    <motion.div
-                        className="flex justify-center w-full lg:w-2/3"
-                        initial={{ y: 50, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{ duration: 0.8, delay: 0.5 }}
-                    >
-                        <DisclaimerLanding />
-                    </motion.div>
+                {bgReady && bgUrl ? (
+                    <img
+                        className="landing-bg-image"
+                        src={bgUrl}
+                        alt=""
+                        fetchPriority="high"
+                        loading="eager"
+                        decoding="async"
+                    />
                 ) : null}
+                <div className="landing-content">
+                    <div className="landing-title-container">
+                        <h1
+                        className="mt-2 mb-4 text-center font-bold landing-fade-in"
+                        style={{ color: colorTitulo }}
+                        >{titleText}</h1>
+                        <div className="landing-bono-pulse">
+                            <span className="landing-bono"
+                            style={{ color: colorBono }}
+                            > {bonusText} </span>
+                        </div>
+                        <h2 className="font-bold" style={{ color: colorSubtitulo }}>{renderSubtitle()}</h2>
+                    </div>
+                    <Suspense fallback={<div className="landing-form-fallback" />}>
+                        <NuevoLead
+                            landingToken={token}
+                            bonusText={bonusText}
+                            whatsappNumber={whatsappNumber}
+                            buttonText={buttonText}
+                            infoText={infoText}
+                            whatsappTemplate={whatsappTemplate}
+                            infoColor={colorInfo}
+                        />
+                    </Suspense>
+                    {landing?.mostrar_disclaimer !== false ? (
+                        <div className="flex justify-center w-full lg:w-2/3 mt-8 lg:mt-10 landing-fade-in">
+                            <Suspense fallback={null}>
+                                <DisclaimerLanding />
+                            </Suspense>
+                        </div>
+                    ) : null}
+                </div>
             </section>
+                <div className="w-full py-1 flex justify-center">
+                    <span className="text-sm" style={{ color: colorInfo }}>{landing?.footer_text || "\u00A9 2026 ControlAR. Todos los derechos reservados."}</span>
+                </div>
         </div>
     );
 }

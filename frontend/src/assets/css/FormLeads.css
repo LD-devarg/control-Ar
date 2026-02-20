@@ -46,3 +46,36 @@
     align-items: center;
     justify-content: center;
 }
+
+.landing-submit-wrap {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: landingSubmitIn 0.45s ease-out forwards;
+}
+
+.landing-submit-wrap.is-active {
+    animation: landingSubmitIn 0.45s ease-out forwards, landingSubmitPulse 1.6s ease-in-out 0.6s infinite;
+}
+
+@keyframes landingSubmitIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes landingSubmitPulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
+    }
+    100% {
+        transform: scale(1);
+    }
+}

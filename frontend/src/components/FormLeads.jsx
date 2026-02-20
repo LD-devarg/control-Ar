@@ -3,7 +3,6 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import "../assets/css/FormLeads.css";
-import { motion } from "motion/react";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
@@ -254,8 +253,8 @@ export default function NuevoLead({
     };
 
     return (
-        <div className="flex flex-col items-center rounded-2xl shadow-xl bg-black/50 w-8/10 lg:w-3/10 h-5/10 pt-2 m-4">
-            <h3 className='text-white text-xl lg:text-2xl mb-2'>Contactanos</h3>
+        <div className="flex flex-col items-center rounded-xl shadow-xl bg-black/70 w-8/10 lg:w-3/10 h-6/10 lg:h-7/10 p-2 m-4">
+            <h3 className='text-white text-xl lg:text-2xl my-1'>Contactanos</h3>
             <Stack spacing={0.5} direction="column" className="form-leads-stack">
                 <TextField
                 className='textfield'
@@ -270,9 +269,9 @@ export default function NuevoLead({
                 sx={{
                     "& .MuiOutlinedInput-root": {
                         marginBottom: "10px",
-                    borderRadius: "50px",
-                    backgroundColor: "rgba(217, 221, 88, 0.12)",
-                    "& fieldset": { borderColor: "rgba(251, 255, 20, 0.8)" },
+                    borderRadius: "20px",
+                    backgroundColor: "rgba(49, 36, 146, 0.12)",
+                    "& fieldset": { borderColor: "rgba(224, 20, 255, 0.84)" },
                     "&:hover fieldset": { borderColor: "#fff" },
                     "&.Mui-focused fieldset": { borderColor: "#fff" },
                     },
@@ -292,10 +291,9 @@ export default function NuevoLead({
                     sx={{
                         "& .MuiOutlinedInput-root": {
                         marginBottom: "0",
-                            borderRadius: "50px",
-                            backgroundColor: "rgba(217, 221, 88, 0.12)",
-                            "& fieldset": { borderColor: "rgba(251, 255, 20, 0.8)",
-                             },
+                            borderRadius: "20px",
+                            backgroundColor: "rgba(49, 36, 146, 0.12)",
+                            "& fieldset": { borderColor: "rgba(224, 20, 255, 0.84)" },
                         "&:hover fieldset": { borderColor: "#fff" },
                         "&.Mui-focused fieldset": { borderColor: "#fff" },
                         },
@@ -306,21 +304,16 @@ export default function NuevoLead({
                     />
             </Stack>
             {error ? <span className='text-red-400 text-xs mt-2'>{error}</span> : null}
-            <motion.div
-                className=""
-                animate={{ 
-                    scale: [1.2, 1.7, 1.2], }}
-                transition={{ duration: 1, repeat: Infinity, repeatDelay: 1 }}
-                >
+            <div className={`landing-submit-wrap ${canSubmit ? "is-active" : ""}`}>
                 <Button variant="contained" startIcon={<WhatsAppIcon />}
                 onClick={handleWhatsappClick}
                 disabled={isPreview || !canSubmit}
                 sx={{
                     backgroundColor: "transparent",
-                    marginTop: "30px",
+                    marginTop: "10px",
                     color: "#ffffff",
                     border: "none",
-                    borderRadius: "50px",
+                    borderRadius: "20px",
                     padding: "10px 20px",
                     fontWeight: "bold",
                     fontSize: "1.2rem",
@@ -338,7 +331,7 @@ export default function NuevoLead({
                 >
                     {finalButtonText}
                 </Button>
-            </motion.div>
-            <span className='font-bold text-md mt-10' style={{ color: infoColor || "#ffffff" }}>{finalInfoText}</span>
+            </div>
+            <span className='font-bold text-md mt-4 lg:mt-5' style={{ color: infoColor || "#ffffff" }}>{finalInfoText}</span>
         </div>);
 }

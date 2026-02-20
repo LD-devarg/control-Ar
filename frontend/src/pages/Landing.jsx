@@ -88,6 +88,7 @@ export default function Landing() {
             mounted = false;
         };
     }, [token]);
+    const hasLandingData = Boolean(landing);
 
     useEffect(() => {
         const pixelId = landing?.pixel_id;
@@ -168,12 +169,12 @@ export default function Landing() {
         };
     }, [token]);
 
-    const titleText = landing?.titulo || "BONO DE BIENVENIDA";
-    const bonusText = landing?.bono || "🎁 100% 🎁";
-    const subtitleText = landing?.subtitulo || "REGISTRATE AHORA Y DUPLICAMOS TU PRIMER DEPÓSITO";
-    const buttonText = landing?.texto_boton || "JUGÁ AHORA";
-    const infoText = landing?.texto_info || "🤳Atención personalizada las 24hs.";
-    const whatsappTemplate = landing?.texto_whatsapp || "";
+    const titleText = hasLandingData ? (landing?.titulo || "BONO DE BIENVENIDA") : "";
+    const bonusText = hasLandingData ? (landing?.bono || "🎁 100% 🎁") : "";
+    const subtitleText = hasLandingData ? (landing?.subtitulo || "REGISTRATE AHORA Y DUPLICAMOS TU PRIMER DEPÓSITO") : "";
+    const buttonText = hasLandingData ? (landing?.texto_boton || "JUGÁ AHORA") : "";
+    const infoText = hasLandingData ? (landing?.texto_info || "🤳Atención personalizada las 24hs.") : "";
+    const whatsappTemplate = hasLandingData ? (landing?.texto_whatsapp || "") : "";
     const bgDesktop = landing?.background_horizontal || null;
     const bgMobile = landing?.background_vertical || null;
     const bgType = landing?.bg_type || "gradient";
@@ -185,7 +186,7 @@ export default function Landing() {
     const colorKeyword = landing?.color_keyword || "#ffe600";
     const colorBono = landing?.color_bono || "#ffe600";
     const colorInfo = landing?.color_info || "#ffffff";
-    const showTicker = landing?.mostrar_ticker !== false;
+    const showTicker = hasLandingData && landing?.mostrar_ticker !== false;
     const keyword = "DUPLICAMOS";
     const renderSubtitle = () => {
         if (!subtitleText) return null;
@@ -282,30 +283,42 @@ export default function Landing() {
                     />
                 ) : null}
                 <div className="landing-content">
-                    <div className="landing-title-container">
-                        <h1
-                        className="mt-2 mb-4 text-center font-bold landing-fade-in"
-                        style={{ color: colorTitulo }}
-                        >{titleText}</h1>
-                        <div className="landing-bono-pulse">
-                            <span className="landing-bono"
-                            style={{ color: colorBono }}
-                            > {bonusText} </span>
+                    {hasLandingData ? (
+                        <div className="landing-title-container">
+                            <h1
+                            className="mt-2 mb-4 text-center font-bold landing-fade-in"
+                            style={{ color: colorTitulo }}
+                            >{titleText}</h1>
+                            <div className="landing-bono-pulse">
+                                <span className="landing-bono"
+                                style={{ color: colorBono }}
+                                > {bonusText} </span>
+                            </div>
+                            <h2 className="font-bold" style={{ color: colorSubtitulo }}>{renderSubtitle()}</h2>
                         </div>
-                        <h2 className="font-bold" style={{ color: colorSubtitulo }}>{renderSubtitle()}</h2>
-                    </div>
-                    <Suspense fallback={<div className="landing-form-fallback" />}>
-                        <NuevoLead
-                            landingToken={token}
-                            bonusText={bonusText}
-                            whatsappNumber={whatsappNumber}
-                            buttonText={buttonText}
-                            infoText={infoText}
-                            whatsappTemplate={whatsappTemplate}
-                            infoColor={colorInfo}
-                        />
-                    </Suspense>
-                    {landing?.mostrar_disclaimer !== false ? (
+                    ) : (
+                        <div className="landing-title-skeleton" aria-hidden="true">
+                            <div className="landing-skeleton-line landing-skeleton-title" />
+                            <div className="landing-skeleton-line landing-skeleton-bono" />
+                            <div className="landing-skeleton-line landing-skeleton-subtitle" />
+                        </div>
+                    )}
+                    {hasLandingData ? (
+                        <Suspense fallback={<div className="landing-form-fallback" />}>
+                            <NuevoLead
+                                landingToken={token}
+                                bonusText={bonusText}
+                                whatsappNumber={whatsappNumber}
+                                buttonText={buttonText}
+                                infoText={infoText}
+                                whatsappTemplate={whatsappTemplate}
+                                infoColor={colorInfo}
+                            />
+                        </Suspense>
+                    ) : (
+                        <div className="landing-form-fallback" />
+                    )}
+                    {hasLandingData && landing?.mostrar_disclaimer !== false ? (
                         <div className="flex justify-center w-full lg:w-2/3 mt-8 lg:mt-10 landing-fade-in">
                             <Suspense fallback={null}>
                                 <DisclaimerLanding />
@@ -315,7 +328,7 @@ export default function Landing() {
                 </div>
             </section>
                 <div className="w-full py-1 flex justify-center">
-                    <span className="text-sm" style={{ color: colorInfo }}>{landing?.footer_text || "\u00A9 2026 ControlAR. Todos los derechos reservados."}</span>
+                    <span className="text-sm" style={{ color: colorInfo }}>{hasLandingData ? (landing?.footer_text || "\u00A9 2026 ControlAR. Todos los derechos reservados.") : ""}</span>
                 </div>
         </div>
     );

@@ -48,7 +48,7 @@ function safeNumber(value) {
 }
 
 function Stats() {
-  const { tenantId } = useTenant();
+  const { tenantId, features: tenantFeatures } = useTenant();
   const [period, setPeriod] = useState("week");
   const [desde, setDesde] = useState(dayjs());
   const [hasta, setHasta] = useState(dayjs());
@@ -117,8 +117,6 @@ function Stats() {
             abortTimerRef.current = null;
           }
           activeRequestRef.current = null;
-        }
-        if (!signal.aborted) {
           setLoading(false);
         }
       }
@@ -164,6 +162,11 @@ function Stats() {
       }
     };
   }, [triggerRefresh]);
+
+  useEffect(() => {
+    if (!tenantId) return;
+    triggerRefresh();
+  }, [tenantId, triggerRefresh]);
 
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((message) => {
@@ -263,10 +266,18 @@ function Stats() {
     ltv30_usd: ltv30Usd = 0,
     ltv60_usd: ltv60Usd = 0,
     gasto_usd: gastoUsd = 0,
+    features: statsFeatures = null,
     ftd = {},
     compras = {},
     retiros = {},
   } = data ?? {};
+
+  const effectiveFeatures = statsFeatures && typeof statsFeatures === "object"
+    ? statsFeatures
+    : (tenantFeatures || {});
+  const showNetMetrics = Boolean(effectiveFeatures?.net_metrics);
+  const showBonos = Boolean(effectiveFeatures?.bonos);
+  const showRetiros = Boolean(effectiveFeatures?.retiros);
 
   const roasFtd = roasFtdRaw ?? roasLegacy;
   const ftdCount = ftd?.count ?? 0;
@@ -277,48 +288,82 @@ function Stats() {
   const retirosCount = retiros?.count ?? 0;
   const retirosMontoUsd = retiros?.monto_total_usd ?? 0;
 
-  const negocioCards = [
-    {
-      title: "Compras",
-      subtitle: loading ? "..." : formatNumber(comprasCount),
-      value: loading ? "..." : formatCurrency(comprasMonto),
-      ...CARD_SIZE_PRESETS.medium,
-      icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "Ganancia Neta",
-      ...CARD_SIZE_PRESETS.medium,
-      value: loading ? "..." : formatUsd(gananciaNetaUsd),
-      icon: <TrendingUpOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "ROAS Neto",
-      ...CARD_SIZE_PRESETS.medium,
-      value: loading ? "..." : safeNumber(roasNeto).toFixed(2),
-      icon: <PercentOutlinedIcon fontSize="extra-small" />,
-    },
-  ];
+  const negocioCards = showNetMetrics
+    ? [
+        {
+          title: "Compras",
+          subtitle: loading ? "..." : formatNumber(comprasCount),
+          value: loading ? "..." : formatCurrency(comprasMonto),
+          ...CARD_SIZE_PRESETS.medium,
+          icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
+        },
+        {
+          title: "Ganancia Neta",
+          ...CARD_SIZE_PRESETS.medium,
+          value: loading ? "..." : formatUsd(gananciaNetaUsd),
+          icon: <TrendingUpOutlinedIcon fontSize="extra-small" />,
+        },
+        {
+          title: "ROAS Neto",
+          ...CARD_SIZE_PRESETS.medium,
+          value: loading ? "..." : safeNumber(roasNeto).toFixed(2),
+          icon: <PercentOutlinedIcon fontSize="extra-small" />,
+        },
+      ]
+    : [
+        {
+          title: "FTD",
+          subtitle: loading ? "..." : formatNumber(ftdCount),
+          value: loading ? "..." : formatCurrency(ftdMonto),
+          ...CARD_SIZE_PRESETS.medium,
+          icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
+        },
+        {
+          title: "Gasto Publicitario",
+          ...CARD_SIZE_PRESETS.medium,
+          value: loading ? "..." : formatUsd(gastoUsd),
+          icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+        },
+        {
+          title: "ROAS FTD",
+          ...CARD_SIZE_PRESETS.medium,
+          value: loading ? "..." : safeNumber(roasFtd).toFixed(2),
+          icon: <PercentOutlinedIcon fontSize="extra-small" />,
+        },
+      ];
 
   const gastosCards = [
-    {
-      title: "Bonos",
-      ...CARD_SIZE_PRESETS.medium,
-      value: loading ? "..." : formatUsd(bonosMontoUsd),
-      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "Retiros",
-      subtitle: loading ? "..." : formatNumber(retirosCount),
-      ...CARD_SIZE_PRESETS.medium,
-      value: loading ? "..." : formatUsd(retirosMontoUsd),
-      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "Gasto Publicitario",
-      ...CARD_SIZE_PRESETS.medium,
-      value: loading ? "..." : formatUsd(gastoUsd),
-      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-    },
+    ...(showBonos
+      ? [
+          {
+            title: "Bonos",
+            ...CARD_SIZE_PRESETS.medium,
+            value: loading ? "..." : formatUsd(bonosMontoUsd),
+            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+          },
+        ]
+      : []),
+    ...(showRetiros
+      ? [
+          {
+            title: "Retiros",
+            subtitle: loading ? "..." : formatNumber(retirosCount),
+            ...CARD_SIZE_PRESETS.medium,
+            value: loading ? "..." : formatUsd(retirosMontoUsd),
+            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+          },
+        ]
+      : []),
+    ...(showNetMetrics
+      ? [
+          {
+            title: "Gasto Publicitario",
+            ...CARD_SIZE_PRESETS.medium,
+            value: loading ? "..." : formatUsd(gastoUsd),
+            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+          },
+        ]
+      : []),
   ];
 
   const pautaCards = [
@@ -340,19 +385,23 @@ function Stats() {
       ...CARD_SIZE_PRESETS.small,
       icon: <ChatBubbleOutlineOutlinedIcon fontSize="extra-small" />,
     },
-    {
-      title: "FTD",
-      subtitle: loading ? "..." : formatNumber(ftdCount),
-      value: loading ? "..." : formatCurrency(ftdMonto),
-      ...CARD_SIZE_PRESETS.small,
-      icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "ROAS FTD",
-      ...CARD_SIZE_PRESETS.small,
-      value: loading ? "..." : safeNumber(roasFtd).toFixed(2),
-      icon: <PercentOutlinedIcon fontSize="extra-small" />,
-    },
+    ...(showNetMetrics
+      ? [
+          {
+            title: "FTD",
+            subtitle: loading ? "..." : formatNumber(ftdCount),
+            value: loading ? "..." : formatCurrency(ftdMonto),
+            ...CARD_SIZE_PRESETS.small,
+            icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
+          },
+          {
+            title: "ROAS FTD",
+            ...CARD_SIZE_PRESETS.small,
+            value: loading ? "..." : safeNumber(roasFtd).toFixed(2),
+            icon: <PercentOutlinedIcon fontSize="extra-small" />,
+          },
+        ]
+      : []),
   ];
 
   const porcentajesCards = [
@@ -374,24 +423,28 @@ function Stats() {
       value: loading ? "..." : formatPct(retencionPct),
       icon: <PercentOutlinedIcon fontSize="extra-small" />,
     },
-    {
-      title: "LTV 7",
-      ...CARD_SIZE_PRESETS.small,
-      value: loading ? "..." : formatUsd(ltv7Usd),
-      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "LTV 30",
-      ...CARD_SIZE_PRESETS.small,
-      value: loading ? "..." : formatUsd(ltv30Usd),
-      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "LTV 60",
-      ...CARD_SIZE_PRESETS.small,
-      value: loading ? "..." : formatUsd(ltv60Usd),
-      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-    },
+    ...(showNetMetrics
+      ? [
+          {
+            title: "LTV 7",
+            ...CARD_SIZE_PRESETS.small,
+            value: loading ? "..." : formatUsd(ltv7Usd),
+            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+          },
+          {
+            title: "LTV 30",
+            ...CARD_SIZE_PRESETS.small,
+            value: loading ? "..." : formatUsd(ltv30Usd),
+            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+          },
+          {
+            title: "LTV 60",
+            ...CARD_SIZE_PRESETS.small,
+            value: loading ? "..." : formatUsd(ltv60Usd),
+            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -455,12 +508,18 @@ function Stats() {
               <Card key={card.title} {...card} variant="kpi" />
             ))}
           </div>
-          <div className="grid w-full grid-cols-2 gap-3 pb-4 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
-            {gastosCards.map((card) => (
-              <Card key={card.title} {...card} variant="kpi" />
-            ))}
-          </div>
-          <div className="grid w-full grid-cols-2 gap-3 pt-4 sm:grid-cols-2 md:grid-cols-5 xl:grid-cols-5 md:gap-5">
+          {gastosCards.length > 0 ? (
+            <div className="grid w-full grid-cols-2 gap-3 pb-4 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
+              {gastosCards.map((card) => (
+                <Card key={card.title} {...card} variant="kpi" />
+              ))}
+            </div>
+          ) : null}
+          <div
+            className={`grid w-full grid-cols-2 gap-3 pt-4 sm:grid-cols-2 md:gap-5 ${
+              showNetMetrics ? "md:grid-cols-5 xl:grid-cols-5" : "md:grid-cols-3 xl:grid-cols-3"
+            }`}
+          >
             {pautaCards.map((card) => (
               <Card key={card.title} {...card} variant="kpi" />
             ))}

@@ -13,11 +13,29 @@ import { getCurrentUser } from "../services/auth";
 
 const TenantContext = createContext(null);
 
+function resolveUserFeatures(user) {
+  const mode = user?.operating_mode || "full";
+  const defaultFeatures = {
+    bonos: mode === "full",
+    retiros: mode === "full",
+    net_metrics: mode === "full",
+    ftd_only: mode === "ftd_only",
+  };
+  if (!user?.features || typeof user.features !== "object") {
+    return defaultFeatures;
+  }
+  return {
+    ...defaultFeatures,
+    ...user.features,
+  };
+}
+
 function normalizeTenantOptions(items = []) {
   return (items || []).map((item) => ({
     id: Number(item.id),
     nombre: item.nombre || `Empresa #${item.id}`,
     activo: Boolean(item.activo),
+    operating_mode: item.operating_mode || "full",
   }));
 }
 
@@ -37,6 +55,12 @@ export function TenantProvider({ children }) {
   const isUserSuperuser = Boolean(isSuperuser(user));
   const isUserPauta = Boolean(isPauta(user));
   const isUserAdminOrganizacional = Boolean(isAdminOrganizacional(user));
+  const selectedTenant = useMemo(
+    () => tenantOptions.find((item) => Number(item.id) === Number(tenantId)) || null,
+    [tenantOptions, tenantId]
+  );
+  const operatingMode = selectedTenant?.operating_mode || "full";
+  const features = useMemo(() => resolveUserFeatures({ operating_mode: operatingMode }), [operatingMode]);
   const canSelectTenant = isUserSuperuser || isUserPauta || isUserAdminOrganizacional;
 
   const setTenantId = useCallback(
@@ -135,7 +159,12 @@ export function TenantProvider({ children }) {
       const fixedEmpresa = getUserEmpresa(user);
       setTenantOptions(
         fixedEmpresa
-          ? [{ id: fixedEmpresa, nombre: `Empresa #${fixedEmpresa}`, activo: true }]
+          ? [{
+              id: fixedEmpresa,
+              nombre: `Empresa #${fixedEmpresa}`,
+              activo: true,
+              operating_mode: user?.empresa_operating_mode || "full",
+            }]
           : []
       );
       setTenantIdState(fixedEmpresa);
@@ -193,9 +222,20 @@ export function TenantProvider({ children }) {
       loading,
       isSuperuser: isUserSuperuser,
       canSelectTenant,
+      operatingMode,
+      features,
       setTenantId,
     }),
-    [tenantId, tenantOptions, loading, isUserSuperuser, canSelectTenant, setTenantId]
+    [
+      tenantId,
+      tenantOptions,
+      loading,
+      isUserSuperuser,
+      canSelectTenant,
+      operatingMode,
+      features,
+      setTenantId,
+    ]
   );
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;

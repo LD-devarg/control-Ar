@@ -6,8 +6,8 @@ from .models import Empresa, Organizacion, Usuario
 
 @admin.register(Empresa)
 class EmpresaAdmin(admin.ModelAdmin):
-    list_display = ("id", "nombre", "activo", "creado_en")
-    list_filter = ("activo",)
+    list_display = ("id", "nombre", "operating_mode", "activo", "creado_en")
+    list_filter = ("operating_mode", "activo")
     search_fields = ("nombre",)
     ordering = ("-creado_en",)
 

@@ -32,11 +32,13 @@ export default function EmpresaForm({
     organizaciones = [],
     showOrganizacionField = false,
     activo,
+    operatingMode = "full",
     error,
     saving,
     onNombreChange,
     onOrganizacionIdChange,
     onActivoChange,
+    onOperatingModeChange,
     onSave,
     onClear,
 }) {
@@ -70,6 +72,18 @@ export default function EmpresaForm({
                     ))}
                 </TextField>
             ) : null}
+            <TextField
+                select
+                label="Modo operativo"
+                value={operatingMode}
+                onChange={(e) => onOperatingModeChange?.(e.target.value)}
+                fullWidth
+                size="small"
+                sx={{ ...textFieldSx, mt: 2 }}
+            >
+                <MenuItem value="full">Full (compras + bonos + retiros)</MenuItem>
+                <MenuItem value="ftd_only">Solo FTD</MenuItem>
+            </TextField>
             <div className="flex items-center gap-2 mt-3">
                 <Checkbox
                     checked={activo}

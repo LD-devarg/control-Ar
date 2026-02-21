@@ -21,6 +21,7 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "id",
             "organizacion",
             "nombre",
+            "operating_mode",
             "activo",
             "workers_activos",
             "beat_activo",
@@ -66,6 +67,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
     groups = serializers.PrimaryKeyRelatedField(many=True, queryset=Group.objects.all(), required=False)
     group_names = serializers.SerializerMethodField()
     empresas_permitidas = serializers.SerializerMethodField(read_only=True)
+    empresa_operating_mode = serializers.SerializerMethodField(read_only=True)
     empresas_permitidas_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
         write_only=True,
@@ -91,6 +93,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
             "activo",
             "organizacion",
             "empresa",
+            "empresa_operating_mode",
             "empresas_permitidas",
             "empresas_permitidas_ids",
             "date_joined",
@@ -213,6 +216,11 @@ class UsuarioSerializer(serializers.ModelSerializer):
     def get_group_names(self, obj):
         return list(obj.groups.values_list("name", flat=True))
 
+    def get_empresa_operating_mode(self, obj):
+        if obj.empresa_id and obj.empresa:
+            return obj.empresa.operating_mode
+        return Empresa.OPERATING_MODE_FULL
+
     def get_empresas_permitidas(self, obj):
         empresa_ids = set()
         if obj.empresa_id:
@@ -230,6 +238,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
                     "id": acceso.empresa_id,
                     "nombre": acceso.empresa.nombre,
                     "activo": bool(acceso.empresa.activo),
+                    "operating_mode": acceso.empresa.operating_mode,
                 }
             )
 
@@ -240,6 +249,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
                     "id": obj.empresa_id,
                     "nombre": obj.empresa.nombre if obj.empresa else f"Empresa #{obj.empresa_id}",
                     "activo": bool(getattr(obj.empresa, "activo", True)),
+                    "operating_mode": getattr(obj.empresa, "operating_mode", Empresa.OPERATING_MODE_FULL),
                 },
             )
         return empresas

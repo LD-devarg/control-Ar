@@ -8,6 +8,13 @@ BEAT_TASKS_AVAILABLE = {
 
 
 class Empresa(models.Model):
+    OPERATING_MODE_FULL = "full"
+    OPERATING_MODE_FTD_ONLY = "ftd_only"
+    OPERATING_MODE_CHOICES = [
+        (OPERATING_MODE_FULL, "Completo"),
+        (OPERATING_MODE_FTD_ONLY, "Solo FTD"),
+    ]
+
     organizacion = models.ForeignKey(
         "empresas.Organizacion",
         on_delete=models.CASCADE,
@@ -16,6 +23,11 @@ class Empresa(models.Model):
         blank=True,
     )
     nombre = models.CharField(max_length=255)
+    operating_mode = models.CharField(
+        max_length=20,
+        choices=OPERATING_MODE_CHOICES,
+        default=OPERATING_MODE_FULL,
+    )
     activo = models.BooleanField(default=True)
     workers_activos = models.BooleanField(default=False)
     beat_activo = models.BooleanField(default=True)

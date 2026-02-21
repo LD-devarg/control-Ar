@@ -56,6 +56,7 @@ export default function Tenant() {
     const [nombre, setNombre] = useState("");
     const [organizacionId, setOrganizacionId] = useState("");
     const [activo, setActivo] = useState(true);
+    const [operatingMode, setOperatingMode] = useState("full");
     const [listLoading, setListLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -91,6 +92,7 @@ export default function Tenant() {
         setNombre(empresa?.nombre || "");
         setOrganizacionId(empresa?.organizacion || "");
         setActivo(Boolean(empresa?.activo));
+        setOperatingMode(empresa?.operating_mode || "full");
         setError("");
     };
 
@@ -99,6 +101,7 @@ export default function Tenant() {
         setNombre("");
         setOrganizacionId("");
         setActivo(true);
+        setOperatingMode("full");
         setError("");
     };
 
@@ -118,6 +121,7 @@ export default function Tenant() {
             const payload = {
                 nombre: trimmedNombre,
                 activo,
+                operating_mode: operatingMode || "full",
                 ...(isSuperuser ? { organizacion: Number(organizacionId) } : {}),
             };
             if (selected) {
@@ -288,6 +292,9 @@ export default function Tenant() {
                                         <div className="text-xs text-white/70">
                                             {empresa.activo ? "Activo" : "Inactivo"} - {empresa.workers_activos ? "Workers ON" : "Workers OFF"} - {empresa.beat_activo ? "Beat ON" : "Beat OFF"} - #{empresa.id}
                                         </div>
+                                        <div className="text-[11px] text-white/50">
+                                            Modo: {empresa.operating_mode === "ftd_only" ? "Solo FTD" : "Full"}
+                                        </div>
                                         <div className="mt-1 text-[11px] text-white/50">
                                             KPI sync: {empresa.kpi_sync_last_run_at ? new Date(empresa.kpi_sync_last_run_at).toLocaleString("es-AR") : "-"} ({empresa.kpi_sync_last_status || "n/a"})
                                         </div>
@@ -331,11 +338,13 @@ export default function Tenant() {
                         organizaciones={organizaciones}
                         showOrganizacionField={isSuperuser}
                         activo={activo}
+                        operatingMode={operatingMode}
                         error={error}
                         saving={saving}
                         onNombreChange={setNombre}
                         onOrganizacionIdChange={setOrganizacionId}
                         onActivoChange={setActivo}
+                        onOperatingModeChange={setOperatingMode}
                         onSave={handleSave}
                         onClear={handleClear}
                     />

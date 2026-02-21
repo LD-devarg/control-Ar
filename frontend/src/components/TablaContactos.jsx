@@ -11,8 +11,9 @@ import '../assets/css/TablaContactos.css';
 import { clearClientesCache, fetchClientes } from '../services/operativo/clientes';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import Pagination from '@mui/material/Pagination';
+import { useTenant } from '../context/TenantContext';
 
-const columns = [
+const baseColumns = [
   {
     width: 180,
     label: 'Nombre',
@@ -85,25 +86,9 @@ const VirtuosoTableComponents = {
   TableBody: React.forwardRef((props, ref) => <TableBody {...props} ref={ref} />),
 };
 
-function fixedHeaderContent() {
-  return (
-    <TableRow>
-      {columns.map((column) => (
-        <TableCell
-          key={column.dataKey}
-          variant="head"
-          align={column.numeric || false ? 'right' : 'left'}
-          style={{ width: column.width }}
-          sx={{ backgroundColor: '#111217', color: '#d6d8e0', borderBottom: '1px solid #2f313a' }}
-        >
-          {column.label}
-        </TableCell>
-      ))}
-    </TableRow>
-  );
-}
-
 export default function TablaContactos() {
+  const { features } = useTenant();
+  const showWalletColumns = Boolean(features?.net_metrics);
   const [search, setSearch] = React.useState('');
   const [rows, setRows] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -111,6 +96,14 @@ export default function TablaContactos() {
   const pageSize = 20;
   const [sortKey, setSortKey] = React.useState('');
   const [sortDir, setSortDir] = React.useState('desc');
+
+  const columns = React.useMemo(() => {
+    if (showWalletColumns) return baseColumns;
+    return baseColumns.filter(
+      (column) =>
+        !["cant_compras", "total_bonos_usd", "cant_retiros", "total_retiros_usd"].includes(column.dataKey)
+    );
+  }, [showWalletColumns]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -163,7 +156,15 @@ export default function TablaContactos() {
       return aStr < bStr ? 1 : -1;
     });
     return sorted;
-  }, [filteredRows, sortKey, sortDir]);
+  }, [filteredRows, sortKey, sortDir, columns]);
+
+  React.useEffect(() => {
+    if (!sortKey) return;
+    const exists = columns.some((column) => column.dataKey === sortKey);
+    if (!exists) {
+      setSortKey('');
+    }
+  }, [columns, sortKey]);
 
   const pageCount = Math.max(1, Math.ceil(sortedRows.length / pageSize));
   const pageSafe = Math.min(page, pageCount);

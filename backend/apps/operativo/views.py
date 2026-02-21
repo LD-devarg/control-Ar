@@ -165,6 +165,22 @@ def _resolve_target_empresa_for_write(request, *, cliente_empresa_id=None, empre
     return int(target)
 
 
+def _get_empresa_operating_mode(empresa_id: int) -> str:
+    empresa = (
+        Empresa.objects
+        .filter(id=empresa_id)
+        .only("id", "operating_mode")
+        .first()
+    )
+    if not empresa:
+        return Empresa.OPERATING_MODE_FULL
+    return empresa.operating_mode or Empresa.OPERATING_MODE_FULL
+
+
+def _is_wallet_enabled_for_empresa(empresa_id: int) -> bool:
+    return _get_empresa_operating_mode(empresa_id) == Empresa.OPERATING_MODE_FULL
+
+
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     filterset_fields = ["empresa__id"]
@@ -459,27 +475,92 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
     def test_event(self, request):
         if not (request.user.is_superuser or is_admin(request.user) or is_pauta(request.user)):
             raise ValidationError("Solo admin o pauta puede probar eventos.")
-        cliente_id = request.data.get("cliente_id")
-        if not cliente_id:
-            raise ValidationError("cliente_id requerido")
-        cliente = get_object_or_404(Cliente, id=cliente_id)
+        tipo = request.data.get("tipo", "lead")
         test_event_code = request.data.get("test_event_code")
-        payload = {
-            "email": request.data.get("email"),
-            "phone": request.data.get("phone"),
-            "value": request.data.get("value"),
-            "currency": request.data.get("currency"),
-            "fbp": request.data.get("fbp"),
-            "fbc": request.data.get("fbc"),
-        }
-        evento = EventosMeta.objects.create(
-            tipo=request.data.get("tipo", "lead"),
-            data=payload,
-            cliente=cliente,
-            empresa=cliente.empresa,
-            operador=request.user,
-            landing=None,
-        )
+        landing = None
+
+        if tipo == "lead":
+            landing_token = request.data.get("landing_token")
+            if not landing_token:
+                raise ValidationError("landing_token requerido para test de lead.")
+            landing = get_object_or_404(Landing, token=landing_token, activo=True)
+
+            _resolve_target_empresa_for_write(
+                request,
+                empresa_input=landing.empresa_id,
+            )
+
+            raw_phone = str(request.data.get("phone") or "")
+            digits_phone = "".join(ch for ch in raw_phone if ch.isdigit())[:15]
+            phone_value = digits_phone or "0000000000"
+
+            base_username = f"meta_test_e{landing.empresa_id}"
+            cliente = Cliente.objects.filter(username=base_username, empresa_id=landing.empresa_id).first()
+            if not cliente:
+                username_candidate = base_username
+                suffix = 1
+                while Cliente.objects.filter(username=username_candidate).exists():
+                    username_candidate = f"{base_username}_{suffix}"
+                    suffix += 1
+                cliente = Cliente.objects.create(
+                    empresa=landing.empresa,
+                    nombre="Meta Test Lead",
+                    contacto=phone_value,
+                    username=username_candidate,
+                    fbp=request.data.get("fbp"),
+                    fbc=request.data.get("fbc"),
+                )
+
+            payload = {
+                "email": request.data.get("email"),
+                "phone": request.data.get("phone") or phone_value,
+                "value": None,
+                "currency": None,
+                "fbp": request.data.get("fbp"),
+                "fbc": request.data.get("fbc"),
+                "external_id": str(cliente.uuid),
+                "event_source_url": request.data.get("event_source_url") or landing.url,
+            }
+            evento = EventosMeta.objects.create(
+                tipo="lead",
+                data=payload,
+                cliente=cliente,
+                empresa=landing.empresa,
+                operador=request.user,
+                landing=landing,
+                fbp=request.data.get("fbp"),
+                fbc=request.data.get("fbc"),
+            )
+        else:
+            cliente_id = request.data.get("cliente_id")
+            if not cliente_id:
+                raise ValidationError("cliente_id requerido para contact/purchase.")
+            cliente = get_object_or_404(Cliente, id=cliente_id)
+
+            _resolve_target_empresa_for_write(
+                request,
+                cliente_empresa_id=cliente.empresa_id,
+                empresa_input=request.data.get("empresa") or request.data.get("empresa_id"),
+            )
+
+            payload = {
+                "email": request.data.get("email"),
+                "phone": request.data.get("phone"),
+                "value": request.data.get("value"),
+                "currency": request.data.get("currency"),
+                "fbp": request.data.get("fbp"),
+                "fbc": request.data.get("fbc"),
+            }
+            evento = EventosMeta.objects.create(
+                tipo=tipo,
+                data=payload,
+                cliente=cliente,
+                empresa=cliente.empresa,
+                operador=request.user,
+                landing=None,
+                fbp=request.data.get("fbp"),
+                fbc=request.data.get("fbc"),
+            )
         try:
             respuesta = enviar_evento_meta(evento, request=request, test_event_code=test_event_code)
         except Exception as exc:
@@ -520,13 +601,14 @@ class CompraViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         cliente = serializer.validated_data["cliente"]
-        _resolve_target_empresa_for_write(
+        target_empresa_id = _resolve_target_empresa_for_write(
             request,
             cliente_empresa_id=cliente.empresa_id,
             empresa_input=request.data.get("empresa") or request.data.get("empresa_id"),
         )
+        wallet_enabled = _is_wallet_enabled_for_empresa(target_empresa_id)
         monto_ars = serializer.validated_data["monto_ars"]
-        bono_ars = serializer.validated_data.get("bono_ars") or 0
+        bono_ars = (serializer.validated_data.get("bono_ars") or 0) if wallet_enabled else 0
         comprobante = serializer.validated_data.get("comprobante")
         comprobante_archivo = serializer.validated_data.get("comprobante_archivo")
         was_first_purchase = False
@@ -626,11 +708,13 @@ class RetiroViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         cliente = serializer.validated_data["cliente"]
-        _resolve_target_empresa_for_write(
+        target_empresa_id = _resolve_target_empresa_for_write(
             request,
             cliente_empresa_id=cliente.empresa_id,
             empresa_input=request.data.get("empresa") or request.data.get("empresa_id"),
         )
+        if not _is_wallet_enabled_for_empresa(target_empresa_id):
+            raise ValidationError("Retiros deshabilitados para esta organizacion (modo solo FTD).")
         monto_ars = serializer.validated_data["monto_ars"]
         comprobante = serializer.validated_data.get("comprobante")
         comprobante_archivo = serializer.validated_data.get("comprobante_archivo")
@@ -675,6 +759,8 @@ class StatsViewSet(viewsets.ViewSet):
 
     def list(self, request):
         empresa_id = _get_empresa_scope_id(request)
+        operating_mode = _get_empresa_operating_mode(empresa_id)
+        wallet_enabled = operating_mode == Empresa.OPERATING_MODE_FULL
 
         visitas_qs = LandingVisit.objects.filter(empresa_id=empresa_id)
         eventos_qs = EventosMeta.objects.filter(empresa_id=empresa_id)
@@ -696,11 +782,11 @@ class StatsViewSet(viewsets.ViewSet):
         compras_count = compras_qs.count()
         compras_total = compras_qs.aggregate(total=Sum("monto_ars"))["total"] or 0
         compras_total_usd = compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
-        bonos_total_ars = compras_qs.aggregate(total=Sum("bono_ars"))["total"] or 0
-        bonos_total_usd = compras_qs.aggregate(total=Sum("bono_usd"))["total"] or 0
-        retiros_count = retiros_qs.count()
-        retiros_total_ars = retiros_qs.aggregate(total=Sum("monto_ars"))["total"] or 0
-        retiros_total_usd = retiros_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
+        bonos_total_ars = (compras_qs.aggregate(total=Sum("bono_ars"))["total"] or 0) if wallet_enabled else 0
+        bonos_total_usd = (compras_qs.aggregate(total=Sum("bono_usd"))["total"] or 0) if wallet_enabled else 0
+        retiros_count = retiros_qs.count() if wallet_enabled else 0
+        retiros_total_ars = (retiros_qs.aggregate(total=Sum("monto_ars"))["total"] or 0) if wallet_enabled else 0
+        retiros_total_usd = (retiros_qs.aggregate(total=Sum("monto_usd"))["total"] or 0) if wallet_enabled else 0
 
         compras_clientes = compras_qs.values("cliente_id").distinct().count()
         conversion_pct = (compras_clientes / contactos * 100) if contactos else 0
@@ -725,8 +811,8 @@ class StatsViewSet(viewsets.ViewSet):
         primeras_compras_usd = primeras_compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
         gasto_usd = gastos_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
         roas_ftd = (primeras_compras_usd / gasto_usd) if gasto_usd else 0
-        ganancia_neta_usd = compras_total_usd - retiros_total_usd - bonos_total_usd
-        roas_neto = (ganancia_neta_usd / gasto_usd) if gasto_usd else 0
+        ganancia_neta_usd = (compras_total_usd - retiros_total_usd - bonos_total_usd) if wallet_enabled else 0
+        roas_neto = ((ganancia_neta_usd / gasto_usd) if gasto_usd else 0) if wallet_enabled else 0
 
         firsts = (
             compras_qs.values("cliente_id")
@@ -785,15 +871,17 @@ class StatsViewSet(viewsets.ViewSet):
                     continue
                 if first_at <= row["creado_en"] <= first_at + timedelta(days=days):
                     net_by_cliente[cliente_id] += float(row.get("monto_usd") or 0)
-                    net_by_cliente[cliente_id] -= float(row.get("bono_usd") or 0)
+                    if wallet_enabled:
+                        net_by_cliente[cliente_id] -= float(row.get("bono_usd") or 0)
 
-            for row in retiros_movs:
-                cliente_id = row["cliente_id"]
-                first_at = first_map_local.get(cliente_id)
-                if not first_at:
-                    continue
-                if first_at <= row["creado_en"] <= first_at + timedelta(days=days):
-                    net_by_cliente[cliente_id] -= float(row.get("monto_usd") or 0)
+            if wallet_enabled:
+                for row in retiros_movs:
+                    cliente_id = row["cliente_id"]
+                    first_at = first_map_local.get(cliente_id)
+                    if not first_at:
+                        continue
+                    if first_at <= row["creado_en"] <= first_at + timedelta(days=days):
+                        net_by_cliente[cliente_id] -= float(row.get("monto_usd") or 0)
 
             cohort_size = len(cohort_ids)
             if cohort_size == 0:
@@ -841,6 +929,13 @@ class StatsViewSet(viewsets.ViewSet):
                 "contactos": contactos,
                 "compras_clientes": compras_clientes,
                 "clientes_primera_compra": len(cohort_rows),
+            },
+            "operating_mode": operating_mode,
+            "features": {
+                "bonos": wallet_enabled,
+                "retiros": wallet_enabled,
+                "net_metrics": wallet_enabled,
+                "ftd_only": not wallet_enabled,
             },
         }
 

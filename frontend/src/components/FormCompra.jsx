@@ -32,7 +32,8 @@ export default function FormCompra() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
-  const { tenantId: empresaId } = useTenant();
+  const { tenantId: empresaId, features } = useTenant();
+  const enableBonos = Boolean(features?.bonos);
   const fieldSx = {
     '& .MuiInputBase-input': { color },
     '& .MuiInputLabel-root': { color },
@@ -65,6 +66,13 @@ export default function FormCompra() {
     };
   }, [empresaId]);
 
+  useEffect(() => {
+    if (!enableBonos) {
+      setHasBono(false);
+      setBono("");
+    }
+  }, [enableBonos]);
+
   const canSubmit = useMemo(() => {
     return Boolean(selectedCliente?.id) && Boolean(monto) && Boolean(empresaId);
   }, [selectedCliente, monto, empresaId]);
@@ -87,7 +95,7 @@ export default function FormCompra() {
       formData.append("empresa", String(empresaId));
       formData.append("cliente", selectedCliente.id);
       formData.append("monto_ars", monto);
-      const bonoArs = hasBono ? Number(bono || 0) : 0;
+      const bonoArs = enableBonos && hasBono ? Number(bono || 0) : 0;
       formData.append("bono_ars", String(bonoArs));
       if (comprobanteFile) {
         formData.append("comprobante_archivo", comprobanteFile);
@@ -151,26 +159,30 @@ export default function FormCompra() {
         onChange={(e) => setMonto(e.target.value)}
         sx={fieldSx}
         />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={hasBono}
-              onChange={(event) => setHasBono(event.target.checked)}
+        {enableBonos ? (
+          <>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={hasBono}
+                  onChange={(event) => setHasBono(event.target.checked)}
+                />
+              }
+              label="Bono"
             />
-          }
-          label="Bono"
-        />
-        {hasBono ? (
-          <TextField
-            id="bono-ars"
-            label="Monto de bono"
-            variant="outlined"
-            fullWidth
-            type='number'
-            value={bono}
-            onChange={(e) => setBono(e.target.value)}
-            sx={fieldSx}
-          />
+            {hasBono ? (
+              <TextField
+                id="bono-ars"
+                label="Monto de bono"
+                variant="outlined"
+                fullWidth
+                type='number'
+                value={bono}
+                onChange={(e) => setBono(e.target.value)}
+                sx={fieldSx}
+              />
+            ) : null}
+          </>
         ) : null}
         <UploadButton label="Subir comprobante" onUpload={setComprobanteFile} />
         <Button variant="outlined" onClick={openConfirm} disabled={!canSubmit || submitting}>
@@ -179,7 +191,9 @@ export default function FormCompra() {
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle>Confirmar compra</DialogTitle>
         <DialogContent>
-          {`¿Deseas guardar la compra para ${selectedCliente?.username || "cliente"} con monto de $${formattedMonto} ARS y bono de $${hasBono ? formattedBono : "0"} ARS?`}
+          {enableBonos
+            ? `¿Deseas guardar la compra para ${selectedCliente?.username || "cliente"} con monto de $${formattedMonto} ARS y bono de $${hasBono ? formattedBono : "0"} ARS?`
+            : `¿Deseas guardar la compra para ${selectedCliente?.username || "cliente"} con monto de $${formattedMonto} ARS?`}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)} variant="outlined">

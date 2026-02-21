@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "@mui/material/styles";
 import Stack from "@mui/material/Stack";
 import Button from "@mui/material/Button";
@@ -9,11 +9,20 @@ import FormCompra from "../components/FormCompra.jsx";
 import FormContacto from "../components/FormContacto.jsx";
 import FormRetiro from "../components/FormRetiro.jsx";
 import Page from "../layouts/Page.jsx";
+import { useTenant } from "../context/TenantContext";
 
 
 function Home() {
   const [activeForm, setActiveForm] = useState("contacto");
   const theme = useTheme();
+  const { features } = useTenant();
+  const showRetiros = Boolean(features?.retiros);
+
+  useEffect(() => {
+    if (!showRetiros && activeForm === "retiro") {
+      setActiveForm("contacto");
+    }
+  }, [showRetiros, activeForm]);
 
   return (
     <Page title="Inicio">
@@ -41,23 +50,25 @@ function Home() {
             >
               Nuevo Contacto
             </Button>
-            <Button
-              variant="outlined"
-              startIcon={<CurrencyExchangeOutlinedIcon />}
-              onClick={() => setActiveForm("retiro")}
-              sx={{
-                color: activeForm === "retiro" ? theme.palette.primary.main : undefined,
-                borderColor: activeForm === "retiro" ? theme.palette.primary.main : undefined,
-              }}
-            >
-              Nuevo Retiro
-            </Button>
+            {showRetiros ? (
+              <Button
+                variant="outlined"
+                startIcon={<CurrencyExchangeOutlinedIcon />}
+                onClick={() => setActiveForm("retiro")}
+                sx={{
+                  color: activeForm === "retiro" ? theme.palette.primary.main : undefined,
+                  borderColor: activeForm === "retiro" ? theme.palette.primary.main : undefined,
+                }}
+              >
+                Nuevo Retiro
+              </Button>
+            ) : null}
           </Stack>
         </div>
         <div className="mt-8 w-full flex justify-center">
           {activeForm === "compra" && <FormCompra />}
           {activeForm === "contacto" && <FormContacto />}
-          {activeForm === "retiro" && <FormRetiro />}
+          {showRetiros && activeForm === "retiro" && <FormRetiro />}
         </div>
       </Page>
   );

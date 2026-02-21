@@ -3,8 +3,9 @@ from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 from django.db import models, transaction
-from django.db.models import Sum, Min
-from django.db.models import Exists, OuterRef, Subquery
+from django.db.models import Sum, Min, Subquery, Count, Value, DecimalField, IntegerField
+from django.db.models import Exists, OuterRef
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -183,7 +184,39 @@ class ClienteViewSet(viewsets.ModelViewSet):
         return False
 
     def get_queryset(self):
-        return filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
+        qs = filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
+
+        compras_base = Compra.objects.filter(cliente_id=OuterRef("pk")).values("cliente_id")
+        retiros_base = Retiro.objects.filter(cliente_id=OuterRef("pk")).values("cliente_id")
+
+        qs = qs.annotate(
+            total_bonos_ars=Coalesce(
+                Subquery(compras_base.annotate(v=Sum("bono_ars")).values("v")[:1]),
+                Value(0),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            ),
+            total_bonos_usd=Coalesce(
+                Subquery(compras_base.annotate(v=Sum("bono_usd")).values("v")[:1]),
+                Value(0),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            ),
+            cant_retiros=Coalesce(
+                Subquery(retiros_base.annotate(v=Count("id")).values("v")[:1]),
+                Value(0),
+                output_field=IntegerField(),
+            ),
+            total_retiros_ars=Coalesce(
+                Subquery(retiros_base.annotate(v=Sum("monto_ars")).values("v")[:1]),
+                Value(0),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            ),
+            total_retiros_usd=Coalesce(
+                Subquery(retiros_base.annotate(v=Sum("monto_usd")).values("v")[:1]),
+                Value(0),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            ),
+        )
+        return qs
 
     def get_serializer_class(self):
         if self.action == "create":

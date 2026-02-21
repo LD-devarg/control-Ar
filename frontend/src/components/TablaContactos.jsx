@@ -29,15 +29,33 @@ const columns = [
     dataKey: 'username',
   },
   {
-    width: 180,
-    label: 'Monto Compra ARS',
-    dataKey: 'total_compras_ars',
+    width: 150,
+    label: 'Cant. Compras',
+    dataKey: 'cant_compras',
     numeric: true,
   },
   {
-    width: 180,
-    label: 'Monto Compra USD',
+    width: 160,
+    label: 'Compras USD',
     dataKey: 'total_compras_usd',
+    numeric: true,
+  },
+  {
+    width: 140,
+    label: 'Bonos USD',
+    dataKey: 'total_bonos_usd',
+    numeric: true,
+  },
+  {
+    width: 150,
+    label: 'Cant. Retiros',
+    dataKey: 'cant_retiros',
+    numeric: true,
+  },
+  {
+    width: 160,
+    label: 'Retiros USD',
+    dataKey: 'total_retiros_usd',
     numeric: true,
   },
 ];
@@ -156,7 +174,16 @@ export default function TablaContactos() {
 
   const formatValue = (column, value) => {
     if (value == null) return '';
-    if (column.dataKey === 'total_compras_ars' || column.dataKey === 'total_compras_usd') {
+    if (column.dataKey === 'cant_compras' || column.dataKey === 'cant_retiros') {
+      const num = Number(value);
+      if (Number.isNaN(num)) return value;
+      return String(Math.trunc(num));
+    }
+    if (
+      column.dataKey === 'total_compras_usd' ||
+      column.dataKey === 'total_bonos_usd' ||
+      column.dataKey === 'total_retiros_usd'
+    ) {
       const num = Number(value);
       if (Number.isNaN(num)) return value;
       return num.toFixed(2);

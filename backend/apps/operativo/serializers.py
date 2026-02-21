@@ -7,6 +7,12 @@ from apps.empresas.scope import get_user_empresa_ids
 
 
 class ClienteSerializer(serializers.ModelSerializer):
+    total_bonos_ars = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_bonos_usd = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    cant_retiros = serializers.IntegerField(read_only=True)
+    total_retiros_ars = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_retiros_usd = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
     class Meta:
         model = Cliente
         fields = [
@@ -19,6 +25,11 @@ class ClienteSerializer(serializers.ModelSerializer):
             "cant_compras",
             "total_compras_ars",
             "total_compras_usd",
+            "total_bonos_ars",
+            "total_bonos_usd",
+            "cant_retiros",
+            "total_retiros_ars",
+            "total_retiros_usd",
             "first_touch_at",
             "fbc",
             "fbp",
@@ -38,6 +49,11 @@ class ClienteSerializer(serializers.ModelSerializer):
             "cant_compras",
             "total_compras_ars",
             "total_compras_usd",
+            "total_bonos_ars",
+            "total_bonos_usd",
+            "cant_retiros",
+            "total_retiros_ars",
+            "total_retiros_usd",
         ]
 
 

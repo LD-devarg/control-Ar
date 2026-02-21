@@ -72,8 +72,8 @@
   background: transparent !important;
   color: #ffffff !important;
   border-bottom: 1px solid #2f313a !important;
-  padding-top: 18px !important;
-  padding-bottom: 18px !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
 }
 
 .tabla-contactos::-webkit-scrollbar {

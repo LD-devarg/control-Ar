@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import Page from "../layouts/Page.jsx";
 import Filter from "../components/Filter";
@@ -11,7 +11,7 @@ import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
 import PercentOutlinedIcon from "@mui/icons-material/PercentOutlined";
 import FilterListOutlinedIcon from "@mui/icons-material/FilterListOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
-import AttachMoneyOutlinedIcon from '@mui/icons-material/AttachMoneyOutlined';
+import AttachMoneyOutlinedIcon from "@mui/icons-material/AttachMoneyOutlined";
 import Button from "@mui/material/Button";
 import { apiClient } from "../services/auth";
 import { subscribeRealtimeEvents } from "../services/realtime";
@@ -19,12 +19,32 @@ import { useTenant } from "../context/TenantContext";
 
 const POLL_MS = 60 * 60 * 1000;
 const TABLET_MAX_WIDTH = 1024;
+const REALTIME_DEBOUNCE_MS = 700;
+const REQUEST_TIMEOUT_MS = 15000;
+
+const CARD_SIZE_PRESETS = {
+  medium: {
+    sizeHeight: "h-22",
+    sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
+    textSize: "text-lg lg:text-2xl",
+  },
+  small: {
+    sizeHeight: "h-18",
+    sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
+    textSize: "text-md lg:text-lg",
+  },
+};
 
 function isIpadDevice() {
   const userAgent = navigator.userAgent || "";
   const isiPadUA = /iPad/i.test(userAgent);
   const isiPadOSDesktopUA = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
   return isiPadUA || isiPadOSDesktopUA;
+}
+
+function safeNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function Stats() {
@@ -42,8 +62,10 @@ function Stats() {
     if (isIpadDevice()) return true;
     return window.innerWidth <= TABLET_MAX_WIDTH;
   });
+
   const activeRequestRef = useRef(null);
   const abortTimerRef = useRef(null);
+  const realtimeDebounceRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -69,11 +91,12 @@ function Stats() {
             from: desde?.format("YYYY-MM-DD"),
             to: hasta?.format("YYYY-MM-DD"),
           },
-    [usePeriod, period, desde, hasta, tenantId]
+    [usePeriod, period, desde, hasta]
   );
 
   const loadStats = useCallback(
-    async (signal) => {
+    async (controller) => {
+      const { signal } = controller;
       setLoading(true);
       setError("");
       try {
@@ -88,7 +111,14 @@ function Stats() {
         }
         setError("No se pudieron cargar las estadisticas.");
       } finally {
-        if (!signal?.aborted) {
+        if (activeRequestRef.current === controller) {
+          if (abortTimerRef.current) {
+            clearTimeout(abortTimerRef.current);
+            abortTimerRef.current = null;
+          }
+          activeRequestRef.current = null;
+        }
+        if (!signal.aborted) {
           setLoading(false);
         }
       }
@@ -102,11 +132,19 @@ function Stats() {
     }
     if (abortTimerRef.current) {
       clearTimeout(abortTimerRef.current);
+      abortTimerRef.current = null;
     }
+
     const controller = new AbortController();
     activeRequestRef.current = controller;
-    loadStats(controller.signal);
-    abortTimerRef.current = setTimeout(() => controller.abort(), 15000);
+
+    abortTimerRef.current = setTimeout(() => {
+      if (activeRequestRef.current === controller) {
+        controller.abort();
+      }
+    }, REQUEST_TIMEOUT_MS);
+
+    loadStats(controller);
   }, [loadStats]);
 
   useEffect(() => {
@@ -121,21 +159,41 @@ function Stats() {
       if (abortTimerRef.current) {
         clearTimeout(abortTimerRef.current);
       }
+      if (realtimeDebounceRef.current) {
+        clearTimeout(realtimeDebounceRef.current);
+      }
     };
   }, [triggerRefresh]);
 
   useEffect(() => {
     const unsubscribe = subscribeRealtimeEvents((message) => {
+      const messageTenantId = message?.empresa_id ?? message?.payload?.empresa_id ?? null;
+      if (messageTenantId && tenantId && Number(messageTenantId) !== Number(tenantId)) {
+        return;
+      }
+
       if (
         message?.type === "lead_created" ||
         message?.type === "compra_created" ||
+        message?.type === "retiro_created" ||
         message?.type === "landing_visit_created"
       ) {
-        triggerRefresh();
+        if (realtimeDebounceRef.current) {
+          clearTimeout(realtimeDebounceRef.current);
+        }
+        realtimeDebounceRef.current = setTimeout(() => {
+          triggerRefresh();
+        }, REALTIME_DEBOUNCE_MS);
       }
     });
-    return unsubscribe;
-  }, [triggerRefresh]);
+
+    return () => {
+      if (realtimeDebounceRef.current) {
+        clearTimeout(realtimeDebounceRef.current);
+      }
+      unsubscribe();
+    };
+  }, [triggerRefresh, tenantId]);
 
   const onPeriodChange = (value) => {
     setPeriod(value);
@@ -185,91 +243,155 @@ function Stats() {
     []
   );
 
-  const formatNumber = (value) => numberFormatter.format(Number(value || 0));
-  const formatCurrency = (value) => currencyFormatter.format(Number(value || 0));
-  const formatUsd = (value) => usdFormatter.format(Number(value || 0));
-  const formatPct = (value) => percentFormatter.format(Number(value || 0) / 100);
+  const formatNumber = useCallback((value) => numberFormatter.format(safeNumber(value)), [numberFormatter]);
+  const formatCurrency = useCallback((value) => currencyFormatter.format(safeNumber(value)), [currencyFormatter]);
+  const formatUsd = useCallback((value) => usdFormatter.format(safeNumber(value)), [usdFormatter]);
+  const formatPct = useCallback((value) => percentFormatter.format(safeNumber(value) / 100), [percentFormatter]);
 
-  const webVisitors = data?.web_visitors ?? 0;
-  const leads = data?.leads ?? 0;
-  const contactos = data?.contactos ?? 0;
-  const comprasCount = data?.compras?.count ?? 0;
-  const comprasMonto = data?.compras?.monto_total ?? 0;
-  const conversionPct = data?.conversion_pct ?? 0;
-  const valorCompraProm = data?.valor_compra_prom ?? 0;
-  const retencionPct = data?.retencion_pct ?? 0;
-  const roas = data?.roas ?? 0;
-  const gastoUsd = data?.gasto_usd ?? 0;
+  const {
+    web_visitors: webVisitors = 0,
+    leads = 0,
+    contactos = 0,
+    conversion_pct: conversionPct = 0,
+    valor_compra_prom: valorCompraProm = 0,
+    retencion_pct: retencionPct = 0,
+    roas_ftd: roasFtdRaw,
+    roas: roasLegacy = 0,
+    roas_neto: roasNeto = 0,
+    ganancia_neta_usd: gananciaNetaUsd = 0,
+    ltv7_usd: ltv7Usd = 0,
+    ltv30_usd: ltv30Usd = 0,
+    ltv60_usd: ltv60Usd = 0,
+    gasto_usd: gastoUsd = 0,
+    ftd = {},
+    compras = {},
+    retiros = {},
+  } = data ?? {};
 
-  const upperCards = [
-    {
-      title: "Gasto Publicitario",
-      sizeHeight: "h-25",
-      sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
-      value: loading ? "..." : formatUsd(gastoUsd),
-      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "ROAS",
-      sizeHeight: "h-25",
-      sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
-      value: loading ? "..." : Number(roas || 0).toFixed(2),
-      icon: <PercentOutlinedIcon fontSize="extra-small" />,
-    },
+  const roasFtd = roasFtdRaw ?? roasLegacy;
+  const ftdCount = ftd?.count ?? 0;
+  const ftdMonto = ftd?.monto_total ?? 0;
+  const comprasCount = compras?.count ?? 0;
+  const comprasMonto = compras?.monto_total ?? 0;
+  const bonosMontoUsd = compras?.bonos_usd ?? 0;
+  const retirosCount = retiros?.count ?? 0;
+  const retirosMontoUsd = retiros?.monto_total_usd ?? 0;
+
+  const negocioCards = [
     {
       title: "Compras",
       subtitle: loading ? "..." : formatNumber(comprasCount),
       value: loading ? "..." : formatCurrency(comprasMonto),
-      sizeHeight: "h-25",
-      sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
+      ...CARD_SIZE_PRESETS.medium,
       icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
     },
-  ];
-  
-  const lowerCards = [
     {
-      title: "Ticket Promedio",
-      sizeHeight: "h-20",
-      sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
-      value: loading ? "..." : formatCurrency(valorCompraProm),
+      title: "Ganancia Neta",
+      ...CARD_SIZE_PRESETS.medium,
+      value: loading ? "..." : formatUsd(gananciaNetaUsd),
+      icon: <TrendingUpOutlinedIcon fontSize="extra-small" />,
+    },
+    {
+      title: "ROAS Neto",
+      ...CARD_SIZE_PRESETS.medium,
+      value: loading ? "..." : safeNumber(roasNeto).toFixed(2),
+      icon: <PercentOutlinedIcon fontSize="extra-small" />,
+    },
+  ];
+
+  const gastosCards = [
+    {
+      title: "Bonos",
+      ...CARD_SIZE_PRESETS.medium,
+      value: loading ? "..." : formatUsd(bonosMontoUsd),
       icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
     },
     {
-      title: "Efectividad",
-      sizeHeight: "h-20",
-      sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
-      value: loading ? "..." : formatPct(conversionPct),
-      icon: <PercentOutlinedIcon fontSize="extra-small" />,
+      title: "Retiros",
+      subtitle: loading ? "..." : formatNumber(retirosCount),
+      ...CARD_SIZE_PRESETS.medium,
+      value: loading ? "..." : formatUsd(retirosMontoUsd),
+      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
     },
+    {
+      title: "Gasto Publicitario",
+      ...CARD_SIZE_PRESETS.medium,
+      value: loading ? "..." : formatUsd(gastoUsd),
+      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+    },
+  ];
+
+  const pautaCards = [
     {
       title: "Web Visitors",
       value: loading ? "..." : formatNumber(webVisitors),
-      sizeHeight: "h-20",
-      sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
+      ...CARD_SIZE_PRESETS.small,
       icon: <PreviewOutlinedIcon fontSize="extra-small" />,
     },
     {
       title: "Leads",
       value: loading ? "..." : formatNumber(leads),
-      sizeHeight: "h-20",
-      sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
+      ...CARD_SIZE_PRESETS.small,
       icon: <PendingActionsOutlinedIcon fontSize="extra-small" />,
     },
     {
       title: "Contactos",
       value: loading ? "..." : formatNumber(contactos),
-      sizeHeight: "h-20",
-      sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
+      ...CARD_SIZE_PRESETS.small,
       icon: <ChatBubbleOutlineOutlinedIcon fontSize="extra-small" />,
     },
     {
-      title: "% Retención",
-      sizeHeight: "h-20",
-      sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
+      title: "FTD",
+      subtitle: loading ? "..." : formatNumber(ftdCount),
+      value: loading ? "..." : formatCurrency(ftdMonto),
+      ...CARD_SIZE_PRESETS.small,
+      icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
+    },
+    {
+      title: "ROAS FTD",
+      ...CARD_SIZE_PRESETS.small,
+      value: loading ? "..." : safeNumber(roasFtd).toFixed(2),
+      icon: <PercentOutlinedIcon fontSize="extra-small" />,
+    },
+  ];
+
+  const porcentajesCards = [
+    {
+      title: "Efectividad",
+      ...CARD_SIZE_PRESETS.small,
+      value: loading ? "..." : formatPct(conversionPct),
+      icon: <PercentOutlinedIcon fontSize="extra-small" />,
+    },
+    {
+      title: "Ticket Promedio",
+      ...CARD_SIZE_PRESETS.small,
+      value: loading ? "..." : formatCurrency(valorCompraProm),
+      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+    },
+    {
+      title: "% Retencion",
+      ...CARD_SIZE_PRESETS.small,
       value: loading ? "..." : formatPct(retencionPct),
       icon: <PercentOutlinedIcon fontSize="extra-small" />,
     },
-
+    {
+      title: "LTV 7",
+      ...CARD_SIZE_PRESETS.small,
+      value: loading ? "..." : formatUsd(ltv7Usd),
+      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+    },
+    {
+      title: "LTV 30",
+      ...CARD_SIZE_PRESETS.small,
+      value: loading ? "..." : formatUsd(ltv30Usd),
+      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+    },
+    {
+      title: "LTV 60",
+      ...CARD_SIZE_PRESETS.small,
+      value: loading ? "..." : formatUsd(ltv60Usd),
+      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
+    },
   ];
 
   return (
@@ -328,14 +450,24 @@ function Stats() {
       ) : null}
       <div className="mt-2 w-full md:w-[90%]">
         <section className="min-w-0 space-y-4">
-          <div className="grid w-full grid-cols-2 gap-3 pb-4 pt-4 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
-            {upperCards.map((card) => (
-              <Card key={card.title} {...card} />
+            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
+              {negocioCards.map((card) => (
+              <Card key={card.title} {...card} variant="kpi" />
             ))}
           </div>
-          <div className="grid w-full grid-cols-2 gap-3 pb-4 pt-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 md:gap-5">
-            {lowerCards.map((card) => (
-              <Card key={card.title} {...card} />
+          <div className="grid w-full grid-cols-2 gap-3 pb-4 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
+            {gastosCards.map((card) => (
+              <Card key={card.title} {...card} variant="kpi" />
+            ))}
+          </div>
+          <div className="grid w-full grid-cols-2 gap-3 pt-4 sm:grid-cols-2 md:grid-cols-5 xl:grid-cols-5 md:gap-5">
+            {pautaCards.map((card) => (
+              <Card key={card.title} {...card} variant="kpi" />
+            ))}
+          </div>
+          <div className="grid w-full grid-cols-2 gap-3 pb-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 md:gap-5">
+            {porcentajesCards.map((card) => (
+              <Card key={card.title} {...card} variant="kpi" />
             ))}
           </div>
         </section>

@@ -1,4 +1,5 @@
 import uuid
+from collections import defaultdict
 from datetime import datetime, time, timedelta
 
 from django.db import models, transaction
@@ -16,10 +17,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
-from apps.empresas.scope import filter_queryset_by_empresa, resolve_request_empresa_id
+from apps.empresas.scope import filter_queryset_by_empresa, resolve_request_empresa_id, get_user_empresa_ids
 from apps.empresas.models import Empresa
 from apps.recursos.servicios.whatsapp_rotacion import seleccionar_numero_whatsapp
-from .models import Cliente, EventosMeta, Landing, Compra, LandingVisit
+from .models import Cliente, EventosMeta, Landing, Compra, LandingVisit, Retiro
 from .serializers import (
     ClienteCreateSerializer,
     ClienteSerializer,
@@ -27,6 +28,7 @@ from .serializers import (
     EventosMetaReadSerializer,
     LandingSerializer,
     CompraSerializer,
+    RetiroSerializer,
     LandingVisitSerializer,
     LandingVisitCreateSerializer,
 )
@@ -123,6 +125,43 @@ def _get_datetime_range(request):
 
 def _get_empresa_scope_id(request):
     return resolve_request_empresa_id(request, allow_empty_for_superuser=False)
+
+
+def _resolve_target_empresa_for_write(request, *, cliente_empresa_id=None, empresa_input=None) -> int:
+    if empresa_input not in (None, ""):
+        try:
+            empresa_input = int(empresa_input)
+        except (TypeError, ValueError):
+            raise ValidationError("Parametro empresa invalido.")
+    else:
+        empresa_input = None
+
+    user = request.user
+    if user.is_superuser:
+        target = empresa_input or cliente_empresa_id
+        if not target:
+            raise ValidationError("Empresa requerida.")
+        return int(target)
+
+    allowed_ids = get_user_empresa_ids(user)
+    if not allowed_ids:
+        raise ValidationError("Empresa no disponible en el usuario actual.")
+
+    if empresa_input is not None:
+        if empresa_input not in allowed_ids:
+            raise ValidationError("No tenes acceso a la empresa seleccionada.")
+        target = empresa_input
+    else:
+        if cliente_empresa_id and int(cliente_empresa_id) in allowed_ids:
+            target = int(cliente_empresa_id)
+        elif len(allowed_ids) == 1:
+            target = int(allowed_ids[0])
+        else:
+            raise ValidationError("Empresa requerida para crear el registro.")
+
+    if cliente_empresa_id and int(cliente_empresa_id) != int(target):
+        raise ValidationError("El cliente no pertenece a la empresa seleccionada.")
+    return int(target)
 
 
 class ClienteViewSet(viewsets.ModelViewSet):
@@ -448,7 +487,13 @@ class CompraViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         cliente = serializer.validated_data["cliente"]
+        _resolve_target_empresa_for_write(
+            request,
+            cliente_empresa_id=cliente.empresa_id,
+            empresa_input=request.data.get("empresa") or request.data.get("empresa_id"),
+        )
         monto_ars = serializer.validated_data["monto_ars"]
+        bono_ars = serializer.validated_data.get("bono_ars") or 0
         comprobante = serializer.validated_data.get("comprobante")
         comprobante_archivo = serializer.validated_data.get("comprobante_archivo")
         was_first_purchase = False
@@ -458,11 +503,14 @@ class CompraViewSet(viewsets.ModelViewSet):
             cliente = Cliente.objects.select_for_update().get(pk=cliente.pk)
             was_first_purchase = cliente.cant_compras == 0
             tc_obj, tc_valor, monto_usd = calcular_compra(monto_ars)
+            _, _, bono_usd = calcular_compra(bono_ars) if bono_ars else (None, None, 0)
             compra = Compra.objects.create(
                 cliente=cliente,
                 empresa=cliente.empresa,
                 operador=request.user,
                 monto_ars=monto_ars,
+                bono_ars=bono_ars,
+                bono_usd=bono_usd,
                 comprobante=comprobante,
                 comprobante_archivo=comprobante_archivo,
                 tc=tc_valor,
@@ -517,6 +565,73 @@ class CompraViewSet(viewsets.ModelViewSet):
         return Response(output.data, status=status.HTTP_201_CREATED)
 
 
+class RetiroViewSet(viewsets.ModelViewSet):
+    queryset = Retiro.objects.all()
+    serializer_class = RetiroSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
+
+    def has_role_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        if is_admin(request.user):
+            return True
+        if is_operador(request.user):
+            return self.action in {"list", "retrieve", "create"}
+        return False
+
+    def get_queryset(self):
+        qs = filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
+        user = self.request.user
+        if user.is_authenticated and is_operador(user):
+            qs = qs.filter(operador=user)
+        qs = _apply_date_filters(qs, "creado_en", self.request)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        cliente = serializer.validated_data["cliente"]
+        _resolve_target_empresa_for_write(
+            request,
+            cliente_empresa_id=cliente.empresa_id,
+            empresa_input=request.data.get("empresa") or request.data.get("empresa_id"),
+        )
+        monto_ars = serializer.validated_data["monto_ars"]
+        comprobante = serializer.validated_data.get("comprobante")
+        comprobante_archivo = serializer.validated_data.get("comprobante_archivo")
+
+        tc_obj, tc_valor, monto_usd = calcular_compra(monto_ars)
+        retiro = Retiro.objects.create(
+            cliente=cliente,
+            empresa=cliente.empresa,
+            operador=request.user,
+            monto_ars=monto_ars,
+            comprobante=comprobante,
+            comprobante_archivo=comprobante_archivo,
+            tc=tc_valor,
+            monto_usd=monto_usd,
+            tipo_cambio=tc_obj,
+        )
+
+        output = self.get_serializer(retiro)
+        publish_empresa_event(
+            empresa_id=cliente.empresa_id,
+            event_type="retiro_created",
+            payload={
+                "id": retiro.id,
+                "username": cliente.username,
+                "contacto": cliente.contacto,
+                "hora": retiro.creado_en.isoformat(),
+                "monto_ars": float(retiro.monto_ars or 0),
+                "monto_usd": float(retiro.monto_usd or 0),
+                "operador": request.user.username if request.user else "",
+            },
+        )
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+
 class StatsViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated, RoleBasedPermission]
 
@@ -531,11 +646,13 @@ class StatsViewSet(viewsets.ViewSet):
         visitas_qs = LandingVisit.objects.filter(empresa_id=empresa_id)
         eventos_qs = EventosMeta.objects.filter(empresa_id=empresa_id)
         compras_qs = Compra.objects.filter(empresa_id=empresa_id)
+        retiros_qs = Retiro.objects.filter(empresa_id=empresa_id)
         gastos_qs = GastoDiario.objects.filter(empresa_id=empresa_id)
 
         visitas_qs = _apply_date_filters(visitas_qs, "creado_en", request)
         eventos_qs = _apply_date_filters(eventos_qs, "creado_en", request)
         compras_qs = _apply_date_filters(compras_qs, "creado_en", request)
+        retiros_qs = _apply_date_filters(retiros_qs, "creado_en", request)
         from_date, to_date = _get_date_range(request)
         gastos_qs = gastos_qs.filter(fecha__gte=from_date, fecha__lte=to_date)
 
@@ -545,6 +662,12 @@ class StatsViewSet(viewsets.ViewSet):
 
         compras_count = compras_qs.count()
         compras_total = compras_qs.aggregate(total=Sum("monto_ars"))["total"] or 0
+        compras_total_usd = compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
+        bonos_total_ars = compras_qs.aggregate(total=Sum("bono_ars"))["total"] or 0
+        bonos_total_usd = compras_qs.aggregate(total=Sum("bono_usd"))["total"] or 0
+        retiros_count = retiros_qs.count()
+        retiros_total_ars = retiros_qs.aggregate(total=Sum("monto_ars"))["total"] or 0
+        retiros_total_usd = retiros_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
 
         compras_clientes = compras_qs.values("cliente_id").distinct().count()
         conversion_pct = (compras_clientes / contactos * 100) if contactos else 0
@@ -564,9 +687,13 @@ class StatsViewSet(viewsets.ViewSet):
             primeras_compras_qs = primeras_compras_qs.filter(creado_en__gte=start_dt)
         if end_dt:
             primeras_compras_qs = primeras_compras_qs.filter(creado_en__lte=end_dt)
+        primeras_compras_count = primeras_compras_qs.count()
+        primeras_compras_total_ars = primeras_compras_qs.aggregate(total=Sum("monto_ars"))["total"] or 0
         primeras_compras_usd = primeras_compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
         gasto_usd = gastos_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
-        roas = (primeras_compras_usd / gasto_usd) if gasto_usd else 0
+        roas_ftd = (primeras_compras_usd / gasto_usd) if gasto_usd else 0
+        ganancia_neta_usd = compras_total_usd - retiros_total_usd - bonos_total_usd
+        roas_neto = (ganancia_neta_usd / gasto_usd) if gasto_usd else 0
 
         firsts = (
             compras_qs.values("cliente_id")
@@ -591,6 +718,59 @@ class StatsViewSet(viewsets.ViewSet):
                         break
         retencion_pct = (retenidos / len(first_map) * 100) if first_map else 0
 
+        cohort_rows = list(
+            primeras_compras_qs.values("cliente_id", "creado_en")
+        )
+
+        def _compute_ltv(days: int) -> float:
+            if not cohort_rows:
+                return 0.0
+            cohort_ids = [row["cliente_id"] for row in cohort_rows]
+            first_map_local = {row["cliente_id"]: row["creado_en"] for row in cohort_rows}
+            min_first = min(first_map_local.values())
+            max_end = max(dt + timedelta(days=days) for dt in first_map_local.values())
+
+            compras_movs = Compra.objects.filter(
+                empresa_id=empresa_id,
+                cliente_id__in=cohort_ids,
+                creado_en__gte=min_first,
+                creado_en__lte=max_end,
+            ).values("cliente_id", "creado_en", "monto_usd", "bono_usd")
+
+            retiros_movs = Retiro.objects.filter(
+                empresa_id=empresa_id,
+                cliente_id__in=cohort_ids,
+                creado_en__gte=min_first,
+                creado_en__lte=max_end,
+            ).values("cliente_id", "creado_en", "monto_usd")
+
+            net_by_cliente = defaultdict(float)
+            for row in compras_movs:
+                cliente_id = row["cliente_id"]
+                first_at = first_map_local.get(cliente_id)
+                if not first_at:
+                    continue
+                if first_at <= row["creado_en"] <= first_at + timedelta(days=days):
+                    net_by_cliente[cliente_id] += float(row.get("monto_usd") or 0)
+                    net_by_cliente[cliente_id] -= float(row.get("bono_usd") or 0)
+
+            for row in retiros_movs:
+                cliente_id = row["cliente_id"]
+                first_at = first_map_local.get(cliente_id)
+                if not first_at:
+                    continue
+                if first_at <= row["creado_en"] <= first_at + timedelta(days=days):
+                    net_by_cliente[cliente_id] -= float(row.get("monto_usd") or 0)
+
+            cohort_size = len(cohort_ids)
+            if cohort_size == 0:
+                return 0.0
+            return float(sum(net_by_cliente.values()) / cohort_size)
+
+        ltv7_usd = _compute_ltv(7)
+        ltv30_usd = _compute_ltv(30)
+        ltv60_usd = _compute_ltv(60)
+
         response = {
             "web_visitors": web_visitors,
             "leads": leads,
@@ -598,17 +778,36 @@ class StatsViewSet(viewsets.ViewSet):
             "compras": {
                 "count": compras_count,
                 "monto_total": compras_total,
+                "monto_total_usd": compras_total_usd,
+                "bonos_ars": bonos_total_ars,
+                "bonos_usd": bonos_total_usd,
+            },
+            "retiros": {
+                "count": retiros_count,
+                "monto_total_ars": retiros_total_ars,
+                "monto_total_usd": retiros_total_usd,
             },
             "conversion_pct": conversion_pct,
             "valor_compra_prom": valor_compra_prom,
             "retencion_pct": retencion_pct,
+            "ftd": {
+                "count": primeras_compras_count,
+                "monto_total": primeras_compras_total_ars,
+                "monto_total_usd": primeras_compras_usd,
+            },
             "primeras_compras_usd": primeras_compras_usd,
             "gasto_usd": gasto_usd,
-            "roas": roas,
+            "ganancia_neta_usd": ganancia_neta_usd,
+            "roas": roas_ftd,
+            "roas_ftd": roas_ftd,
+            "roas_neto": roas_neto,
+            "ltv7_usd": ltv7_usd,
+            "ltv30_usd": ltv30_usd,
+            "ltv60_usd": ltv60_usd,
             "base": {
                 "contactos": contactos,
                 "compras_clientes": compras_clientes,
-                "clientes_primera_compra": len(first_map),
+                "clientes_primera_compra": len(cohort_rows),
             },
         }
 

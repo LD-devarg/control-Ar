@@ -1,8 +1,9 @@
 from rest_framework import serializers
 import re
 
-from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit
+from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit, Retiro
 from apps.pauta.models import CredencialesMeta
+from apps.empresas.scope import get_user_empresa_ids
 
 
 class ClienteSerializer(serializers.ModelSerializer):
@@ -231,6 +232,8 @@ class EventosMetaCreateSerializer(serializers.Serializer):
         tipo = data["tipo"]
         landing = None
         empresa_id = data.get("empresa_id")
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
 
         if tipo == "lead":
             landing_token = data.get("landing_token")
@@ -242,11 +245,26 @@ class EventosMetaCreateSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Landing invalida o inactiva.")
             empresa_id = landing.empresa_id
         else:
-            if not empresa_id:
-                request = self.context.get("request")
-                empresa_id = getattr(getattr(request, "user", None), "empresa_id", None)
-            if not empresa_id:
-                raise serializers.ValidationError("empresa_id requerido para contact/purchase.")
+            if not user or not user.is_authenticated:
+                raise serializers.ValidationError("Autenticacion requerida para contact/purchase.")
+
+            allowed_ids = [] if user.is_superuser else get_user_empresa_ids(user)
+            if empresa_id not in (None, ""):
+                try:
+                    empresa_id = int(empresa_id)
+                except (TypeError, ValueError):
+                    raise serializers.ValidationError("empresa_id invalido.")
+                if not user.is_superuser and empresa_id not in allowed_ids:
+                    raise serializers.ValidationError("No tenes acceso a la empresa seleccionada.")
+            else:
+                if user.is_superuser:
+                    raise serializers.ValidationError("empresa_id requerido para contact/purchase.")
+                if len(allowed_ids) == 1:
+                    empresa_id = int(allowed_ids[0])
+                elif getattr(user, "empresa_id", None) in allowed_ids:
+                    empresa_id = int(user.empresa_id)
+                else:
+                    raise serializers.ValidationError("empresa_id requerido para contact/purchase.")
 
         cliente = Cliente.objects.filter(id=data["cliente_id"], empresa_id=empresa_id).only("id", "cant_compras").first()
         if not cliente:
@@ -267,6 +285,32 @@ class CompraSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Compra
+        fields = [
+            "id",
+            "cliente",
+            "cliente_nombre",
+            "cliente_username",
+            "empresa",
+            "operador",
+            "monto_ars",
+            "tc",
+            "monto_usd",
+            "bono_ars",
+            "bono_usd",
+            "comprobante",
+            "comprobante_archivo",
+            "tipo_cambio",
+            "creado_en",
+        ]
+        read_only_fields = ["id", "empresa", "tc", "monto_usd", "bono_usd", "creado_en"]
+
+
+class RetiroSerializer(serializers.ModelSerializer):
+    cliente_nombre = serializers.CharField(source="cliente.nombre", read_only=True)
+    cliente_username = serializers.CharField(source="cliente.username", read_only=True)
+
+    class Meta:
+        model = Retiro
         fields = [
             "id",
             "cliente",

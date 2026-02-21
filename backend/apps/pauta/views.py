@@ -585,7 +585,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
             "web_visitors": 0.0,
             "leads": 0.0,
             "contactos": 0.0,
-            "compras": 0.0,
+            "ftd": 0.0,
         }
         daily = {}
         by_level = {"campaign": {}, "adset": {}, "ad": {}}
@@ -600,7 +600,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
             web_visitors = float(row["web_visitors"] or 0)
             leads = float(row["leads"] or 0)
             contactos = float(row["contacts"] or 0)
-            compras = float(row["purchases"] or 0)
+            ftd = float(row["purchases"] or 0)
 
             totals["inversion"] += inversion
             totals["ingresos"] += ingresos
@@ -611,7 +611,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
             totals["web_visitors"] += web_visitors
             totals["leads"] += leads
             totals["contactos"] += contactos
-            totals["compras"] += compras
+            totals["ftd"] += ftd
 
             date_key = row["fecha"].isoformat()
             if date_key not in daily:
@@ -642,7 +642,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
                         "web_visitors": 0.0,
                         "leads": 0.0,
                         "contactos": 0.0,
-                        "compras": 0.0,
+                        "ftd": 0.0,
                     }
                 item = bucket[meta_id]
                 item["inversion"] += inversion
@@ -654,14 +654,14 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 item["web_visitors"] += web_visitors
                 item["leads"] += leads
                 item["contactos"] += contactos
-                item["compras"] += compras
+                item["ftd"] += ftd
 
         def finalize(item):
             inversion = item["inversion"]
             ingresos = item["ingresos"]
             leads = item["leads"]
             contactos = item["contactos"]
-            compras = item["compras"]
+            ftd = item["ftd"]
             impressions = item["impressions"]
             link_clicks = item["link_clicks"]
             reach = item["reach"]
@@ -671,9 +671,12 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 "cpc": self._safe_div(inversion, contactos),
                 "cpc_click": self._safe_div(inversion, link_clicks),
                 "cpl": self._safe_div(inversion, leads),
-                "cpa": self._safe_div(inversion, compras),
+                "cpa": self._safe_div(inversion, ftd),
                 "roas": self._safe_div(ingresos, inversion),
                 "frecuencia": self._safe_div(impressions, reach),
+                "valor_ftd": ingresos,
+                # Backward compatibility for older front clients.
+                "compras": ftd,
                 "valor_compras": ingresos,
             }
 
@@ -687,7 +690,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
         ing = totals["ingresos"]
         leads = totals["leads"]
         contactos = totals["contactos"]
-        compras = totals["compras"]
+        ftd = totals["ftd"]
         impressions = totals["impressions"]
         link_clicks = totals["link_clicks"]
         reach = totals["reach"]
@@ -698,7 +701,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 "inversion": inv,
                 "ingresos": ing,
                 "roas": self._safe_div(ing, inv),
-                "cpa": self._safe_div(inv, compras),
+                "cpa": self._safe_div(inv, ftd),
                 "cpc": self._safe_div(inv, contactos),
                 "cpc_click": self._safe_div(inv, link_clicks),
                 "cpl": self._safe_div(inv, leads),
@@ -709,9 +712,12 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 "web_visitors": web_visitors,
                 "leads": leads,
                 "contactos": contactos,
-                "compras": compras,
+                "ftd": ftd,
+                "valor_ftd": ing,
+                "efectividad": self._safe_div(ftd, web_visitors),
+                # Backward compatibility for older front clients.
+                "compras": ftd,
                 "valor_compras": ing,
-                "efectividad": self._safe_div(compras, web_visitors),
             },
             "daily_roas": [
                 {

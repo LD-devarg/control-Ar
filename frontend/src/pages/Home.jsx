@@ -4,8 +4,10 @@ import Stack from "@mui/material/Stack";
 import Button from "@mui/material/Button";
 import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
 import PhoneCallbackOutlinedIcon from "@mui/icons-material/PhoneCallbackOutlined";
+import CurrencyExchangeOutlinedIcon from "@mui/icons-material/CurrencyExchangeOutlined";
 import FormCompra from "../components/FormCompra.jsx";
 import FormContacto from "../components/FormContacto.jsx";
+import FormRetiro from "../components/FormRetiro.jsx";
 import Page from "../layouts/Page.jsx";
 
 
@@ -39,11 +41,23 @@ function Home() {
             >
               Nuevo Contacto
             </Button>
+            <Button
+              variant="outlined"
+              startIcon={<CurrencyExchangeOutlinedIcon />}
+              onClick={() => setActiveForm("retiro")}
+              sx={{
+                color: activeForm === "retiro" ? theme.palette.primary.main : undefined,
+                borderColor: activeForm === "retiro" ? theme.palette.primary.main : undefined,
+              }}
+            >
+              Nuevo Retiro
+            </Button>
           </Stack>
         </div>
         <div className="mt-8 w-full flex justify-center">
           {activeForm === "compra" && <FormCompra />}
           {activeForm === "contacto" && <FormContacto />}
+          {activeForm === "retiro" && <FormRetiro />}
         </div>
       </Page>
   );

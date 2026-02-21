@@ -14,6 +14,7 @@ def publish_empresa_event(empresa_id: int, event_type: str, payload: dict) -> No
         empresa_group_name(empresa_id),
         {
             "type": "realtime.event",
+            "empresa_id": empresa_id,
             "event_type": event_type,
             "payload": payload,
         },

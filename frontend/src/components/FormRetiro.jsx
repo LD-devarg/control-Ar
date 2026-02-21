@@ -1,45 +1,42 @@
-import { useEffect, useMemo, useState } from 'react';
-import TextField from '@mui/material/TextField';
-import Autocomplete from '@mui/material/Autocomplete';
-import Stack from '@mui/material/Stack';
-import Button from '@mui/material/Button';
+import { useEffect, useMemo, useState } from "react";
+import TextField from "@mui/material/TextField";
+import Autocomplete from "@mui/material/Autocomplete";
+import Stack from "@mui/material/Stack";
+import Button from "@mui/material/Button";
 import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
 import DialogActions from "@mui/material/DialogActions";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Switch from "@mui/material/Switch";
+import { useTheme } from "@mui/material/styles";
+import UploadButton from "./UploadButton";
 import "../assets/css/Form.css";
-import UploadButton from './UploadButton';
-import { useTheme } from '@mui/material/styles';
-import { fetchClientes } from '../services/operativo/clientes';
-import { apiClient } from '../services/auth';
-import { useTenant } from '../context/TenantContext';
+import { fetchClientes } from "../services/operativo/clientes";
+import { apiClient } from "../services/auth";
+import { useTenant } from "../context/TenantContext";
 
-export default function FormCompra() {
+export default function FormRetiro() {
   const theme = useTheme();
-  const isDarkMode = theme.palette.mode === 'dark';
-  const color = isDarkMode ? '#f4f4f5' : '#000000';
+  const isDarkMode = theme.palette.mode === "dark";
+  const color = isDarkMode ? "#f4f4f5" : "#000000";
   const [usuarios, setUsuarios] = useState([]);
   const [selectedCliente, setSelectedCliente] = useState(null);
   const [monto, setMonto] = useState("");
   const [comprobanteFile, setComprobanteFile] = useState(null);
-  const [hasBono, setHasBono] = useState(false);
-  const [bono, setBono] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
   const { tenantId: empresaId } = useTenant();
+
   const fieldSx = {
-    '& .MuiInputBase-input': { color },
-    '& .MuiInputLabel-root': { color },
-    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: color },
-    '&:hover .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: color },
-    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: color },
-    '& .MuiSvgIcon-root': { color },
+    "& .MuiInputBase-input": { color },
+    "& .MuiInputLabel-root": { color },
+    "& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline": { borderColor: color },
+    "&:hover .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline": { borderColor: color },
+    "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: color },
+    "& .MuiSvgIcon-root": { color },
   };
 
   useEffect(() => {
@@ -74,11 +71,6 @@ export default function FormCompra() {
     return Number.isFinite(value) ? value.toLocaleString("es-AR") : "0";
   }, [monto]);
 
-  const formattedBono = useMemo(() => {
-    const value = Number(bono || 0);
-    return Number.isFinite(value) ? value.toLocaleString("es-AR") : "0";
-  }, [bono]);
-
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
@@ -87,41 +79,22 @@ export default function FormCompra() {
       formData.append("empresa", String(empresaId));
       formData.append("cliente", selectedCliente.id);
       formData.append("monto_ars", monto);
-      const bonoArs = hasBono ? Number(bono || 0) : 0;
-      formData.append("bono_ars", String(bonoArs));
       if (comprobanteFile) {
         formData.append("comprobante_archivo", comprobanteFile);
       }
-      await apiClient.post("/compras/", formData, {
+      await apiClient.post("/retiros/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(
-          new CustomEvent("compra:created", {
-            detail: { clienteId: selectedCliente.id, montoArs: monto, at: Date.now() },
-          })
-        );
-        try {
-          window.localStorage.setItem(
-            "compra:last-created",
-            JSON.stringify({ at: Date.now(), clienteId: selectedCliente.id })
-          );
-        } catch {
-          // ignore storage errors
-        }
-      }
       setMonto("");
-      setBono("");
-      setHasBono(false);
       setSelectedCliente(null);
       setComprobanteFile(null);
-      setToast({ open: true, severity: "success", message: "Compra guardada." });
+      setToast({ open: true, severity: "success", message: "Retiro guardado." });
     } catch (err) {
       const detail = err?.response?.data?.detail;
       setToast({
         open: true,
         severity: "error",
-        message: detail || "No se pudo guardar la compra.",
+        message: detail || "No se pudo guardar el retiro.",
       });
     } finally {
       setSubmitting(false);
@@ -135,9 +108,8 @@ export default function FormCompra() {
 
   return (
     <Stack spacing={2} className="form-stack">
-        <Autocomplete
+      <Autocomplete
         disablePortal
-        id="combo-box-demo"
         options={usuarios}
         loading={loading}
         className="form-autocomplete"
@@ -146,40 +118,24 @@ export default function FormCompra() {
         onChange={(event, value) => setSelectedCliente(value)}
         renderInput={(params) => <TextField {...params} label="Seleccione el cliente" sx={fieldSx} />}
       />
-        <TextField id="outlined-basic" label="Monto" variant="outlined" fullWidth type='number'
+      <TextField
+        id="retiro-monto"
+        label="Monto"
+        variant="outlined"
+        fullWidth
+        type="number"
         value={monto}
         onChange={(e) => setMonto(e.target.value)}
         sx={fieldSx}
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={hasBono}
-              onChange={(event) => setHasBono(event.target.checked)}
-            />
-          }
-          label="Bono"
-        />
-        {hasBono ? (
-          <TextField
-            id="bono-ars"
-            label="Monto de bono"
-            variant="outlined"
-            fullWidth
-            type='number'
-            value={bono}
-            onChange={(e) => setBono(e.target.value)}
-            sx={fieldSx}
-          />
-        ) : null}
-        <UploadButton label="Subir comprobante" onUpload={setComprobanteFile} />
-        <Button variant="outlined" onClick={openConfirm} disabled={!canSubmit || submitting}>
-          {submitting ? "Guardando..." : "Guardar"}
-        </Button>
+      />
+      <UploadButton label="Subir comprobante" onUpload={setComprobanteFile} />
+      <Button variant="outlined" onClick={openConfirm} disabled={!canSubmit || submitting}>
+        {submitting ? "Guardando..." : "Guardar"}
+      </Button>
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>Confirmar compra</DialogTitle>
+        <DialogTitle>Confirmar retiro</DialogTitle>
         <DialogContent>
-          {`¿Deseas guardar la compra para ${selectedCliente?.username || "cliente"} con monto de $${formattedMonto} ARS y bono de $${hasBono ? formattedBono : "0"} ARS?`}
+          {`¿Deseas guardar el retiro de $${formattedMonto} ARS para el cliente ${selectedCliente?.username || "cliente"}?`}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmOpen(false)} variant="outlined">

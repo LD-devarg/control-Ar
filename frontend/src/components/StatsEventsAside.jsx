@@ -5,6 +5,36 @@ import { subscribeRealtimeEvents } from "../services/realtime";
 import ModalBase from "./ModalBase.jsx";
 import { useTenant } from "../context/TenantContext";
 import "../assets/css/RecentPurchasesTable.css";
+import PendingActionsOutlinedIcon from '@mui/icons-material/PendingActionsOutlined';
+import ChatBubbleOutlineOutlinedIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
+import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
+
+function normalizeEventType(rawType) {
+  return String(rawType || "").toLowerCase();
+}
+
+function getEventBadgeTheme(rawType) {
+  const type = normalizeEventType(rawType);
+  if (type === "compra" || type === "purchase") {
+    return {
+      text: "text-emerald-300",
+      border: "border-emerald-400/60",
+      bg: "bg-emerald-500/10",
+    };
+  }
+  if (type === "contacto" || type === "contact") {
+    return {
+      text: "text-amber-300",
+      border: "border-amber-400/60",
+      bg: "bg-amber-500/10",
+    };
+  }
+  return {
+    text: "text-sky-300",
+    border: "border-sky-400/60",
+    bg: "bg-sky-500/10",
+  };
+}
 
 function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight = false }) {
   const { tenantId } = useTenant();
@@ -169,6 +199,8 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
 
         {events.map((item) => {
           const isCompra = item.evento === "compra";
+          const badgeTheme = getEventBadgeTheme(item.evento);
+          const eventType = normalizeEventType(item.evento);
           return (
             <button
               key={item.id}
@@ -177,11 +209,22 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
               className={`w-full rounded-[18px] cursor-pointer px-4 py-2 text-left transition-all duration-200 ${
                 highlightedIds.includes(item.id)
                   ? "border-cyan-400/70 bg-green-200/90"
-                  : "border-white/10 bg-gradient-to-r from-zinc-800 to-zinc-900 hover:border-white/30"
+                  : "border-white/10 bg-black/20 hover:border-white/30"
               }`}
             >
               <div className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-white/65">
-                <span>{item.evento_label}</span>
+                <div className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] leading-none ${badgeTheme.bg} ${badgeTheme.text} ${badgeTheme.border}`}>
+                  <div>
+                    {eventType === "compra" || eventType === "purchase" ? (
+                      <ShoppingCartOutlinedIcon sx={{ fontSize: 14 }} />
+                    ) : eventType === "lead" || eventType === "lead_creado" ? (
+                      <PendingActionsOutlinedIcon sx={{ fontSize: 14 }} />
+                    ) : (
+                      <ChatBubbleOutlineOutlinedIcon sx={{ fontSize: 14 }} />
+                    )}
+                  </div>
+                  <span>{item.evento_label}</span>
+                </div>
                 <span>{formatDateTime(item.fecha_hora)}</span>
               </div>
               <div className="flex items-center justify-between gap-2">

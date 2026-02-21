@@ -10,7 +10,7 @@ from apps.empresas.views import (
     UsuarioEmpresaAccesoViewSet,
     GroupViewSet,
 )
-from apps.operativo.views import ClienteViewSet, EventosMetaViewSet, LandingViewSet, CompraViewSet, LandingVisitViewSet, StatsViewSet
+from apps.operativo.views import ClienteViewSet, EventosMetaViewSet, LandingViewSet, CompraViewSet, RetiroViewSet, LandingVisitViewSet, StatsViewSet
 from apps.operativo.health import HealthView
 from apps.recursos.views import WhatsAppViewSet, TipoCambioViewSet
 from apps.pauta.views import (
@@ -40,6 +40,7 @@ router.register(r"clientes", ClienteViewSet, basename="cliente")
 router.register(r"landings", LandingViewSet, basename="landing")
 router.register(r"eventos-meta", EventosMetaViewSet, basename="eventos-meta")
 router.register(r"compras", CompraViewSet, basename="compra")
+router.register(r"retiros", RetiroViewSet, basename="retiro")
 router.register(r"landing-visits", LandingVisitViewSet, basename="landing-visit")
 router.register(r"stats", StatsViewSet, basename="stats")
 router.register(r"whatsapps", WhatsAppViewSet, basename="whatsapp")

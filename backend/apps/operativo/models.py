@@ -186,6 +186,8 @@ class Compra(models.Model):
     )
     creado_en = models.DateTimeField(auto_now_add=True)
     monto_usd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    bono_ars = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    bono_usd = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     tc = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
     cliente = models.ForeignKey(
         "operativo.Cliente",
@@ -215,3 +217,50 @@ class Compra(models.Model):
 
     def __str__(self):
         return f"Compra {self.id} - Cliente: {self.cliente.nombre} - Monto: {self.monto_ars}"
+
+
+class Retiro(models.Model):
+    def _comprobante_upload_to(instance, filename):
+        empresa_id = instance.empresa_id or "unknown"
+        cliente_id = instance.cliente_id or "unknown"
+        return f"retiros/{empresa_id}/clientes/{cliente_id}/{filename}"
+
+    monto_ars = models.DecimalField(max_digits=10, decimal_places=2)
+    comprobante = models.CharField(max_length=255, null=True, blank=True)
+    comprobante_archivo = models.FileField(
+        upload_to=_comprobante_upload_to,
+        storage=PrivateMediaStorage(),
+        null=True,
+        blank=True,
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+    monto_usd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    tc = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
+    cliente = models.ForeignKey(
+        "operativo.Cliente",
+        on_delete=models.CASCADE,
+        related_name="retiros",
+    )
+    empresa = models.ForeignKey(
+        "empresas.Empresa",
+        on_delete=models.CASCADE,
+        related_name="retiros",
+    )
+    operador = models.ForeignKey(
+        "empresas.Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="retiros",
+    )
+    tipo_cambio = models.ForeignKey(
+        "recursos.TipoCambio",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="retiros",
+    )
+
+    class Meta:
+        db_table = "operativo_retiro"
+
+    def __str__(self):
+        return f"Retiro {self.id} - Cliente: {self.cliente.nombre} - Monto: {self.monto_ars}"

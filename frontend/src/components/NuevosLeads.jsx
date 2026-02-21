@@ -3,6 +3,8 @@ import { apiClient } from "../services/auth";
 import { subscribeRealtimeEvents } from "../services/realtime";
 import ModalBase from "./ModalBase.jsx";
 import { useTenant } from "../context/TenantContext";
+import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
+import "../assets/css/RecentPurchasesTable.css";
 
 function formatDateTime(value) {
     if (!value) return "-";
@@ -101,41 +103,45 @@ function NuevosLeads() {
     })), [leads]);
 
     return (
-        <div className="flex flex-col gap-4 p-4 align-center items-center bg-white dark:bg-neutral-900 rounded-2xl shadow-xl shadow-black w-full h-full">
-            <div className="w-full">
-                <h2 className="text-black dark:text-white text-sm font-semibold text-left">NUEVOS LEADS</h2>
+        <aside className="w-full rounded-2xl shadow-xl shadow-black bg-white dark:bg-neutral-900 p-4 text-white h-full flex flex-col">
+            <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-base text-black dark:text-white font-semibold">Nuevos Leads</h3>
+                <span className="text-xs text-black/80 dark:text-white/60">{loading ? "Actualizando..." : "Tiempo real"}</span>
             </div>
-            <div className="w-full flex flex-col gap-2">
-                {loading ? <p className="text-black dark:text-white text-center">Cargando...</p> : null}
-                {error ? <p className="text-red-500 text-center">{error}</p> : null}
+
+            {error ? <p className="mb-2 text-sm text-red-500">{error}</p> : null}
+
+            <div className="recent-compras-scroll space-y-2 overflow-y-auto pr-1 flex-1 min-h-0">
                 {!loading && !error && leadRows.length === 0 ? (
-                    <p className="text-black dark:text-white text-center">
+                    <div className="rounded-xl bg-white dark:bg-neutral-900 px-3 py-4 text-sm text-black/60 dark:text-white/60">
                         No hay leads sin contactar.
-                    </p>
+                    </div>
                 ) : null}
-                <div className="flex flex-col gap-2 max-h-full overflow-y-auto px-1 py-1">
-                    {leadRows.map((lead) => (
-                        <button
-                            key={lead.id}
-                            type="button"
-                            onClick={() => handleOpen(lead)}
-                            className="w-full rounded-[18px] cursor-pointer bg-gradient-to-r from-white/10 via-white/5 to-transparent px-4 py-3 text-left transition-all duration-200 hover:border-white/30"
-                        >
-                            <div className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-white/65">
+
+                {leadRows.map((lead) => (
+                    <button
+                        key={lead.id}
+                        type="button"
+                        onClick={() => handleOpen(lead)}
+                        className="w-full rounded-[18px] cursor-pointer border border-white/10 bg-black/20 px-4 py-2 text-left transition-all duration-200 hover:border-white/30"
+                    >
+                        <div className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-white/65">
+                            <div className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] leading-none bg-sky-500/10 text-sky-300 border-sky-400/60">
+                                <PendingActionsOutlinedIcon sx={{ fontSize: 14 }} />
                                 <span>Lead</span>
-                                <span>{lead.fecha}</span>
                             </div>
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="truncate text-lg font-semibold text-white">
-                                    {lead.username}
-                                </span>
-                                <span className="shrink-0 text-base font-semibold text-cyan-300">
-                                    {lead.cliente_contacto || "Sin nombre"}
-                                </span>
-                            </div>
-                        </button>
-                    ))}
-                </div>
+                            <span>{lead.fecha}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm xl:text-lg font-semibold text-white">
+                                {lead.username}
+                            </span>
+                            <span className="shrink-0 text-base font-semibold text-cyan-300">
+                                {lead.cliente_contacto || "-"}
+                            </span>
+                        </div>
+                    </button>
+                ))}
             </div>
 
             <ModalBase
@@ -155,7 +161,7 @@ function NuevosLeads() {
                     </>
                 )}
             </ModalBase>
-        </div>
+        </aside>
     );
 }
 export default NuevosLeads;

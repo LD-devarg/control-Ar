@@ -41,14 +41,14 @@ const ALL_COLUMNS = [
   { key: "cpa", label: "CPA", align: "right", format: (v) => currencyFormatter.format(v) },
   { key: "roas", label: "ROAS", align: "right", format: (v) => numberFormatter.format(v) },
   { key: "frecuencia", label: "Frecuencia", align: "right", format: (v) => numberFormatter.format(v) },
-  { key: "compras", label: "Compras", align: "right", format: (v) => numberFormatter.format(v) },
-  { key: "valor_compras", label: "Valor de compras", align: "right", format: (v) => currencyFormatter.format(v) },
+  { key: "ftd", label: "FTD", align: "right", format: (v) => numberFormatter.format(v) },
+  { key: "valor_ftd", label: "Valor FTD", align: "right", format: (v) => currencyFormatter.format(v) },
   { key: "leads", label: "Leads", align: "right", format: (v) => numberFormatter.format(v) },
   { key: "contactos", label: "Contactos", align: "right", format: (v) => numberFormatter.format(v) },
   { key: "web_visitors", label: "Web visitors", align: "right", format: (v) => numberFormatter.format(v) },
 ];
 
-const DEFAULT_VISIBLE_COLUMNS = ["inversion", "leads", "contactos", "compras", "valor_compras", "roas"];
+const DEFAULT_VISIBLE_COLUMNS = ["inversion", "leads", "contactos", "ftd", "valor_ftd", "roas"];
 const KPI_COLUMNS_STORAGE_KEY = "pauta_kpi_visible_columns";
 
 function compareValues(a, b, key, direction) {
@@ -119,9 +119,9 @@ function mapApiToLocalShape(payload) {
     { key: "web_visitors", label: "Web Visitors", value: Number(footer.web_visitors || 0) },
     { key: "leads", label: "Leads", value: Number(footer.leads || 0) },
     { key: "contactos", label: "Contactos", value: Number(footer.contactos || 0) },
-    { key: "compras", label: "Compras", value: Number(footer.compras || 0) },
-    { key: "valor_compras", label: "Valor de compras", value: Number(footer.valor_compras || 0), display: "USD" },
-    { key: "efectividad", label: "Efectividad", value: Number(footer.efectividad || 0), display: "percent" },
+    { key: "ftd", label: "FTD", value: Number(footer.ftd ?? footer.compras ?? 0) },
+    { key: "valor_ftd", label: "Valor FTD", value: Number(footer.valor_ftd ?? footer.valor_compras ?? 0), display: "USD" },
+    { key: "efectividad", label: "Efectividad FTD", value: Number(footer.efectividad || 0), display: "percent" },
   ];
 
   return {
@@ -239,8 +239,8 @@ export default function TablaKPI({
 
   const totals = useMemo(() => {
     const totalInversion = sortedRows.reduce((acc, row) => acc + Number(row.inversion || 0), 0);
-    const totalCompras = sortedRows.reduce((acc, row) => acc + Number(row.compras || 0), 0);
-    const totalValorCompras = sortedRows.reduce((acc, row) => acc + Number(row.valor_compras || 0), 0);
+    const totalFtd = sortedRows.reduce((acc, row) => acc + Number(row.ftd ?? row.compras ?? 0), 0);
+    const totalValorFtd = sortedRows.reduce((acc, row) => acc + Number(row.valor_ftd ?? row.valor_compras ?? 0), 0);
     const totalLeads = sortedRows.reduce((acc, row) => acc + Number(row.leads || 0), 0);
     const totalContactos = sortedRows.reduce((acc, row) => acc + Number(row.contactos || 0), 0);
     const totalWebVisitors = sortedRows.reduce((acc, row) => acc + Number(row.web_visitors || 0), 0);
@@ -254,7 +254,7 @@ export default function TablaKPI({
     const weightedCpl = totalInversion
       ? sortedRows.reduce((acc, row) => acc + Number(row.cpl || 0) * Number(row.inversion || 0), 0) / totalInversion
       : 0;
-    const cpa = totalCompras ? totalInversion / totalCompras : 0;
+    const cpa = totalFtd ? totalInversion / totalFtd : 0;
     const weightedRoas = totalInversion
       ? sortedRows.reduce((acc, row) => acc + Number(row.roas || 0) * Number(row.inversion || 0), 0) / totalInversion
       : 0;
@@ -270,8 +270,8 @@ export default function TablaKPI({
       cpa,
       roas: weightedRoas,
       frecuencia: weightedFreq,
-      compras: totalCompras,
-      valor_compras: totalValorCompras,
+      ftd: totalFtd,
+      valor_ftd: totalValorFtd,
       leads: totalLeads,
       contactos: totalContactos,
       web_visitors: totalWebVisitors,

@@ -30,7 +30,7 @@ function Card({
     >
       <div className="flex items-center">
         <h2 className={titleClasses}>{title}</h2>
-        <div className="flex grow justify-end items-center mr-4">
+        <div className="flex grow justify-end items-center">
           <motion.div
             className={`w-2 h-2 rounded-full ml-2 mb-1 ${isKpi ? "bg-cyan-300/90" : "bg-green-500"}`}
             animate={{ opacity: [0, 1, 0] }}
@@ -39,9 +39,9 @@ function Card({
         </div>
       </div>
       <div className="flex flex-row">
-        {subtitle ? <span className="flex text-white mr-2 items-end text-sm md:text-base">{subtitle}</span> : null}
+        {subtitle ? <span className="flex text-white mr-2 items-end text-[11px] md:text-[12px]">{subtitle}</span> : null}
         <span className={`${valueClasses} ${textSize || ""} mt-1`.trim()}>{value}</span>
-        <div className="flex grow justify-end items-center mr-4">
+        <div className="flex grow justify-end items-center">
           <div className={iconChipClasses}>{icon}</div>
         </div>
       </div>

@@ -42,6 +42,34 @@ function FieldRenderer({
     );
   }
 
+  if (field.type === "multiselect-remote") {
+    const fieldOptions = remoteOptions[field.name] || [];
+    const selectedValues = Array.isArray(value) ? value : [];
+    const selectedOptions = fieldOptions.filter((item) => selectedValues.includes(item.id));
+    return (
+      <Autocomplete
+        key={fieldKey}
+        multiple
+        disableCloseOnSelect
+        options={fieldOptions}
+        value={selectedOptions}
+        onChange={(_, next) => onChange(field.name, (next || []).map((item) => item.id))}
+        getOptionLabel={(option) => buildOptionLabel(option, field)}
+        isOptionEqualToValue={(option, selected) => option.id === selected?.id}
+        slotProps={{ popper: { sx: whiteAutocompletePopperSx } }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label={field.label}
+            required={field.required}
+            size="small"
+            sx={whiteFieldSx}
+          />
+        )}
+      />
+    );
+  }
+
   if (field.type === "select-static") {
     const staticOptions = Array.isArray(field.options) ? field.options : [];
     const selectedOption = staticOptions.find((item) => item.value === value) || null;

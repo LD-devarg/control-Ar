@@ -71,7 +71,9 @@ def create_campaign_in_meta(
     token: str,
     nombre: str,
     objetivo: str,
+    tipo_compra: str | None = None,
     estrategia_presupuesto: str | None = None,
+    objetivo_roas=None,
     fecha_inicio=None,
     fecha_fin=None,
 ) -> str:
@@ -85,8 +87,17 @@ def create_campaign_in_meta(
         payload["start_time"] = str(fecha_inicio)
     if fecha_fin:
         payload["stop_time"] = str(fecha_fin)
+    if tipo_compra:
+        payload["buying_type"] = str(tipo_compra)
     if estrategia_presupuesto:
         payload["bid_strategy"] = str(estrategia_presupuesto)
+    if objetivo_roas not in (None, ""):
+        try:
+            payload["bid_constraints"] = {
+                "roas_average_floor": float(Decimal(str(objetivo_roas)))
+            }
+        except (InvalidOperation, ValueError, TypeError):
+            pass
 
     account_id = _clean_account_id(cuenta_publicitaria.meta_id)
     data = _post(f"{account_id}/campaigns", token, payload)

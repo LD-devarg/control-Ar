@@ -119,8 +119,8 @@ function Sidebar() {
             expanded ? "max-w-[160px] opacity-100" : "max-w-0 opacity-0",
           ].join(" ")}
         >
-          <span className="text-base font-bold leading-none tracking-[0.5px]">CONTROL</span>
-          <span className="ml-0.5 self-start text-xs font-light leading-none">AR</span>
+          <span className="text-base font-bold leading-none font-['Roboto'] tracking-[0.5px]">CONTROL</span>
+          <span className="ml-0.5 self-start text-xs font-light leading-none font-['Roboto']">AR</span>
         </span>
       </div>
 
@@ -144,12 +144,12 @@ function Sidebar() {
         <div className="mt-1 border-t border-zinc-600/70 pt-1.5">
           <button
             type="button"
-            onClick={() => {
-              logout();
+            onClick={async () => {
+              await logout();
               navigate("/");
             }}
             className={[
-              "relative flex h-9 w-full items-center overflow-hidden rounded-[10px] transition-all duration-200",
+              "relative flex h-9 w-full items-center font-['Roboto'] overflow-hidden rounded-[10px] transition-all duration-200",
               expanded ? "justify-start px-2.5" : "justify-center px-0",
               "hover:bg-neutral-900 hover:shadow-[inset_-2px_0_0_rgba(45,124,255,0.9),inset_-20px_0_24px_rgba(45,124,255,0.25)]",
             ].join(" ")}

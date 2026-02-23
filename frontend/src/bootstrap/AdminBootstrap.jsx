@@ -5,23 +5,32 @@ import CssBaseline from '@mui/material/CssBaseline'
 import App from '../App.jsx'
 import { startTokenRefresh } from '../services/auth'
 import { TenantProvider } from '../context/TenantContext'
+import { getUISettings, subscribeUISettings } from '../services/uiSettings'
 
 export default function AdminBootstrap() {
   const [mode, setMode] = useState(() =>
-    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+    getUISettings().theme === 'light' ? 'light' : 'dark',
   )
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = (event) => setMode(event.matches ? 'dark' : 'light')
-
-    mediaQuery.addEventListener('change', onChange)
-    return () => mediaQuery.removeEventListener('change', onChange)
+    const unsubscribe = subscribeUISettings((settings) => {
+      setMode(settings?.theme === 'light' ? 'light' : 'dark')
+    })
+    return unsubscribe
   }, [])
 
   useEffect(() => {
     startTokenRefresh()
   }, [])
+
+  useEffect(() => {
+    document.documentElement.style.colorScheme = mode
+    if (mode === 'dark') {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [mode])
 
   const theme = useMemo(
     () =>

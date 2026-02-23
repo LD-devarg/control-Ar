@@ -33,6 +33,11 @@ from .models import (
 
 
 class BMSerializer(serializers.ModelSerializer):
+    empresas = serializers.PrimaryKeyRelatedField(
+        queryset=Empresa.objects.select_related("organizacion").all(),
+        many=True,
+        required=False,
+    )
     empresa = serializers.PrimaryKeyRelatedField(
         queryset=Empresa.objects.select_related("organizacion").all(),
         write_only=True,
@@ -41,7 +46,7 @@ class BMSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BM
-        fields = ["id", "organizacion", "empresa", "meta_id", "nombre", "estado", "creado_en"]
+        fields = ["id", "organizacion", "empresas", "empresa", "meta_id", "nombre", "estado", "creado_en"]
         read_only_fields = ["id", "creado_en"]
 
     def validate(self, attrs):
@@ -50,14 +55,20 @@ class BMSerializer(serializers.ModelSerializer):
         instance = getattr(self, "instance", None)
 
         empresa = attrs.pop("empresa", None)
+        empresas = list(attrs.get("empresas") or [])
+        if empresa and empresa not in empresas:
+            empresas.append(empresa)
         organizacion = attrs.get("organizacion") or getattr(instance, "organizacion", None)
 
-        if empresa:
-            if not empresa.organizacion_id:
+        if not empresas and instance is not None:
+            empresas = list(instance.empresas.all())
+
+        for selected_empresa in empresas:
+            if not selected_empresa.organizacion_id:
                 raise serializers.ValidationError("La empresa seleccionada no tiene organizacion asociada.")
-            if organizacion and organizacion.id != empresa.organizacion_id:
+            if organizacion and organizacion.id != selected_empresa.organizacion_id:
                 raise serializers.ValidationError("La organizacion no coincide con la empresa seleccionada.")
-            organizacion = empresa.organizacion
+            organizacion = selected_empresa.organizacion
 
         if user and not user.is_superuser:
             user_org_id = user.organizacion_id or getattr(getattr(user, "empresa", None), "organizacion_id", None)
@@ -69,10 +80,26 @@ class BMSerializer(serializers.ModelSerializer):
             if organizacion is None and user.organizacion_id:
                 organizacion = user.organizacion
 
+            allowed_ids = set(get_user_empresa_ids(user))
+            if not empresas:
+                if user.empresa_id:
+                    default_empresa = Empresa.objects.filter(id=user.empresa_id).first()
+                    if default_empresa:
+                        empresas = [default_empresa]
+            if not empresas:
+                raise serializers.ValidationError("Debes seleccionar al menos una empresa para el BM.")
+            forbidden = [item.id for item in empresas if item.id not in allowed_ids]
+            if forbidden:
+                raise serializers.ValidationError(f"No tenes acceso a las empresas seleccionadas: {forbidden}")
+
+        if not empresas:
+            raise serializers.ValidationError("Debes seleccionar al menos una empresa para el BM.")
+
         if organizacion is None:
             raise serializers.ValidationError("Organizacion requerida.")
 
         attrs["organizacion"] = organizacion
+        attrs["empresas"] = empresas
         return attrs
 
 
@@ -112,13 +139,23 @@ class CuentaPublicitariaSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("BM requerido.")
         if empresa.organizacion_id != bm.organizacion_id:
             raise serializers.ValidationError("El BM no pertenece a la organizacion de la empresa seleccionada.")
+        if not bm.empresas.filter(id=empresa.id).exists():
+            raise serializers.ValidationError("El BM seleccionado no esta vinculado a la empresa.")
 
         attrs["empresa"] = empresa
         return attrs
 
 
 class CampañaSerializer(serializers.ModelSerializer):
+    tipo_compra = serializers.CharField(write_only=True, required=False, allow_blank=True)
     estrategia_presupuesto = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    objetivo_roas = serializers.DecimalField(
+        write_only=True,
+        required=False,
+        allow_null=True,
+        max_digits=10,
+        decimal_places=4,
+    )
     create_meta_draft = serializers.BooleanField(write_only=True, required=False, default=True)
 
     class Meta:
@@ -133,7 +170,9 @@ class CampañaSerializer(serializers.ModelSerializer):
             "fecha_inicio",
             "fecha_fin",
             "objetivo",
+            "tipo_compra",
             "estrategia_presupuesto",
+            "objetivo_roas",
             "create_meta_draft",
             "creado_en",
         ]
@@ -160,7 +199,9 @@ class CampañaSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        tipo_compra = validated_data.pop("tipo_compra", "")
         estrategia_presupuesto = validated_data.pop("estrategia_presupuesto", "")
+        objetivo_roas = validated_data.pop("objetivo_roas", None)
         create_meta_draft = validated_data.pop("create_meta_draft", True)
         validated_data["estado"] = "pending"
         if not validated_data.get("fecha_inicio"):
@@ -173,7 +214,9 @@ class CampañaSerializer(serializers.ModelSerializer):
                     token=token,
                     nombre=validated_data["nombre"],
                     objetivo=validated_data["objetivo"],
+                    tipo_compra=tipo_compra,
                     estrategia_presupuesto=estrategia_presupuesto,
+                    objetivo_roas=objetivo_roas,
                     fecha_inicio=validated_data.get("fecha_inicio"),
                     fecha_fin=validated_data.get("fecha_fin"),
                 )
@@ -256,6 +299,7 @@ class ConjuntoAnunciosSerializer(serializers.ModelSerializer):
 
 
 class AnuncioSerializer(serializers.ModelSerializer):
+    destino = serializers.CharField(write_only=True, required=False, allow_blank=True)
     create_meta_draft = serializers.BooleanField(write_only=True, required=False, default=True)
 
     class Meta:
@@ -268,6 +312,7 @@ class AnuncioSerializer(serializers.ModelSerializer):
             "meta_id",
             "nombre",
             "estado",
+            "destino",
             "create_meta_draft",
             "creado_en",
         ]
@@ -299,6 +344,7 @@ class AnuncioSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        validated_data.pop("destino", None)
         create_meta_draft = validated_data.pop("create_meta_draft", True)
         validated_data["estado"] = "pending"
         if not validated_data.get("meta_id") and create_meta_draft:
@@ -416,6 +462,8 @@ class CredencialesMetaSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("BM requerido.")
         if empresa.organizacion_id != bm.organizacion_id:
             raise serializers.ValidationError("El BM no pertenece a la organizacion de la empresa seleccionada.")
+        if not bm.empresas.filter(id=empresa.id).exists():
+            raise serializers.ValidationError("El BM seleccionado no esta vinculado a la empresa.")
 
         attrs["empresa"] = empresa
         return attrs
@@ -452,6 +500,8 @@ class FanPageSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("BM requerido.")
         if empresa.organizacion_id != bm.organizacion_id:
             raise serializers.ValidationError("El BM no pertenece a la organizacion de la empresa seleccionada.")
+        if not bm.empresas.filter(id=empresa.id).exists():
+            raise serializers.ValidationError("El BM seleccionado no esta vinculado a la empresa.")
 
         attrs["empresa"] = empresa
         return attrs

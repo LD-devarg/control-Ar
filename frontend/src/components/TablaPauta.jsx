@@ -83,6 +83,7 @@ export default function TablaPauta({
   visibleColumns,
   hiddenColumns,
   enableColumnPicker = true,
+  renderRowActions,
 }) {
   const baseColumns = COLUMN_SETS[view] ?? COLUMN_SETS.Bms;
   const rows = rowsByView?.[view] ?? [];
@@ -194,12 +195,13 @@ export default function TablaPauta({
               {columns.map((col) => (
                 <TableCell key={col.key}>{col.label}</TableCell>
               ))}
+              {renderRowActions ? <TableCell align="right">Acciones</TableCell> : null}
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={Math.max(columns.length, 1)} align="center">
+                <TableCell colSpan={Math.max(columns.length + (renderRowActions ? 1 : 0), 1)} align="center">
                   Sin datos
                 </TableCell>
               </TableRow>
@@ -209,6 +211,7 @@ export default function TablaPauta({
                   {columns.map((col) => (
                     <TableCell key={col.key}>{getCellValue(row, col.key)}</TableCell>
                   ))}
+                  {renderRowActions ? <TableCell align="right">{renderRowActions(row)}</TableCell> : null}
                 </TableRow>
               ))
             )}

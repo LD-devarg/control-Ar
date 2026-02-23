@@ -5,7 +5,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import "../assets/css/Filter.css";
 import FilterDatePicker from "./DatePicker";
 
-function Filter({ period, onPeriodChange, desde, hasta, onDesdeChange, onHastaChange }) {
+function Filter({ period, usePeriod = true, onPeriodChange, desde, hasta, onDesdeChange, onHastaChange }) {
     const periodButtonSx = (active) => ({
         minWidth: 80,
         fontWeight: 700,
@@ -29,23 +29,23 @@ function Filter({ period, onPeriodChange, desde, hasta, onDesdeChange, onHastaCh
                     >
                         <div className="color flex flex-wrap items-center gap-2 w-full sm:w-auto">
                             <Button
-                                variant={period === "day" ? "contained" : "outlined"}
+                                variant={usePeriod && period === "day" ? "contained" : "outlined"}
                                 onClick={() => onPeriodChange?.("day")}
-                                sx={periodButtonSx(period === "day")}
+                                sx={periodButtonSx(usePeriod && period === "day")}
                             >
                                 Dia
                             </Button>
                             <Button
-                                variant={period === "week" ? "contained" : "outlined"}
+                                variant={usePeriod && period === "week" ? "contained" : "outlined"}
                                 onClick={() => onPeriodChange?.("week")}
-                                sx={periodButtonSx(period === "week")}
+                                sx={periodButtonSx(usePeriod && period === "week")}
                             >
                                 Semana
                             </Button>
                             <Button
-                                variant={period === "month" ? "contained" : "outlined"}
+                                variant={usePeriod && period === "month" ? "contained" : "outlined"}
                                 onClick={() => onPeriodChange?.("month")}
-                                sx={periodButtonSx(period === "month")}
+                                sx={periodButtonSx(usePeriod && period === "month")}
                             >
                                 Mes
                             </Button>

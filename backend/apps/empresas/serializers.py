@@ -1,7 +1,14 @@
 from rest_framework import serializers
 from django.contrib.auth.models import Group
 
-from .models import BEAT_TASKS_AVAILABLE, Empresa, Organizacion, Usuario, UsuarioEmpresaAcceso
+from .models import (
+    BEAT_TASKS_AVAILABLE,
+    Empresa,
+    Organizacion,
+    Usuario,
+    UsuarioEmpresaAcceso,
+    NotificacionEstructural,
+)
 from .permissions import is_admin_organizacional
 
 
@@ -21,6 +28,7 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "id",
             "organizacion",
             "nombre",
+            "meta_test_mode",
             "operating_mode",
             "activo",
             "workers_activos",
@@ -61,6 +69,14 @@ class EmpresaSerializer(serializers.ModelSerializer):
                 continue
             cleaned[key] = bool(enabled)
         return cleaned
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if request and request.user and not request.user.is_superuser and "meta_test_mode" in attrs:
+            raise serializers.ValidationError(
+                {"meta_test_mode": "Solo superuser puede modificar test mode de Meta."}
+            )
+        return attrs
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
@@ -239,6 +255,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
                     "nombre": acceso.empresa.nombre,
                     "activo": bool(acceso.empresa.activo),
                     "operating_mode": acceso.empresa.operating_mode,
+                    "meta_test_mode": bool(acceso.empresa.meta_test_mode),
                 }
             )
 
@@ -250,6 +267,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
                     "nombre": obj.empresa.nombre if obj.empresa else f"Empresa #{obj.empresa_id}",
                     "activo": bool(getattr(obj.empresa, "activo", True)),
                     "operating_mode": getattr(obj.empresa, "operating_mode", Empresa.OPERATING_MODE_FULL),
+                    "meta_test_mode": bool(getattr(obj.empresa, "meta_test_mode", False)),
                 },
             )
         return empresas
@@ -266,3 +284,25 @@ class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = ["id", "name"]
+
+
+class NotificacionEstructuralSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source="actor.username", read_only=True)
+    empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
+
+    class Meta:
+        model = NotificacionEstructural
+        fields = [
+            "id",
+            "tipo",
+            "mensaje",
+            "payload",
+            "leida",
+            "creado_en",
+            "actor",
+            "actor_username",
+            "empresa",
+            "empresa_nombre",
+            "organizacion",
+        ]
+        read_only_fields = fields

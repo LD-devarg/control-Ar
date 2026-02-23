@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from apps.pauta.models import CredencialesMeta
 from apps.pauta.servicios.crypto import decrypt_token
+from apps.empresas.models import Empresa
 
 from .constructor import MetaEventBuilder
 
@@ -19,6 +20,23 @@ META_TIMEOUT_SECONDS = float(os.getenv("META_TIMEOUT_SECONDS", "10"))
 
 def _get_test_event_code() -> str | None:
     return os.getenv("META_TEST_EVENT_CODE")
+
+
+def _empresa_test_mode_enabled(empresa_id: int) -> bool:
+    return bool(
+        Empresa.objects.filter(id=empresa_id, meta_test_mode=True).values_list("id", flat=True).first()
+    )
+
+
+def _resolve_test_event_code(evento, request=None, explicit_code: str | None = None) -> str | None:
+    if explicit_code:
+        return explicit_code
+
+    env_code = _get_test_event_code()
+    if not env_code:
+        return None
+
+    return env_code if _empresa_test_mode_enabled(evento.empresa_id) else None
 
 
 def _build_capi_url(pixel_id: str, access_token: str, test_event_code: str | None = None) -> str:
@@ -55,7 +73,8 @@ def enviar_evento_meta(evento, request=None, credenciales: CredencialesMeta | No
     data["event_id"] = str(evento.id_evento)
 
     token_acceso = decrypt_token(credenciales.token_acceso_encrypted)
-    url = _build_capi_url(credenciales.pixel_id, token_acceso, test_event_code or _get_test_event_code())
+    resolved_test_code = _resolve_test_event_code(evento, request=request, explicit_code=test_event_code)
+    url = _build_capi_url(credenciales.pixel_id, token_acceso, resolved_test_code)
 
     response = None
     response_data: dict[str, Any]

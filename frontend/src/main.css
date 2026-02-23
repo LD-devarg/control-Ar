@@ -1,7 +1,14 @@
 @import "tailwindcss";
+
+@theme {
+  --font-roboto: "Roboto", sans-serif;
+  --font-roboto-condensed: "Roboto Condensed", sans-serif;
+  --font-inter: "Inter", sans-serif;
+}
+
 html,
 body {
-  font-family: "Roboto", sans-serif;
+  font-family: var(--font-roboto);
 }
 
 .app-scrollbar {

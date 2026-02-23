@@ -36,6 +36,7 @@ function normalizeTenantOptions(items = []) {
     nombre: item.nombre || `Empresa #${item.id}`,
     activo: Boolean(item.activo),
     operating_mode: item.operating_mode || "full",
+    meta_test_mode: Boolean(item.meta_test_mode),
   }));
 }
 
@@ -75,6 +76,16 @@ export function TenantProvider({ children }) {
     [canSelectTenant]
   );
 
+  const setTenantMetaTestMode = useCallback((empresaId, enabled) => {
+    setTenantOptions((prev) =>
+      (prev || []).map((item) =>
+        Number(item.id) === Number(empresaId)
+          ? { ...item, meta_test_mode: Boolean(enabled) }
+          : item
+      )
+    );
+  }, []);
+
   useEffect(() => {
     const syncUser = () => {
       setUser(getCurrentUser());
@@ -97,6 +108,7 @@ export function TenantProvider({ children }) {
             id: Number(item.id),
             nombre: item.nombre || `Empresa #${item.id}`,
             activo: Boolean(item.activo),
+            meta_test_mode: Boolean(item.meta_test_mode),
           }))
         : [];
       setTenantOptions(allowed);
@@ -164,6 +176,7 @@ export function TenantProvider({ children }) {
               nombre: `Empresa #${fixedEmpresa}`,
               activo: true,
               operating_mode: user?.empresa_operating_mode || "full",
+              meta_test_mode: false,
             }]
           : []
       );
@@ -225,6 +238,7 @@ export function TenantProvider({ children }) {
       operatingMode,
       features,
       setTenantId,
+      setTenantMetaTestMode,
     }),
     [
       tenantId,
@@ -235,6 +249,7 @@ export function TenantProvider({ children }) {
       operatingMode,
       features,
       setTenantId,
+      setTenantMetaTestMode,
     ]
   );
 

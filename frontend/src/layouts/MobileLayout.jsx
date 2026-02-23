@@ -174,8 +174,8 @@ function MobileLayout() {
           <Divider />
           <List dense>
             <ListItemButton
-              onClick={() => {
-                logout();
+              onClick={async () => {
+                await logout();
                 navigate("/");
                 setMenuOpen(false);
               }}

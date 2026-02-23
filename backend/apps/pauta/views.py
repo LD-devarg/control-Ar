@@ -132,12 +132,32 @@ class BMViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        org_id = _get_request_organizacion_id(self.request)
-        if org_id:
-            return super().get_queryset().filter(organizacion_id=org_id)
-        if self.request.user.is_superuser:
-            return super().get_queryset()
-        return super().get_queryset().none()
+        qs = super().get_queryset().prefetch_related("empresas").distinct()
+        user = self.request.user
+        empresa_param = self.request.query_params.get("empresa")
+
+        if user.is_superuser:
+            if empresa_param:
+                try:
+                    return qs.filter(empresas__id=int(empresa_param))
+                except (TypeError, ValueError):
+                    return qs.none()
+            return qs
+
+        allowed_ids = get_user_empresa_ids(user)
+        if not allowed_ids:
+            return qs.none()
+
+        if empresa_param:
+            try:
+                empresa_id = int(empresa_param)
+            except (TypeError, ValueError):
+                return qs.none()
+            if empresa_id not in allowed_ids:
+                return qs.none()
+            return qs.filter(empresas__id=empresa_id)
+
+        return qs.filter(empresas__id__in=allowed_ids)
 
 
 class CuentaPublicitariaViewSet(viewsets.ModelViewSet):

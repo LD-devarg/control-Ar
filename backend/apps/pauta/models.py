@@ -12,6 +12,11 @@ class BM(models.Model):
     meta_id = models.CharField(max_length=100)
     nombre = models.CharField(max_length=120)
     estado = models.CharField(max_length=50)
+    empresas = models.ManyToManyField(
+        "empresas.Empresa",
+        related_name="bms",
+        blank=True,
+    )
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:

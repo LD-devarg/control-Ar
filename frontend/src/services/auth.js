@@ -179,7 +179,14 @@ export async function login(username, password) {
   return user;
 }
 
-export function logout() {
+export async function logout() {
+  try {
+    if (localStorage.getItem("access_token")) {
+      await apiClient.post("/usuarios/logout/");
+    }
+  } catch {
+    // No bloquea el cierre de sesion local si falla el log estructural.
+  }
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("current_user");

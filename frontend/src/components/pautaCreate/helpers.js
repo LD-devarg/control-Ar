@@ -7,7 +7,14 @@ export function buildOptionLabel(item = {}, field = null) {
 
 export function buildInitialValues(fields = []) {
   return fields.reduce((acc, field) => {
-    acc[field.name] = "";
+    const initialValue = field.default;
+    if (Array.isArray(initialValue)) {
+      acc[field.name] = [...initialValue];
+    } else if (initialValue && typeof initialValue === "object") {
+      acc[field.name] = { ...initialValue };
+    } else {
+      acc[field.name] = initialValue ?? "";
+    }
     return acc;
   }, {});
 }
@@ -45,8 +52,14 @@ export function resolveErrorMessage(errorPayload) {
 
 export function isEmptyValue(value, field) {
   if (value === null || value === undefined) return true;
+  if (Array.isArray(value)) return value.length === 0;
   if (typeof value === "string") return value.trim() === "";
-  if ((field.type === "select-static" || field.type === "select-remote") && (value === "" || value === null)) return true;
+  if (
+    (field.type === "select-static" || field.type === "select-remote" || field.type === "multiselect-remote") &&
+    (value === "" || value === null)
+  ) {
+    return true;
+  }
   return false;
 }
 

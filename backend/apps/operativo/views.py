@@ -20,6 +20,7 @@ from rest_framework.response import Response
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
 from apps.empresas.scope import filter_queryset_by_empresa, resolve_request_empresa_id, get_user_empresa_ids
 from apps.empresas.models import Empresa
+from apps.recursos.models import TipoCambio
 from apps.recursos.servicios.whatsapp_rotacion import seleccionar_numero_whatsapp
 from .models import Cliente, EventosMeta, Landing, Compra, LandingVisit, Retiro
 from .serializers import (
@@ -790,7 +791,8 @@ class StatsViewSet(viewsets.ViewSet):
 
         compras_clientes = compras_qs.values("cliente_id").distinct().count()
         conversion_pct = (compras_clientes / contactos * 100) if contactos else 0
-        valor_compra_prom = (compras_total / compras_count) if compras_count else 0
+        valor_compra_prom_ars = (compras_total / compras_count) if compras_count else 0
+        valor_compra_prom_usd = (compras_total_usd / compras_count) if compras_count else 0
 
         first_purchase_id_subquery = (
             Compra.objects.filter(empresa_id=empresa_id, cliente_id=OuterRef("cliente_id"))
@@ -809,8 +811,10 @@ class StatsViewSet(viewsets.ViewSet):
         primeras_compras_count = primeras_compras_qs.count()
         primeras_compras_total_ars = primeras_compras_qs.aggregate(total=Sum("monto_ars"))["total"] or 0
         primeras_compras_usd = primeras_compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
+        gasto_ars = gastos_qs.aggregate(total=Sum("monto_ars"))["total"] or 0
         gasto_usd = gastos_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
         roas_ftd = (primeras_compras_usd / gasto_usd) if gasto_usd else 0
+        ganancia_neta_ars = (compras_total - retiros_total_ars - bonos_total_ars) if wallet_enabled else 0
         ganancia_neta_usd = (compras_total_usd - retiros_total_usd - bonos_total_usd) if wallet_enabled else 0
         roas_neto = ((ganancia_neta_usd / gasto_usd) if gasto_usd else 0) if wallet_enabled else 0
 
@@ -841,7 +845,7 @@ class StatsViewSet(viewsets.ViewSet):
             primeras_compras_qs.values("cliente_id", "creado_en")
         )
 
-        def _compute_ltv(days: int) -> float:
+        def _compute_ltv(days: int, amount_field: str, bonus_field: str) -> float:
             if not cohort_rows:
                 return 0.0
             cohort_ids = [row["cliente_id"] for row in cohort_rows]
@@ -854,14 +858,14 @@ class StatsViewSet(viewsets.ViewSet):
                 cliente_id__in=cohort_ids,
                 creado_en__gte=min_first,
                 creado_en__lte=max_end,
-            ).values("cliente_id", "creado_en", "monto_usd", "bono_usd")
+            ).values("cliente_id", "creado_en", amount_field, bonus_field)
 
             retiros_movs = Retiro.objects.filter(
                 empresa_id=empresa_id,
                 cliente_id__in=cohort_ids,
                 creado_en__gte=min_first,
                 creado_en__lte=max_end,
-            ).values("cliente_id", "creado_en", "monto_usd")
+            ).values("cliente_id", "creado_en", amount_field)
 
             net_by_cliente = defaultdict(float)
             for row in compras_movs:
@@ -870,9 +874,9 @@ class StatsViewSet(viewsets.ViewSet):
                 if not first_at:
                     continue
                 if first_at <= row["creado_en"] <= first_at + timedelta(days=days):
-                    net_by_cliente[cliente_id] += float(row.get("monto_usd") or 0)
+                    net_by_cliente[cliente_id] += float(row.get(amount_field) or 0)
                     if wallet_enabled:
-                        net_by_cliente[cliente_id] -= float(row.get("bono_usd") or 0)
+                        net_by_cliente[cliente_id] -= float(row.get(bonus_field) or 0)
 
             if wallet_enabled:
                 for row in retiros_movs:
@@ -881,16 +885,26 @@ class StatsViewSet(viewsets.ViewSet):
                     if not first_at:
                         continue
                     if first_at <= row["creado_en"] <= first_at + timedelta(days=days):
-                        net_by_cliente[cliente_id] -= float(row.get("monto_usd") or 0)
+                        net_by_cliente[cliente_id] -= float(row.get(amount_field) or 0)
 
             cohort_size = len(cohort_ids)
             if cohort_size == 0:
                 return 0.0
             return float(sum(net_by_cliente.values()) / cohort_size)
 
-        ltv7_usd = _compute_ltv(7)
-        ltv30_usd = _compute_ltv(30)
-        ltv60_usd = _compute_ltv(60)
+        ltv7_usd = _compute_ltv(7, "monto_usd", "bono_usd")
+        ltv30_usd = _compute_ltv(30, "monto_usd", "bono_usd")
+        ltv60_usd = _compute_ltv(60, "monto_usd", "bono_usd")
+        ltv7_ars = _compute_ltv(7, "monto_ars", "bono_ars")
+        ltv30_ars = _compute_ltv(30, "monto_ars", "bono_ars")
+        ltv60_ars = _compute_ltv(60, "monto_ars", "bono_ars")
+
+        tc_vigente_obj = (
+            TipoCambio.objects.filter(vigente_hasta__isnull=True)
+            .order_by("-vigente_desde", "-creado_en")
+            .first()
+        )
+        tc_vigente = float(tc_vigente_obj.valor) if tc_vigente_obj and tc_vigente_obj.valor is not None else None
 
         response = {
             "web_visitors": web_visitors,
@@ -899,6 +913,7 @@ class StatsViewSet(viewsets.ViewSet):
             "compras": {
                 "count": compras_count,
                 "monto_total": compras_total,
+                "monto_total_ars": compras_total,
                 "monto_total_usd": compras_total_usd,
                 "bonos_ars": bonos_total_ars,
                 "bonos_usd": bonos_total_usd,
@@ -909,22 +924,31 @@ class StatsViewSet(viewsets.ViewSet):
                 "monto_total_usd": retiros_total_usd,
             },
             "conversion_pct": conversion_pct,
-            "valor_compra_prom": valor_compra_prom,
+            "valor_compra_prom": valor_compra_prom_ars,
+            "valor_compra_prom_ars": valor_compra_prom_ars,
+            "valor_compra_prom_usd": valor_compra_prom_usd,
             "retencion_pct": retencion_pct,
             "ftd": {
                 "count": primeras_compras_count,
                 "monto_total": primeras_compras_total_ars,
+                "monto_total_ars": primeras_compras_total_ars,
                 "monto_total_usd": primeras_compras_usd,
             },
             "primeras_compras_usd": primeras_compras_usd,
+            "gasto_ars": gasto_ars,
             "gasto_usd": gasto_usd,
+            "ganancia_neta_ars": ganancia_neta_ars,
             "ganancia_neta_usd": ganancia_neta_usd,
             "roas": roas_ftd,
             "roas_ftd": roas_ftd,
             "roas_neto": roas_neto,
+            "ltv7_ars": ltv7_ars,
             "ltv7_usd": ltv7_usd,
+            "ltv30_ars": ltv30_ars,
             "ltv30_usd": ltv30_usd,
+            "ltv60_ars": ltv60_ars,
             "ltv60_usd": ltv60_usd,
+            "tc_vigente": tc_vigente,
             "base": {
                 "contactos": contactos,
                 "compras_clientes": compras_clientes,

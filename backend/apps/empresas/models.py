@@ -23,6 +23,7 @@ class Empresa(models.Model):
         blank=True,
     )
     nombre = models.CharField(max_length=255)
+    meta_test_mode = models.BooleanField(default=False)
     operating_mode = models.CharField(
         max_length=20,
         choices=OPERATING_MODE_CHOICES,
@@ -108,3 +109,50 @@ class UsuarioEmpresaAcceso(models.Model):
 
     def __str__(self):
         return f"{self.usuario_id}-{self.empresa_id}"
+
+
+class NotificacionEstructural(models.Model):
+    TIPO_WHATSAPP_ACTIVADA = "whatsapp_activada"
+    TIPO_WHATSAPP_DESACTIVADA = "whatsapp_desactivada"
+    TIPO_LOGIN = "login"
+    TIPO_LOGOUT = "logout"
+    TIPO_CHOICES = [
+        (TIPO_WHATSAPP_ACTIVADA, "WhatsApp activada"),
+        (TIPO_WHATSAPP_DESACTIVADA, "WhatsApp desactivada"),
+        (TIPO_LOGIN, "Login"),
+        (TIPO_LOGOUT, "Logout"),
+    ]
+
+    organizacion = models.ForeignKey(
+        "empresas.Organizacion",
+        on_delete=models.CASCADE,
+        related_name="notificaciones_estructurales",
+        null=True,
+        blank=True,
+    )
+    empresa = models.ForeignKey(
+        "empresas.Empresa",
+        on_delete=models.CASCADE,
+        related_name="notificaciones_estructurales",
+        null=True,
+        blank=True,
+    )
+    actor = models.ForeignKey(
+        "empresas.Usuario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notificaciones_emitidas",
+    )
+    tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
+    mensaje = models.CharField(max_length=255)
+    payload = models.JSONField(default=dict, blank=True)
+    leida = models.BooleanField(default=False)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "empresas_notificacion_estructural"
+        ordering = ["-creado_en", "-id"]
+
+    def __str__(self):
+        return f"{self.tipo} - {self.mensaje}"

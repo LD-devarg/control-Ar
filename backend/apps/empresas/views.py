@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import models
 
-from .models import Empresa, Organizacion, Usuario, UsuarioEmpresaAcceso
+from .models import Empresa, Organizacion, Usuario, UsuarioEmpresaAcceso, NotificacionEstructural
 from django.contrib.auth.models import Group
 from .serializers import (
     EmpresaSerializer,
@@ -13,6 +13,7 @@ from .serializers import (
     UsuarioSerializer,
     UsuarioEmpresaAccesoSerializer,
     GroupSerializer,
+    NotificacionEstructuralSerializer,
 )
 from .servicios.validaciones_empresa import (
     validar_usuario_superusuario,
@@ -22,7 +23,9 @@ from .servicios.validaciones_empresa import (
     validar_borrado_usuario,
     validar_modificacion_usuario,
 )
-from .permissions import RoleBasedPermission, is_admin, is_admin_organizacional
+from .permissions import RoleBasedPermission, is_admin, is_admin_organizacional, is_pauta
+from .scope import get_user_empresa_ids
+from .notificaciones import crear_notificacion_estructural
 
 
 def _run_validation(fn, *args, **kwargs):
@@ -38,8 +41,12 @@ class EmpresaViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, RoleBasedPermission]
 
     def has_role_permission(self, request, view):
+        if view.action == "set_meta_test_mode":
+            return request.user.is_superuser
         if request.user.is_superuser:
             return True
+        if is_pauta(request.user):
+            return view.action in {"list", "retrieve"}
         return is_admin(request.user)
 
     def get_queryset(self):
@@ -51,6 +58,9 @@ class EmpresaViewSet(viewsets.ModelViewSet):
             if not org_id:
                 return qs.none()
             return qs.filter(organizacion_id=org_id)
+        allowed_ids = get_user_empresa_ids(self.request.user)
+        if allowed_ids:
+            return qs.filter(id__in=allowed_ids)
         if self.request.user.empresa_id:
             return qs.filter(id=self.request.user.empresa_id)
         return qs.none()
@@ -87,6 +97,18 @@ class EmpresaViewSet(viewsets.ModelViewSet):
         _run_validation(validar_cupos_organizacion, organizacion, serializer.instance.id)
         serializer.validated_data["organizacion"] = organizacion
         serializer.save()
+
+    @action(detail=True, methods=["post"], url_path="meta-test-mode")
+    def set_meta_test_mode(self, request, pk=None):
+        if not request.user.is_superuser:
+            raise ValidationError("Solo superuser puede activar/desactivar Meta test mode.")
+        instance = self.get_object()
+        enabled = bool(request.data.get("enabled", False))
+        if instance.meta_test_mode != enabled:
+            instance.meta_test_mode = enabled
+            instance.save(update_fields=["meta_test_mode"])
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 class OrganizacionViewSet(viewsets.ModelViewSet):
@@ -134,6 +156,8 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             return True
         if view.action == "me":
             return True
+        if view.action == "logout":
+            return True
         if view.action == "retrieve":
             target_id = view.kwargs.get("pk")
             return str(target_id) == str(request.user.id)
@@ -171,6 +195,18 @@ class UsuarioViewSet(viewsets.ModelViewSet):
     def me(self, request):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], url_path="logout")
+    def logout(self, request):
+        user = request.user
+        crear_notificacion_estructural(
+            tipo="logout",
+            actor=user,
+            empresa=user.empresa,
+            mensaje=f"El operador {user.username} cerro sesion.",
+            payload={},
+        )
+        return Response({"ok": True})
 
     def perform_create(self, serializer):
         if serializer.validated_data.get("is_superuser"):
@@ -264,3 +300,40 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
     def perform_destroy(self, instance):
         _run_validation(validar_borrado_usuario, self.request.user, instance)
         instance.delete()
+
+
+class NotificacionEstructuralViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = NotificacionEstructural.objects.select_related("actor", "empresa", "organizacion").all()
+    serializer_class = NotificacionEstructuralSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        if request.user.is_superuser:
+            return True
+        return is_admin(request.user) or is_admin_organizacional(request.user)
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_superuser:
+            empresa_param = self.request.query_params.get("empresa")
+            if empresa_param:
+                try:
+                    return qs.filter(empresa_id=int(empresa_param))
+                except (TypeError, ValueError):
+                    return qs.none()
+            return qs
+        if is_admin_organizacional(user):
+            if not user.organizacion_id:
+                return qs.none()
+            return qs.filter(organizacion_id=user.organizacion_id)
+        if user.empresa_id:
+            return qs.filter(empresa_id=user.empresa_id)
+        return qs.none()
+
+    @action(detail=False, methods=["post"], url_path="mark-all-read")
+    def mark_all_read(self, request):
+        updated = self.get_queryset().filter(leida=False).update(leida=True)
+        return Response({"updated": updated})
+
+

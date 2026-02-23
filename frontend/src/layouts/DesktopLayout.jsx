@@ -16,7 +16,7 @@ function DesktopLayout() {
     <div className="flex h-screen w-full bg-neutral-100 dark:bg-zinc-800 overflow-hidden">
         <Sidebar />
         <div className="flex grow flex-col min-w-0">
-            <header className="flex justify-end items-center gap-3 px-4 pb-1 pt-5">
+            <header className="flex justify-end items-center gap-3 px-10 pt-5">
                 <TenantSelector />
                 <NuevoLeadAlert />
                 <User />

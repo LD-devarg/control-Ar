@@ -16,6 +16,8 @@ import Button from "@mui/material/Button";
 import { apiClient } from "../services/auth";
 import { subscribeRealtimeEvents } from "../services/realtime";
 import { useTenant } from "../context/TenantContext";
+import { getUISettings, subscribeUISettings } from "../services/uiSettings";
+import CardFAQ from "../components/CardFAQ.jsx";
 
 const POLL_MS = 60 * 60 * 1000;
 const TABLET_MAX_WIDTH = 1024;
@@ -31,7 +33,7 @@ const CARD_SIZE_PRESETS = {
   small: {
     sizeHeight: "h-18",
     sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
-    textSize: "text-md lg:text-lg",
+    textSize: "text-sm lg:text-md",
   },
 };
 
@@ -47,8 +49,53 @@ function safeNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function buildMockStatsData() {
+  const tcVigente = 1220;
+  return {
+    web_visitors: 3129,
+    leads: 2790,
+    contactos: 2041,
+    conversion_pct: 30.03,
+    valor_compra_prom_ars: 15144,
+    valor_compra_prom_usd: 12.41,
+    retencion_pct: 28.4,
+    roas_ftd: 1.29,
+    roas: 2.0,
+    roas_neto: 2.35,
+    ganancia_neta_ars: 301340000,
+    ganancia_neta_usd: 247000,
+    ltv7_ars: 231800,
+    ltv7_usd: 190.0,
+    ltv30_ars: 414800,
+    ltv30_usd: 340.0,
+    ltv60_ars: 628300,
+    ltv60_usd: 515.0,
+    gasto_ars: 7212520,
+    gasto_usd: 5911.90,
+    tc_vigente: tcVigente,
+    ftd: {
+      count: 613,
+      monto_total_ars: 9279680,
+      monto_total_usd: 7606.29,
+    },
+    compras: {
+      count: 1050,
+      monto_total_ars: 448350000,
+      monto_total_usd: 367500,
+      bonos_ars: 27450000,
+      bonos_usd: 22500,
+    },
+    retiros: {
+      count: 520,
+      monto_total_ars: 119560000,
+      monto_total_usd: 98000,
+    },
+  };
+}
+
 function Stats() {
-  const { tenantId, features: tenantFeatures } = useTenant();
+  const { tenantId, features: tenantFeatures, isSuperuser } = useTenant();
+  const [uiSettings, setUiSettings] = useState(() => getUISettings());
   const [period, setPeriod] = useState("week");
   const [desde, setDesde] = useState(dayjs());
   const [hasta, setHasta] = useState(dayjs());
@@ -66,6 +113,11 @@ function Stats() {
   const activeRequestRef = useRef(null);
   const abortTimerRef = useRef(null);
   const realtimeDebounceRef = useRef(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeUISettings((next) => setUiSettings(next));
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -217,7 +269,7 @@ function Stats() {
     () => new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 }),
     []
   );
-  const currencyFormatter = useMemo(
+  const arsFormatter = useMemo(
     () =>
       new Intl.NumberFormat("es-AR", {
         style: "currency",
@@ -247,30 +299,40 @@ function Stats() {
   );
 
   const formatNumber = useCallback((value) => numberFormatter.format(safeNumber(value)), [numberFormatter]);
-  const formatCurrency = useCallback((value) => currencyFormatter.format(safeNumber(value)), [currencyFormatter]);
+  const formatArs = useCallback((value) => arsFormatter.format(safeNumber(value)), [arsFormatter]);
   const formatUsd = useCallback((value) => usdFormatter.format(safeNumber(value)), [usdFormatter]);
   const formatPct = useCallback((value) => percentFormatter.format(safeNumber(value) / 100), [percentFormatter]);
+
+  const shouldUseMockStats = Boolean(isSuperuser && uiSettings?.statsMockMode);
+  const sourceData = useMemo(() => (shouldUseMockStats ? buildMockStatsData() : data), [shouldUseMockStats, data]);
 
   const {
     web_visitors: webVisitors = 0,
     leads = 0,
     contactos = 0,
     conversion_pct: conversionPct = 0,
-    valor_compra_prom: valorCompraProm = 0,
+    valor_compra_prom_ars: valorCompraPromArsRaw = null,
+    valor_compra_prom_usd: valorCompraPromUsdRaw = null,
     retencion_pct: retencionPct = 0,
     roas_ftd: roasFtdRaw,
     roas: roasLegacy = 0,
     roas_neto: roasNeto = 0,
+    ganancia_neta_ars: gananciaNetaArs = 0,
     ganancia_neta_usd: gananciaNetaUsd = 0,
+    ltv7_ars: ltv7Ars = 0,
     ltv7_usd: ltv7Usd = 0,
+    ltv30_ars: ltv30Ars = 0,
     ltv30_usd: ltv30Usd = 0,
+    ltv60_ars: ltv60Ars = 0,
     ltv60_usd: ltv60Usd = 0,
+    gasto_ars: gastoArs = 0,
     gasto_usd: gastoUsd = 0,
+    tc_vigente: tcVigente = null,
     features: statsFeatures = null,
     ftd = {},
     compras = {},
     retiros = {},
-  } = data ?? {};
+  } = sourceData ?? {};
 
   const effectiveFeatures = statsFeatures && typeof statsFeatures === "object"
     ? statsFeatures
@@ -281,26 +343,54 @@ function Stats() {
 
   const roasFtd = roasFtdRaw ?? roasLegacy;
   const ftdCount = ftd?.count ?? 0;
-  const ftdMonto = ftd?.monto_total ?? 0;
+  const ftdMontoArs = ftd?.monto_total_ars ?? ftd?.monto_total ?? 0;
+  const ftdMontoUsd = ftd?.monto_total_usd ?? 0;
   const comprasCount = compras?.count ?? 0;
-  const comprasMonto = compras?.monto_total ?? 0;
+  const comprasMontoArs = compras?.monto_total_ars ?? compras?.monto_total ?? 0;
+  const comprasMontoUsd = compras?.monto_total_usd ?? 0;
+  const bonosMontoArs = compras?.bonos_ars ?? 0;
   const bonosMontoUsd = compras?.bonos_usd ?? 0;
   const retirosCount = retiros?.count ?? 0;
+  const retirosMontoArs = retiros?.monto_total_ars ?? 0;
   const retirosMontoUsd = retiros?.monto_total_usd ?? 0;
+  const valorCompraPromUsd = valorCompraPromUsdRaw ?? (comprasCount ? comprasMontoUsd / comprasCount : 0);
+  const valorCompraPromArs = valorCompraPromArsRaw ?? (comprasCount ? comprasMontoArs / comprasCount : 0);
+  const useArs = uiSettings?.currency === "ARS";
+
+  const resolveArsValue = useCallback(
+    (arsValue, usdValue) => {
+      const hasArs = arsValue !== null && arsValue !== undefined;
+      if (hasArs) return safeNumber(arsValue);
+      const tc = safeNumber(tcVigente);
+      if (tc > 0) return safeNumber(usdValue) * tc;
+      return 0;
+    },
+    [tcVigente]
+  );
+
+  const formatMoney = useCallback(
+    ({ arsValue = null, usdValue = null }) => {
+      if (useArs) {
+        return formatArs(resolveArsValue(arsValue, usdValue));
+      }
+      return formatUsd(usdValue);
+    },
+    [useArs, formatArs, formatUsd, resolveArsValue]
+  );
 
   const negocioCards = showNetMetrics
     ? [
         {
           title: "Compras",
           subtitle: loading ? "..." : formatNumber(comprasCount),
-          value: loading ? "..." : formatCurrency(comprasMonto),
+          value: loading ? "..." : formatMoney({ arsValue: comprasMontoArs, usdValue: comprasMontoUsd }),
           ...CARD_SIZE_PRESETS.medium,
           icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
         },
         {
           title: "Ganancia Neta",
           ...CARD_SIZE_PRESETS.medium,
-          value: loading ? "..." : formatUsd(gananciaNetaUsd),
+          value: loading ? "..." : formatMoney({ arsValue: gananciaNetaArs, usdValue: gananciaNetaUsd }),
           icon: <TrendingUpOutlinedIcon fontSize="extra-small" />,
         },
         {
@@ -314,14 +404,14 @@ function Stats() {
         {
           title: "FTD",
           subtitle: loading ? "..." : formatNumber(ftdCount),
-          value: loading ? "..." : formatCurrency(ftdMonto),
+          value: loading ? "..." : formatMoney({ arsValue: ftdMontoArs, usdValue: ftdMontoUsd }),
           ...CARD_SIZE_PRESETS.medium,
           icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
         },
         {
           title: "Gasto Publicitario",
           ...CARD_SIZE_PRESETS.medium,
-          value: loading ? "..." : formatUsd(gastoUsd),
+          value: loading ? "..." : formatMoney({ arsValue: gastoArs, usdValue: gastoUsd }),
           icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
         },
         {
@@ -338,7 +428,7 @@ function Stats() {
           {
             title: "Bonos",
             ...CARD_SIZE_PRESETS.medium,
-            value: loading ? "..." : formatUsd(bonosMontoUsd),
+            value: loading ? "..." : formatMoney({ arsValue: bonosMontoArs, usdValue: bonosMontoUsd }),
             icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
           },
         ]
@@ -349,7 +439,7 @@ function Stats() {
             title: "Retiros",
             subtitle: loading ? "..." : formatNumber(retirosCount),
             ...CARD_SIZE_PRESETS.medium,
-            value: loading ? "..." : formatUsd(retirosMontoUsd),
+            value: loading ? "..." : formatMoney({ arsValue: retirosMontoArs, usdValue: retirosMontoUsd }),
             icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
           },
         ]
@@ -359,7 +449,7 @@ function Stats() {
           {
             title: "Gasto Publicitario",
             ...CARD_SIZE_PRESETS.medium,
-            value: loading ? "..." : formatUsd(gastoUsd),
+            value: loading ? "..." : formatMoney({ arsValue: gastoArs, usdValue: gastoUsd }),
             icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
           },
         ]
@@ -390,7 +480,7 @@ function Stats() {
           {
             title: "FTD",
             subtitle: loading ? "..." : formatNumber(ftdCount),
-            value: loading ? "..." : formatCurrency(ftdMonto),
+            value: loading ? "..." : formatMoney({ arsValue: ftdMontoArs, usdValue: ftdMontoUsd }),
             ...CARD_SIZE_PRESETS.small,
             icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
           },
@@ -414,33 +504,33 @@ function Stats() {
     {
       title: "Ticket Promedio",
       ...CARD_SIZE_PRESETS.small,
-      value: loading ? "..." : formatCurrency(valorCompraProm),
+      value: loading ? "..." : formatMoney({ arsValue: valorCompraPromArs, usdValue: valorCompraPromUsd }),
       icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "% Retencion",
-      ...CARD_SIZE_PRESETS.small,
-      value: loading ? "..." : formatPct(retencionPct),
-      icon: <PercentOutlinedIcon fontSize="extra-small" />,
     },
     ...(showNetMetrics
       ? [
           {
+            title: "% Retencion",
+            ...CARD_SIZE_PRESETS.small,
+            value: loading ? "..." : formatPct(retencionPct),
+            icon: <PercentOutlinedIcon fontSize="extra-small" />,
+          },
+          {
             title: "LTV 7",
             ...CARD_SIZE_PRESETS.small,
-            value: loading ? "..." : formatUsd(ltv7Usd),
+            value: loading ? "..." : formatMoney({ arsValue: ltv7Ars, usdValue: ltv7Usd }),
             icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
           },
           {
             title: "LTV 30",
             ...CARD_SIZE_PRESETS.small,
-            value: loading ? "..." : formatUsd(ltv30Usd),
+            value: loading ? "..." : formatMoney({ arsValue: ltv30Ars, usdValue: ltv30Usd }),
             icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
           },
           {
             title: "LTV 60",
             ...CARD_SIZE_PRESETS.small,
-            value: loading ? "..." : formatUsd(ltv60Usd),
+            value: loading ? "..." : formatMoney({ arsValue: ltv60Ars, usdValue: ltv60Usd }),
             icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
           },
         ]
@@ -473,6 +563,7 @@ function Stats() {
           <div className={isCompactViewport ? "hidden" : "block"}>
             <Filter
               period={period}
+              usePeriod={usePeriod}
               onPeriodChange={onPeriodChange}
               desde={desde}
               hasta={hasta}
@@ -487,6 +578,7 @@ function Stats() {
         <div className="w-full">
           <Filter
             period={period}
+            usePeriod={usePeriod}
             onPeriodChange={onPeriodChange}
             desde={desde}
             hasta={hasta}
@@ -497,11 +589,11 @@ function Stats() {
       ) : null}
 
       {error ? (
-        <div className="w-full rounded-md border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200 md:w-[90%]">
+        <div className="w-full rounded-md border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200 md:w-[95%]">
           {error}
         </div>
       ) : null}
-      <div className="mt-2 w-full md:w-[90%]">
+      <div className="mt-2 w-full md:w-[95%]">
         <section className="min-w-0 space-y-4">
             <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
               {negocioCards.map((card) => (
@@ -509,14 +601,14 @@ function Stats() {
             ))}
           </div>
           {gastosCards.length > 0 ? (
-            <div className="grid w-full grid-cols-2 gap-3 pb-4 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
+            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
               {gastosCards.map((card) => (
                 <Card key={card.title} {...card} variant="kpi" />
               ))}
             </div>
           ) : null}
           <div
-            className={`grid w-full grid-cols-2 gap-3 pt-4 sm:grid-cols-2 md:gap-5 ${
+            className={`grid w-full grid-cols-2 gap-3 pt-2 sm:grid-cols-2 md:gap-2 ${
               showNetMetrics ? "md:grid-cols-5 xl:grid-cols-5" : "md:grid-cols-3 xl:grid-cols-3"
             }`}
           >
@@ -524,11 +616,27 @@ function Stats() {
               <Card key={card.title} {...card} variant="kpi" />
             ))}
           </div>
-          <div className="grid w-full grid-cols-2 gap-3 pb-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 md:gap-5">
+          <div className={`grid w-full grid-cols-2 gap-3 pt-2 sm:grid-cols-2 md:gap-2 ${
+              showNetMetrics ? "md:grid-cols-5 xl:grid-cols-5" : "md:grid-cols-2 xl:grid-cols-2"
+            }`}>
             {porcentajesCards.map((card) => (
               <Card key={card.title} {...card} variant="kpi" />
             ))}
           </div>
+            {showNetMetrics ? (null) :(
+              <div className="">
+                <h3>
+                  <span className="text-base text-black dark:text-white font-semibold">FAQ</span>
+                </h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                  <CardFAQ title="¿Que es FTD?" content="FTD (First Time Deposit) se refiere a la primera compra realizada por un usuario." />
+                  <CardFAQ title="¿Cómo se calcula el ROAS FTD?" content="ROAS FTD se calcula dividiendo los ingresos generados por los FTD entre la inversión publicitaria." />
+                  <CardFAQ title="¿Qué es la efectividad?" content="La efectividad es el porcentaje de usuarios que pasan a conversión luego de contactarse." />
+                  <CardFAQ title="¿Qué significa un ROAS de 1?" content="Un ROAS de 1 significa que se recupera el 100% de la inversión con los clientes nuevos." />
+                </div>
+              </div>
+              )
+            }
         </section>
       </div>
     </Page>

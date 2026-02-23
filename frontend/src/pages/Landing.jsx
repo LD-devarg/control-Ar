@@ -1,5 +1,5 @@
 ﻿import "../assets/css/Landing.css";
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 const NuevoLead = lazy(() => import("../components/FormLeads"));
 const DisclaimerLanding = lazy(() => import("../components/DisclaimerLanding"));
@@ -31,6 +31,7 @@ export default function Landing() {
     const [bgReady, setBgReady] = useState(false);
     const [bgUrl, setBgUrl] = useState("");
     const pixelLoadedRef = useRef(null);
+    const rotatingWhatsappRef = useRef(false);
 
     const token = useMemo(() => {
         const params = new URLSearchParams(window.location.search);
@@ -45,6 +46,15 @@ export default function Landing() {
         const useMobile = mediaNarrow.matches || mediaPortrait.matches;
         return useMobile ? (mobileUrl || desktopUrl || "") : (desktopUrl || mobileUrl || "");
     };
+
+    const fetchWhatsappPeek = useCallback(async () => {
+        if (!token) return "";
+        const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+        const response = await axios.get(`${baseUrl}/landings/whatsapp-rotacion/`, {
+            params: { landing_token: token },
+        });
+        return normalizeWhatsappNumber(response.data?.numero);
+    }, [token]);
 
     useEffect(() => {
         let mounted = true;
@@ -150,12 +160,9 @@ export default function Landing() {
         const fetchWhatsapp = async () => {
             if (!token) return;
             try {
-                const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-                const response = await axios.get(`${baseUrl}/landings/whatsapp-rotacion/`, {
-                    params: { landing_token: token },
-                });
+                const nextNumber = await fetchWhatsappPeek();
                 if (mounted) {
-                    setWhatsappNumber(normalizeWhatsappNumber(response.data?.numero));
+                    setWhatsappNumber(nextNumber);
                 }
             } catch (error) {
                 if (mounted) {
@@ -167,7 +174,29 @@ export default function Landing() {
         return () => {
             mounted = false;
         };
-    }, [token]);
+    }, [fetchWhatsappPeek, token]);
+
+    const handleWhatsappOpened = useCallback(async () => {
+        if (!token || rotatingWhatsappRef.current) return;
+        rotatingWhatsappRef.current = true;
+        try {
+            const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+            const { data } = await axios.post(`${baseUrl}/landings/whatsapp-rotacion/consume/`, {
+                landing_token: token,
+            });
+            const siguienteNumero = normalizeWhatsappNumber(data?.siguiente_numero);
+            if (siguienteNumero) {
+                setWhatsappNumber(siguienteNumero);
+            } else {
+                const fallback = await fetchWhatsappPeek();
+                setWhatsappNumber(fallback);
+            }
+        } catch {
+            // keep current number if rotation fails
+        } finally {
+            rotatingWhatsappRef.current = false;
+        }
+    }, [fetchWhatsappPeek, token]);
 
     const titleText = hasLandingData ? (landing?.titulo || "BONO DE BIENVENIDA") : "";
     const bonusText = hasLandingData ? (landing?.bono || "🎁 100% 🎁") : "";
@@ -309,6 +338,7 @@ export default function Landing() {
                                 landingToken={token}
                                 bonusText={bonusText}
                                 whatsappNumber={whatsappNumber}
+                                onWhatsappOpened={handleWhatsappOpened}
                                 buttonText={buttonText}
                                 infoText={infoText}
                                 whatsappTemplate={whatsappTemplate}

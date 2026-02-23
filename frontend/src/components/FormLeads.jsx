@@ -86,6 +86,7 @@ export default function NuevoLead({
     buttonText,
     infoText,
     whatsappNumber,
+    onWhatsappOpened,
     landingToken,
     bonusText,
     whatsappTemplate = "",
@@ -238,6 +239,9 @@ export default function NuevoLead({
         tryFlushQueue();
 
         window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+        if (typeof onWhatsappOpened === "function") {
+            onWhatsappOpened();
+        }
     };
 
     const handleNameChange = (event) => {

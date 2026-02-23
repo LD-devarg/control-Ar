@@ -298,7 +298,7 @@ class LandingViewSet(viewsets.ModelViewSet):
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def get_permissions(self):
-        if self.action in {"whatsapp_rotacion", "public"}:
+        if self.action in {"whatsapp_rotacion", "whatsapp_rotacion_consume", "public"}:
             return [AllowAny()]
         return [IsAuthenticated(), RoleBasedPermission()]
 
@@ -330,10 +330,26 @@ class LandingViewSet(viewsets.ModelViewSet):
             raise ValidationError("landing_token requerido")
         landing = get_object_or_404(Landing, token=token, activo=True)
         try:
-            numero = seleccionar_numero_whatsapp(landing.empresa_id)
+            numero = seleccionar_numero_whatsapp(landing.empresa_id, consume=False)
         except ValueError as exc:
             return Response({"detail": str(exc), "numero": ""}, status=status.HTTP_404_NOT_FOUND)
         return Response({"numero": numero})
+
+    @action(detail=False, methods=["post"], permission_classes=[AllowAny], url_path="whatsapp-rotacion/consume")
+    def whatsapp_rotacion_consume(self, request):
+        token = request.data.get("landing_token")
+        if not token:
+            raise ValidationError("landing_token requerido")
+        landing = get_object_or_404(Landing, token=token, activo=True)
+        try:
+            numero = seleccionar_numero_whatsapp(landing.empresa_id, consume=True)
+            siguiente_numero = seleccionar_numero_whatsapp(landing.empresa_id, consume=False)
+        except ValueError as exc:
+            return Response(
+                {"detail": str(exc), "numero": "", "siguiente_numero": ""},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response({"numero": numero, "siguiente_numero": siguiente_numero})
 
     @action(detail=False, methods=["get"], permission_classes=[AllowAny], url_path="public")
     def public(self, request):
@@ -443,13 +459,19 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         value = serializer.validated_data.get("value")
         if value is not None:
             value = float(value)
+        cliente = (
+            Cliente.objects
+            .filter(id=serializer.validated_data["cliente_id"])
+            .only("id", "uuid", "fbp", "fbc", "contacto", "nombre")
+            .first()
+        )
         payload = {
             "value": value,
             "currency": serializer.validated_data.get("currency"),
             "email": serializer.validated_data.get("email"),
-            "phone": serializer.validated_data.get("phone"),
+            "phone": serializer.validated_data.get("phone") or (cliente.contacto if cliente else None),
+            "nombre": cliente.nombre if cliente else None,
         }
-        cliente = Cliente.objects.filter(id=serializer.validated_data["cliente_id"]).only("id", "uuid", "fbp", "fbc").first()
         if cliente:
             payload["external_id"] = str(cliente.uuid)
 

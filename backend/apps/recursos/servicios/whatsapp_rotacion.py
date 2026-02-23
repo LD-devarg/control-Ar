@@ -7,7 +7,7 @@ from django.utils import timezone
 from apps.recursos.models import WhatsApp
 
 
-def seleccionar_numero_whatsapp(empresa_id):
+def seleccionar_numero_whatsapp(empresa_id, *, consume=True):
     epoch = timezone.make_aware(datetime(1970, 1, 1))
     with transaction.atomic():
         numero = (
@@ -19,6 +19,7 @@ def seleccionar_numero_whatsapp(empresa_id):
         if not numero:
             raise ValueError("No hay lineas de WhatsApp activas para la empresa.")
 
-        numero.ultimo_uso = timezone.now()
-        numero.save(update_fields=["ultimo_uso"])
+        if consume:
+            numero.ultimo_uso = timezone.now()
+            numero.save(update_fields=["ultimo_uso"])
         return numero.numero

@@ -9,6 +9,7 @@ import "../assets/css/Form.css";
 import { useTheme } from '@mui/material/styles';
 import { apiClient } from '../services/auth';
 import { useTenant } from '../context/TenantContext';
+import { subscribeRealtimeEvents } from '../services/realtime';
 
 export default function FormContacto() {
   const theme = useTheme();
@@ -29,10 +30,18 @@ export default function FormContacto() {
     '& .MuiSvgIcon-root': { color },
   };
 
+  const markLeadsDirty = () => {
+    try {
+      localStorage.setItem("leads_dirty", "1");
+      localStorage.setItem("leads_refresh_ts", String(Date.now()));
+    } catch {
+      // ignore storage errors
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
-    const CACHE_KEY = "leads_cache";
-    const DIRTY_KEY = "leads_dirty";
+    const CACHE_KEY = `leads_cache:${empresaId || "default"}`;
 
     const readCache = () => {
       try {
@@ -46,13 +55,11 @@ export default function FormContacto() {
     const writeCache = (data) => {
       try {
         localStorage.setItem(CACHE_KEY, JSON.stringify(data || []));
-        localStorage.setItem(DIRTY_KEY, "0");
+        localStorage.setItem("leads_dirty", "0");
       } catch {
         // ignore cache errors
       }
     };
-
-    const isDirty = () => localStorage.getItem(DIRTY_KEY) === "1";
 
     const normalize = (data) => {
       const unique = new Map();
@@ -92,26 +99,29 @@ export default function FormContacto() {
     };
 
     const cached = readCache();
-    if (cached && !isDirty()) {
+    if (cached) {
       setUsuarios(cached);
-    } else {
-      load();
     }
+    load({ silent: Boolean(cached) });
 
     const handleRefresh = () => {
-      if (isDirty()) {
-        load({ silent: true });
-      }
+      load({ silent: true });
     };
     const handleStorage = (event) => {
       if (event.key === "leads_refresh_ts") {
         load({ silent: true });
       }
     };
+    const unsubscribeRealtime = subscribeRealtimeEvents((message) => {
+      if (message?.type === "lead_created" || message?.type === "contact_created") {
+        load({ silent: true });
+      }
+    });
     window.addEventListener("leads:refresh", handleRefresh);
     window.addEventListener("storage", handleStorage);
     return () => {
       mounted = false;
+      unsubscribeRealtime();
       window.removeEventListener("leads:refresh", handleRefresh);
       window.removeEventListener("storage", handleStorage);
     };
@@ -128,6 +138,7 @@ export default function FormContacto() {
         tipo: "contact",
         empresa_id: empresaId,
       });
+      markLeadsDirty();
       window.dispatchEvent(new CustomEvent("leads:refresh"));
       setSelectedCliente(null);
       setToast({ open: true, severity: "success", message: "Contacto guardado." });

@@ -1,17 +1,27 @@
 const STORAGE_KEY = "ui_settings_v1";
 const SETTINGS_EVENT = "ui:settings-changed";
 
-const DEFAULTS = {
-  currency: "USD",
-  theme: "dark",
-  statsMockMode: false,
-};
+function resolveSystemTheme() {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return "light";
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function getDefaults() {
+  return {
+    currency: "USD",
+    theme: resolveSystemTheme(),
+    statsMockMode: false,
+  };
+}
 
 function sanitize(next = {}) {
+  const defaults = getDefaults();
   const currency = next.currency === "ARS" ? "ARS" : "USD";
-  const theme = next.theme === "light" ? "light" : "dark";
+  const theme = next.theme === "light" || next.theme === "dark" ? next.theme : defaults.theme;
   return {
-    ...DEFAULTS,
+    ...defaults,
     ...next,
     currency,
     theme,
@@ -20,12 +30,13 @@ function sanitize(next = {}) {
 }
 
 export function getUISettings() {
+  const defaults = getDefaults();
   const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return { ...DEFAULTS };
+  if (!raw) return { ...defaults };
   try {
     return sanitize(JSON.parse(raw));
   } catch {
-    return { ...DEFAULTS };
+    return { ...defaults };
   }
 }
 
@@ -42,4 +53,3 @@ export function subscribeUISettings(handler) {
   window.addEventListener(SETTINGS_EVENT, wrapped);
   return () => window.removeEventListener(SETTINGS_EVENT, wrapped);
 }
-

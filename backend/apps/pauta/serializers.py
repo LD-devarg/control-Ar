@@ -445,8 +445,11 @@ class CredencialesMetaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CredencialesMeta
-        fields = ["id", "empresa", "bm", "pixel_id", "app_id", "token_acceso_encrypted"]
+        fields = ["id", "empresa", "bm", "nombre", "pixel_id", "app_id", "token_acceso_encrypted"]
         read_only_fields = ["id"]
+        extra_kwargs = {
+            "app_id": {"required": False, "allow_blank": True, "allow_null": True},
+        }
 
     def validate(self, attrs):
         request = self.context.get("request")

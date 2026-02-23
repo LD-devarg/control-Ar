@@ -318,6 +318,9 @@ class LandingViewSet(viewsets.ModelViewSet):
                 empresa = Empresa.objects.filter(id=empresa_id).first()
         if not empresa:
             raise ValidationError("Empresa requerida.")
+        credencial_meta = serializer.validated_data.get("credencial_meta")
+        if credencial_meta and credencial_meta.bm.organizacion_id != empresa.organizacion_id:
+            raise ValidationError("La credencial Meta seleccionada no pertenece a la organizacion de la empresa.")
         serializer.save(empresa=empresa)
 
     @action(detail=False, methods=["get"], permission_classes=[AllowAny], url_path="whatsapp-rotacion")

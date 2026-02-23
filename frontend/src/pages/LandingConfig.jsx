@@ -37,6 +37,7 @@ const EMPTY_FORM = {
     bgGradientAngle: 135,
     bgGradientFrom: "#0b1f3a",
     bgGradientTo: "#111827",
+    credencialMetaId: "",
     backgroundVertical: null,
     backgroundHorizontal: null,
 };
@@ -107,6 +108,7 @@ function LandingConfig() {
     const { tenantId } = useTenant();
     const [selectedLanding, setSelectedLanding] = useState(null);
     const [landingOptions, setLandingOptions] = useState([]);
+    const [credencialesMetaOptions, setCredencialesMetaOptions] = useState([]);
     const [form, setForm] = useState(() => cloneEmptyForm());
     const [initialForm, setInitialForm] = useState(() => cloneEmptyForm());
     const [activo, setActivo] = useState(false);
@@ -178,6 +180,7 @@ function LandingConfig() {
             bgType: value.bg_type || EMPTY_FORM.bgType,
             bgColor: value.bg_color || EMPTY_FORM.bgColor,
             bgGradient: value.bg_gradient || EMPTY_FORM.bgGradient,
+            credencialMetaId: value.credencial_meta || "",
             backgroundVertical: null,
             backgroundHorizontal: null,
         };
@@ -218,11 +221,39 @@ function LandingConfig() {
         }
     }, [handleSelectLanding, showToast]);
 
+    const loadCredencialesMeta = useCallback(async () => {
+        try {
+            const { data } = await apiClient.get("/credenciales-meta/");
+            const options = (data || []).map((credencial) => ({
+                ...credencial,
+                label: credencial.nombre
+                    ? `${credencial.nombre} (${credencial.pixel_id || "sin pixel"})`
+                    : credencial.pixel_id || `Credencial #${credencial.id}`,
+            }));
+            setCredencialesMetaOptions(options);
+        } catch (error) {
+            const status = error?.response?.status;
+            const detail = error?.response?.data?.detail;
+            showToast("error", `Error (${status || "?"}): ${detail || "No se pudieron cargar las credenciales Meta."}`);
+        }
+    }, [showToast]);
+
     useEffect(() => {
         loadLandings();
     }, [loadLandings, tenantId]);
 
+    useEffect(() => {
+        loadCredencialesMeta();
+    }, [loadCredencialesMeta, tenantId]);
+
     const isEditMode = Boolean(selectedLanding);
+    const selectedCredencialMeta = useMemo(() => {
+        if (!form.credencialMetaId) return null;
+        return (
+            credencialesMetaOptions.find((item) => Number(item.id) === Number(form.credencialMetaId))
+            || null
+        );
+    }, [credencialesMetaOptions, form.credencialMetaId]);
     const currentGradient = useMemo(
         () => buildGradient(form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo),
         [form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo]
@@ -242,6 +273,7 @@ function LandingConfig() {
         if (hasNewFiles) return true;
         if (activo !== initialActivo) return true;
         if (currentGradient !== initialForm.bgGradient) return true;
+        if (String(form.credencialMetaId || "") !== String(initialForm.credencialMetaId || "")) return true;
         return FIELD_MAP.some(({ formKey, normalize }) => {
             const toValue = normalize || ((value) => value);
             return toValue(form[formKey]) !== toValue(initialForm[formKey]);
@@ -312,6 +344,11 @@ function LandingConfig() {
             if (currentGradient !== initialForm.bgGradient) {
                 formData.append("bg_gradient", currentGradient);
             }
+            const nextCredencial = String(form.credencialMetaId || "");
+            const prevCredencial = String(initialForm.credencialMetaId || "");
+            if (nextCredencial !== prevCredencial) {
+                formData.append("credencial_meta", nextCredencial);
+            }
             appendFiles();
             if ([...formData.keys()].length === 0) {
                 showToast("info", "No hay cambios para guardar.");
@@ -322,6 +359,9 @@ function LandingConfig() {
             appendFields({ includeOnlyChanged: false });
             formData.append("activo", String(Boolean(activo)));
             formData.append("bg_gradient", currentGradient);
+            if (form.credencialMetaId) {
+                formData.append("credencial_meta", String(form.credencialMetaId));
+            }
             appendFiles();
         }
 
@@ -364,7 +404,24 @@ function LandingConfig() {
         <Page title="Configuración de Landing Page">
             <div className="flex flex-row w-full p-2 sm:p-4 justify-center ">
                 <div className="flex flex-col items-center w-full xl:w-9/10 mb-3 rounded-xl pt-1 pb-1 px-3 sm:px-5 bg-black shadow-lg shadow-zinc-900 dark:shadow-black/70">
-                            <div className="flex flex-col gap-0 items-end w-full mt-2 text-black dark:text-white">
+                        <div className="flex flex-row font-bold text-lg items-center justify-start gap-2 ml-0 mt-1 mb-1">
+                            <div className="flex w-full text-black dark:text-white">
+                            {publicLandingUrl ? (
+                                <div className="w-full flex  justify-start">
+                                    <span className="text-black dark:text-white text-xs ">
+                                        URL pública:{" "}
+                                        <a
+                                            href={publicLandingUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sky-700 underline"
+                                        >
+                                            {publicLandingUrl}
+                                        </a>
+                                    </span>
+                                </div>
+                            ) : null}
+                            </div>    
                                 <Autocomplete
                                     options={landingOptions}
                                     value={selectedLanding}
@@ -521,7 +578,28 @@ function LandingConfig() {
                                     fontSize: "",
                                 }}
                             />
-                            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center justify-end w-full mt-1 sm:mt-2 mb-2">
+                            <Autocomplete
+                                options={credencialesMetaOptions}
+                                value={selectedCredencialMeta}
+                                onChange={(_, value) =>
+                                    setForm((prev) => ({ ...prev, credencialMetaId: value?.id || "" }))
+                                }
+                                getOptionLabel={(option) => option?.label || ""}
+                                isOptionEqualToValue={(option, value) => Number(option.id) === Number(value.id)}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Pixel vinculado"
+                                        variant="outlined"
+                                        size="small"
+                                        sx={{ ...commonTextFieldSx, width: { xs: "100%", md: "300%", lg: "400%" } }}
+                                    />
+                                )}
+                            />
+                        </Stack>
+                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
+                        >
+                            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center justify-end w-full mt-1">
                                 <FormControlLabel
                                     control={
                                         <Checkbox
@@ -579,28 +657,7 @@ function LandingConfig() {
                                 />
                             </div>
                         </Stack>
-                            {publicLandingUrl ? (
-                                <div className="w-full mt-2 flex items-center justify-center">
-                                    <span className="text-black dark:text-white text-xs ">
-                                        URL pública:{" "}
-                                        <a
-                                            href={publicLandingUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-sky-700 underline"
-                                        >
-                                            {publicLandingUrl}
-                                        </a>
-                                    </span>
-                                </div>
-                            ) : null}
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
-                        sx={{
-                            mb: 1,
-                        }}
-                        >
-                        </Stack>
-                        <div className="flex w-full text-center justify-center mt-2 mb-2">
+                        <div className="flex w-full text-center justify-center mb-1">
                             <h2 className="text-white font-bold text-lg underline">Recursos Visuales</h2>
                         </div>
                         <Stack direction={{ xs: "column", md: "row" }} spacing={2} className="mt-1 justify-center">
@@ -653,7 +710,7 @@ function LandingConfig() {
                             </Button>
                             </div>
                         </Stack>
-                        <div className="w-full gap-2 mt-4 mb-4 items-end flex justify-end">
+                        <div className="w-full gap-2 mb-2 mt-2 items-end flex justify-end">
                             <Button
                                 variant="outlined"
                                 startIcon={<SaveIcon />}

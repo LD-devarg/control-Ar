@@ -46,7 +46,12 @@ def _build_capi_url(pixel_id: str, access_token: str, test_event_code: str | Non
     return base
 
 
-def obtener_credenciales_meta(empresa_id: int) -> CredencialesMeta | None:
+def obtener_credenciales_meta(empresa_id: int, landing=None) -> CredencialesMeta | None:
+    landing_cred_id = getattr(landing, "credencial_meta_id", None)
+    if landing_cred_id:
+        cred = CredencialesMeta.objects.filter(id=landing_cred_id).first()
+        if cred:
+            return cred
     return CredencialesMeta.objects.filter(empresa_id=empresa_id).order_by("id").first()
 
 
@@ -64,7 +69,7 @@ def enviar_evento_meta(evento, request=None, credenciales: CredencialesMeta | No
     Envia un evento CAPI a Meta usando las CredencialesMeta de la empresa.
     Actualiza el estado del evento en la base de datos.
     """
-    credenciales = credenciales or obtener_credenciales_meta(evento.empresa_id)
+    credenciales = credenciales or obtener_credenciales_meta(evento.empresa_id, landing=getattr(evento, "landing", None))
     if not credenciales:
         raise ValueError("No hay credenciales Meta configuradas para la empresa.")
 

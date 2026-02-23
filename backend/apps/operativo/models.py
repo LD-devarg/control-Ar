@@ -56,6 +56,13 @@ class Landing(models.Model):
         on_delete=models.CASCADE,
         related_name="landings",
     )
+    credencial_meta = models.ForeignKey(
+        "pauta.CredencialesMeta",
+        on_delete=models.SET_NULL,
+        related_name="landings",
+        null=True,
+        blank=True,
+    )
     nombre = models.CharField(max_length=120)
     token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     url = models.URLField()

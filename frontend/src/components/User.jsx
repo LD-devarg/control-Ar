@@ -79,6 +79,19 @@ function User() {
                             </Select>
                         </FormControl>
 
+                        <FormControl fullWidth size="small">
+                            <InputLabel id="ui-theme-label">Tema</InputLabel>
+                            <Select
+                                labelId="ui-theme-label"
+                                value={settings.theme === "light" ? "light" : "dark"}
+                                label="Tema"
+                                onChange={(event) => saveUISettings({ theme: event.target.value })}
+                            >
+                                <MenuItem value="light">Light</MenuItem>
+                                <MenuItem value="dark">Dark</MenuItem>
+                            </Select>
+                        </FormControl>
+
                         {isSuperuser ? (
                             <>
                                 <Divider />

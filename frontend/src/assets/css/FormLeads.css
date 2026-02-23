@@ -18,13 +18,13 @@
     cursor: pointer;
 }
 
-.MuiFormControl-root {
+.form-leads-stack .MuiFormControl-root {
     margin: 0.5rem;
     width: 25ch;
     color: #ffffff;
 }
 
-.MuiInputBase-input {
+.form-leads-stack .MuiInputBase-input {
     color: #ffffff;
 }
 

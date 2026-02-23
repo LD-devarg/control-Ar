@@ -259,8 +259,9 @@ export const CREATE_FORM_CONFIG = {
     endpoint: "/credenciales-meta/",
     fields: [
       { name: "bm", label: "BM", type: "select-remote", source: "/bms/", required: true },
+      { name: "nombre", label: "Nombre", type: "text", required: true },
       { name: "pixel_id", label: "Pixel ID", type: "text", required: true },
-      { name: "app_id", label: "App ID", type: "text", required: true },
+      { name: "app_id", label: "App ID (opcional)", type: "text", required: false },
       { name: "token_acceso_encrypted", label: "Token de acceso", type: "password", required: true },
     ],
   },

@@ -115,8 +115,24 @@ class LandingSerializer(serializers.ModelSerializer):
     pixel_id = serializers.SerializerMethodField()
 
     def get_pixel_id(self, obj):
+        cred = obj.credencial_meta
+        if cred:
+            return cred.pixel_id
         cred = CredencialesMeta.objects.filter(empresa=obj.empresa).order_by("id").first()
         return cred.pixel_id if cred else None
+
+    def validate(self, attrs):
+        credencial_meta = attrs.get("credencial_meta")
+        empresa = attrs.get("empresa") or getattr(self.instance, "empresa", None)
+        if (
+            credencial_meta
+            and empresa
+            and credencial_meta.bm.organizacion_id != empresa.organizacion_id
+        ):
+            raise serializers.ValidationError(
+                "La credencial Meta seleccionada no pertenece a la organizacion de la landing."
+            )
+        return attrs
 
     def validate_url(self, value):
         if value and not value.startswith(("http://", "https://")):
@@ -142,6 +158,7 @@ class LandingSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "empresa",
+            "credencial_meta",
             "nombre",
             "token",
             "url",

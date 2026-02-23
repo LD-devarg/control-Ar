@@ -35,12 +35,12 @@ export default function FormCompra() {
   const { tenantId: empresaId, features } = useTenant();
   const enableBonos = Boolean(features?.bonos);
   const fieldSx = {
-    '& .MuiInputBase-input': { color },
-    '& .MuiInputLabel-root': { color },
-    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: color },
-    '&:hover .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: color },
-    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: color },
-    '& .MuiSvgIcon-root': { color },
+    '& .MuiInputBase-input': { color: `${color} !important` },
+    '& .MuiInputLabel-root': { color: `${color} !important` },
+    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: `${color} !important` },
+    '&:hover .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: `${color} !important` },
+    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: `${color} !important` },
+    '& .MuiSvgIcon-root': { color: `${color} !important` },
   };
 
   useEffect(() => {
@@ -152,7 +152,13 @@ export default function FormCompra() {
         getOptionLabel={(option) => option.label || ""}
         value={selectedCliente}
         onChange={(event, value) => setSelectedCliente(value)}
-        renderInput={(params) => <TextField {...params} label="Seleccione el cliente" sx={fieldSx} />}
+        renderInput={(params) => <TextField {...params} label="Seleccione el cliente" 
+        sx={{ ...fieldSx, 
+              '& .MuiAutocomplete-input': { color: `${color} !important` },
+              '& .MuiFormLabel-root': { color: `${color} !important` },
+              '& .MuiOutlinedInput-root': { borderColor: `${color} !important` },
+
+        }} />}
       />
         <TextField id="outlined-basic" label="Monto" variant="outlined" fullWidth type='number'
         value={monto}

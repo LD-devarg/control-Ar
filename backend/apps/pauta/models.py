@@ -243,8 +243,9 @@ class CredencialesMeta(models.Model):
         on_delete=models.CASCADE,
         related_name="credenciales_meta",
     )
+    nombre = models.CharField(max_length=120, default="Credencial Meta")
     pixel_id = models.CharField(max_length=100)
-    app_id = models.CharField(max_length=100)
+    app_id = models.CharField(max_length=100, null=True, blank=True)
     token_acceso_encrypted = models.TextField()
 
     class Meta:

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Badge from "@mui/material/Badge";
 import IconButton from "@mui/material/IconButton";
 import Popover from "@mui/material/Popover";
@@ -7,8 +7,7 @@ import MarkChatUnreadOutlinedIcon from "@mui/icons-material/MarkChatUnreadOutlin
 import { getCurrentUser } from "../services/auth";
 import { fetchNotificacionesEstructura, markAllNotificacionesRead } from "../services/empresas/notificaciones";
 import { useTenant } from "../context/TenantContext";
-
-const POLL_MS = 30000;
+import { subscribeRealtimeEvents } from "../services/realtime";
 
 function canViewNotifications(user) {
   if (user?.is_superuser) return true;
@@ -33,7 +32,7 @@ export default function NuevoLeadAlert() {
 
   const canView = canViewNotifications(user);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!canView) return;
     setLoading(true);
     try {
@@ -42,14 +41,19 @@ export default function NuevoLeadAlert() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [canView]);
 
   useEffect(() => {
     if (!canView) return undefined;
     load();
-    const id = setInterval(load, POLL_MS);
-    return () => clearInterval(id);
-  }, [canView, tenantId]);
+    const unsubscribe = subscribeRealtimeEvents((message) => {
+      const type = message?.type;
+      if (type === "notificacion_estructural_created") {
+        load();
+      }
+    });
+    return () => unsubscribe();
+  }, [canView, load, tenantId]);
 
   const unreadCount = useMemo(() => items.filter((item) => !item.leida).length, [items]);
 

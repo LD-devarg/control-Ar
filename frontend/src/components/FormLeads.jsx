@@ -207,7 +207,7 @@ export default function NuevoLead({
             if (!isNameValid) {
                 setError("Ingresá un nombre válido.");
             } else if (!isPhoneValid) {
-                setError("Ingresá un número válido de 10 dígitos (con 0, sin 15).");
+                setError("Ingresá un número válido de 10 dígitos (sin 0, sin 15).");
             } else if (!landingToken) {
                 setError("Landing inválida o sin token.");
             }
@@ -289,7 +289,6 @@ export default function NuevoLead({
                 />
                 <TextField
                     required
-                    helperText="10 dígitos, con 0, sin 15."
                     id="celular"
                     label="Celular"
                     fullWidth
@@ -299,7 +298,7 @@ export default function NuevoLead({
                         readOnly: isPreview,
                         endAdornment: (
                             <InputAdornment position="end">
-                                <Tooltip title="10 dígitos, con 0, sin 15." arrow>
+                                <Tooltip title="10 dígitos, sin 0, sin 15." arrow>
                                     <InfoOutlinedIcon sx={{ color: "rgba(255,255,255,0.75)", fontSize: 18 }} />
                                 </Tooltip>
                             </InputAdornment>
@@ -321,6 +320,7 @@ export default function NuevoLead({
                     }}
                     />
             </Stack>
+            <span className='text-xs mt-1 text-white/70'>No compartiremos tu número con nadie.</span>
             {error ? <span className='text-red-400 text-xs mt-2'>{error}</span> : null}
             <div className={`landing-submit-wrap ${canSubmit ? "is-active" : ""}`}>
                 <Button variant="contained" startIcon={<WhatsAppIcon />}

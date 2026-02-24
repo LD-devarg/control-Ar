@@ -27,6 +27,34 @@ TASK_KEY = "sync_pauta_estado_15m"
 PAUTA_SYNC_START_DATE = getattr(settings, "PAUTA_SYNC_START_DATE", None)
 
 
+def _credential_tokens_for_empresa(*, empresa_id: int, cuenta: CuentaPublicitaria | None = None) -> list[str]:
+    creds = list(CredencialesMeta.objects.filter(empresa_id=empresa_id).only("bm_id", "token_acceso_encrypted").order_by("id"))
+    if not creds:
+        return []
+
+    ordered = []
+    if cuenta is not None:
+        same_bm = [cred for cred in creds if cred.bm_id == cuenta.bm_id]
+        other = [cred for cred in creds if cred.bm_id != cuenta.bm_id]
+        ordered = same_bm + other
+    else:
+        ordered = creds
+
+    tokens: list[str] = []
+    seen = set()
+    for cred in ordered:
+        try:
+            token = decrypt_token(cred.token_acceso_encrypted)
+        except Exception:
+            continue
+        token = str(token or "").strip()
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        tokens.append(token)
+    return tokens
+
+
 def _safe_request(path: str, token: str, fields: str, params: dict | None = None) -> dict:
     query = {"access_token": token, "fields": fields}
     if params:
@@ -602,35 +630,38 @@ def sync_pauta_estado_15m(*, empresa_ids: list[int] | None = None, force: bool =
     for empresa in empresas:
         if not force and not _is_task_enabled_for_empresa(empresa, TASK_KEY):
             continue
-        cred = CredencialesMeta.objects.filter(empresa_id=empresa.id).order_by("id").first()
-        if not cred:
+        base_tokens = _credential_tokens_for_empresa(empresa_id=empresa.id)
+        if not base_tokens:
             continue
 
         try:
-            token = decrypt_token(cred.token_acceso_encrypted)
             empresa_ok = False
 
             for cuenta in CuentaPublicitaria.objects.filter(empresa_id=empresa.id):
-                try:
-                    if _sync_ad_account(cuenta, token):
-                        result["cuentas_actualizadas"] += 1
-                    empresa_ok = True
-                except Exception as exc:
-                    result["errores"].append({"empresa_id": empresa.id, "tipo": "cuenta", "id": cuenta.id, "error": str(exc)})
+                tokens = _credential_tokens_for_empresa(empresa_id=empresa.id, cuenta=cuenta) or base_tokens
+                last_exc: Exception | None = None
+                for token in tokens:
+                    try:
+                        if _sync_ad_account(cuenta, token):
+                            result["cuentas_actualizadas"] += 1
 
-            for cuenta in CuentaPublicitaria.objects.filter(empresa_id=empresa.id):
-                try:
-                    stats = _sync_account_structure(cuenta, token)
-                    result["campanias_actualizadas"] += stats["campanias"]
-                    result["adsets_actualizados"] += stats["adsets"]
-                    result["ads_actualizados"] += stats["ads"]
-                    result["assets_actualizados"] += stats["assets"]
-                    result["creatives_actualizados"] += stats["creatives"]
-                    result["alertas_telegram_enviadas"] += stats["alertas_telegram"]
-                    empresa_ok = True
-                except Exception as exc:
+                        stats = _sync_account_structure(cuenta, token)
+                        result["campanias_actualizadas"] += stats["campanias"]
+                        result["adsets_actualizados"] += stats["adsets"]
+                        result["ads_actualizados"] += stats["ads"]
+                        result["assets_actualizados"] += stats["assets"]
+                        result["creatives_actualizados"] += stats["creatives"]
+                        result["alertas_telegram_enviadas"] += stats["alertas_telegram"]
+                        empresa_ok = True
+                        last_exc = None
+                        break
+                    except Exception as exc:
+                        last_exc = exc
+                        continue
+
+                if last_exc is not None:
                     result["errores"].append(
-                        {"empresa_id": empresa.id, "tipo": "estructura_cuenta", "id": cuenta.id, "error": str(exc)}
+                        {"empresa_id": empresa.id, "tipo": "cuenta_sync", "id": cuenta.id, "error": str(last_exc)}
                     )
 
             if empresa_ok:

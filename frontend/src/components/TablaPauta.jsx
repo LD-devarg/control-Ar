@@ -194,7 +194,7 @@ export default function TablaPauta({
           ))}
         </div>
       ) : null}
-      <div className="w-full overflow-x-auto">
+      <div className="app-scrollbar w-full max-h-[52vh] overflow-auto">
         <TableContainer component={Paper} elevation={0} sx={{ background: 'transparent !important' }}>
         <Table
           className="w-full border-collapse-separate border-spacing-0"

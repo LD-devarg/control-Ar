@@ -39,6 +39,34 @@ TASK_KEY = "sync_pauta_kpi_15m"
 PAUTA_SYNC_START_DATE = getattr(settings, "PAUTA_SYNC_START_DATE", None)
 
 
+def _credential_tokens_for_empresa(*, empresa_id: int, cuenta: CuentaPublicitaria | None = None) -> list[str]:
+    creds = list(CredencialesMeta.objects.filter(empresa_id=empresa_id).only("bm_id", "token_acceso_encrypted").order_by("id"))
+    if not creds:
+        return []
+
+    ordered = []
+    if cuenta is not None:
+        same_bm = [cred for cred in creds if cred.bm_id == cuenta.bm_id]
+        other = [cred for cred in creds if cred.bm_id != cuenta.bm_id]
+        ordered = same_bm + other
+    else:
+        ordered = creds
+
+    tokens: list[str] = []
+    seen = set()
+    for cred in ordered:
+        try:
+            token = decrypt_token(cred.token_acceso_encrypted)
+        except Exception:
+            continue
+        token = str(token or "").strip()
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        tokens.append(token)
+    return tokens
+
+
 def _to_decimal(value, default="0") -> Decimal:
     try:
         if value in (None, ""):
@@ -185,39 +213,57 @@ def sync_rendimientos_meta_diarios(*, empresa_ids: list[int] | None = None, forc
         if not force and not _is_task_enabled_for_empresa(empresa, TASK_KEY):
             continue
         try:
-            cuenta = CuentaPublicitaria.objects.filter(empresa_id=empresa.id).order_by("id").first()
-            if not cuenta:
+            cuentas = list(CuentaPublicitaria.objects.filter(empresa_id=empresa.id).order_by("id"))
+            if not cuentas:
+                continue
+            base_tokens = _credential_tokens_for_empresa(empresa_id=empresa.id)
+            if not base_tokens:
                 continue
 
-            cred = CredencialesMeta.objects.filter(empresa_id=empresa.id).order_by("id").first()
-            if not cred:
-                continue
+            empresa_ok = False
+            for cuenta in cuentas:
+                ad_account_id = str(cuenta.meta_id)
+                if not ad_account_id.startswith("act_"):
+                    ad_account_id = f"act_{ad_account_id}"
 
-            token = decrypt_token(cred.token_acceso_encrypted)
-            ad_account_id = str(cuenta.meta_id)
-            if not ad_account_id.startswith("act_"):
-                ad_account_id = f"act_{ad_account_id}"
+                tokens = _credential_tokens_for_empresa(empresa_id=empresa.id, cuenta=cuenta) or base_tokens
+                rows = None
+                last_exc: Exception | None = None
+                for token in tokens:
+                    try:
+                        rows = _fetch_insights_rows(ad_account_id, token, fecha_objetivo)
+                        last_exc = None
+                        break
+                    except Exception as exc:
+                        last_exc = exc
+                        continue
 
-            rows = _fetch_insights_rows(ad_account_id, token, fecha_objetivo)
-            account_currency = str((rows[0] or {}).get("account_currency") or "").upper() if rows else ""
-            if account_currency in {CuentaPublicitaria.MONEDA_USD, CuentaPublicitaria.MONEDA_ARS} and cuenta.moneda != account_currency:
-                cuenta.moneda = account_currency
-                cuenta.save(update_fields=["moneda"])
+                if rows is None:
+                    if last_exc is not None:
+                        result["errores"].append({"empresa_id": empresa.id, "cuenta_id": cuenta.id, "error": str(last_exc)})
+                    continue
 
-            with transaction.atomic():
-                for row in rows:
-                    created, _obj = _upsert_row(empresa, cuenta, fecha_objetivo, row)
-                    if created:
-                        result["insertados"] += 1
-                    else:
-                        result["actualizados"] += 1
+                account_currency = str((rows[0] or {}).get("account_currency") or "").upper() if rows else ""
+                if account_currency in {CuentaPublicitaria.MONEDA_USD, CuentaPublicitaria.MONEDA_ARS} and cuenta.moneda != account_currency:
+                    cuenta.moneda = account_currency
+                    cuenta.save(update_fields=["moneda"])
+
+                with transaction.atomic():
+                    for row in rows:
+                        created, _obj = _upsert_row(empresa, cuenta, fecha_objetivo, row)
+                        if created:
+                            result["insertados"] += 1
+                        else:
+                            result["actualizados"] += 1
+                empresa_ok = True
 
             empresa.kpi_sync_last_run_at = timezone.now()
-            empresa.kpi_sync_last_status = "ok"
-            empresa.kpi_sync_last_error = ""
+            empresa.kpi_sync_last_status = "ok" if empresa_ok else "error"
+            empresa.kpi_sync_last_error = "" if empresa_ok else "No se pudo sincronizar ninguna cuenta publicitaria."
             empresa.save(update_fields=["kpi_sync_last_run_at", "kpi_sync_last_status", "kpi_sync_last_error"])
 
-            result["empresas_procesadas"] += 1
+            if empresa_ok:
+                result["empresas_procesadas"] += 1
         except Exception as exc:
             empresa.kpi_sync_last_run_at = timezone.now()
             empresa.kpi_sync_last_status = "error"

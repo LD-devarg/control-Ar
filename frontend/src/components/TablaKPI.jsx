@@ -7,20 +7,15 @@ const LEVEL_LABELS = {
   campaign: "Campaña",
   adset: "Adset",
   ad: "Ad",
+  naming: "Naming",
 };
 
 const EMPTY_OPERATIVE_DATA = {
   campaign: [],
   adset: [],
   ad: [],
+  naming: [],
 };
-
-const currencyFormatter = new Intl.NumberFormat("es-AR", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-  minimumFractionDigits: 0,
-});
 
 const percentFormatter = new Intl.NumberFormat("es-AR", {
   style: "percent",
@@ -33,19 +28,19 @@ const numberFormatter = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 0,
 });
 
-const ALL_COLUMNS = [
-  { key: "inversion", label: "Inversion", align: "right", format: (v) => currencyFormatter.format(v) },
-  { key: "ctr", label: "CTR", align: "right", format: (v) => percentFormatter.format(v) },
-  { key: "cpc", label: "CPC", align: "right", format: (v) => currencyFormatter.format(v) },
-  { key: "cpl", label: "CPL", align: "right", format: (v) => currencyFormatter.format(v) },
-  { key: "cpa", label: "CPA", align: "right", format: (v) => currencyFormatter.format(v) },
-  { key: "roas", label: "ROAS", align: "right", format: (v) => numberFormatter.format(v) },
-  { key: "frecuencia", label: "Frecuencia", align: "right", format: (v) => numberFormatter.format(v) },
-  { key: "ftd", label: "FTD", align: "right", format: (v) => numberFormatter.format(v) },
-  { key: "valor_ftd", label: "Valor FTD", align: "right", format: (v) => currencyFormatter.format(v) },
-  { key: "leads", label: "Leads", align: "right", format: (v) => numberFormatter.format(v) },
-  { key: "contactos", label: "Contactos", align: "right", format: (v) => numberFormatter.format(v) },
-  { key: "web_visitors", label: "Web visitors", align: "right", format: (v) => numberFormatter.format(v) },
+const BASE_COLUMNS = [
+  { key: "inversion", label: "Inversion", align: "right", type: "money" },
+  { key: "ctr", label: "CTR", align: "right", type: "percent" },
+  { key: "cpc", label: "CPC", align: "right", type: "money" },
+  { key: "cpl", label: "CPL", align: "right", type: "money" },
+  { key: "cpa", label: "CPA", align: "right", type: "money" },
+  { key: "roas", label: "ROAS", align: "right", type: "number" },
+  { key: "frecuencia", label: "Frecuencia", align: "right", type: "number" },
+  { key: "ftd", label: "FTD", align: "right", type: "number" },
+  { key: "valor_ftd", label: "Valor FTD", align: "right", type: "money" },
+  { key: "leads", label: "Leads", align: "right", type: "number" },
+  { key: "contactos", label: "Contactos", align: "right", type: "number" },
+  { key: "web_visitors", label: "Web visitors", align: "right", type: "number" },
 ];
 
 const DEFAULT_VISIBLE_COLUMNS = ["inversion", "leads", "contactos", "ftd", "valor_ftd", "roas"];
@@ -98,14 +93,16 @@ function mapApiToLocalShape(payload) {
   const executiveCards = payload?.executive?.cards || {};
   const footer = payload?.executive?.footer || {};
   const daily = Array.isArray(payload?.executive?.daily_roas) ? payload.executive.daily_roas : [];
+  const moneyCurrency = payload?.money_currency === "ARS" ? "ARS" : payload?.money_currency === "USD" ? "USD" : "MIXED";
+  const moneyDisplay = moneyCurrency === "MIXED" ? "number" : moneyCurrency;
 
   const cards = [
-    { key: "inversion", label: "Inversion", value: Number(executiveCards.inversion || 0), display: "USD" },
-    { key: "ingresos", label: "Ingresos", value: Number(executiveCards.ingresos || 0), display: "USD" },
+    { key: "inversion", label: "Inversion", value: Number(executiveCards.inversion || 0), display: moneyDisplay },
+    { key: "ingresos", label: "Ingresos", value: Number(executiveCards.ingresos || 0), display: moneyDisplay },
     { key: "roas", label: "ROAS", value: Number(executiveCards.roas || 0), display: "number" },
-    { key: "cpa", label: "CPA", value: Number(executiveCards.cpa || 0), display: "USD" },
-    { key: "cpc", label: "CPC", value: Number(executiveCards.cpc || 0), display: "USD" },
-    { key: "cpl", label: "CPL", value: Number(executiveCards.cpl || 0), display: "USD" },
+    { key: "cpa", label: "CPA", value: Number(executiveCards.cpa || 0), display: moneyDisplay },
+    { key: "cpc", label: "CPC", value: Number(executiveCards.cpc || 0), display: moneyDisplay },
+    { key: "cpl", label: "CPL", value: Number(executiveCards.cpl || 0), display: moneyDisplay },
     { key: "frecuencia", label: "Frecuencia", value: Number(executiveCards.frecuencia || 0), display: "number" },
     { key: "ctr", label: "CTR", value: Number(executiveCards.ctr || 0), display: "percent" },
   ].map((card) => ({
@@ -120,11 +117,13 @@ function mapApiToLocalShape(payload) {
     { key: "leads", label: "Leads", value: Number(footer.leads || 0) },
     { key: "contactos", label: "Contactos", value: Number(footer.contactos || 0) },
     { key: "ftd", label: "FTD", value: Number(footer.ftd ?? footer.compras ?? 0) },
-    { key: "valor_ftd", label: "Valor FTD", value: Number(footer.valor_ftd ?? footer.valor_compras ?? 0), display: "USD" },
+    { key: "valor_ftd", label: "Valor FTD", value: Number(footer.valor_ftd ?? footer.valor_compras ?? 0), display: moneyDisplay },
     { key: "efectividad", label: "Efectividad FTD", value: Number(footer.efectividad || 0), display: "percent" },
   ];
 
   return {
+    moneyCurrency,
+    moneyDisplay,
     executiveCards: cards,
     footerCards,
     dailySeries: daily.map((d) => ({
@@ -137,6 +136,7 @@ function mapApiToLocalShape(payload) {
       campaign: Array.isArray(payload?.operative?.campaign) ? payload.operative.campaign : [],
       adset: Array.isArray(payload?.operative?.adset) ? payload.operative.adset : [],
       ad: Array.isArray(payload?.operative?.ad) ? payload.operative.ad : [],
+      naming: Array.isArray(payload?.operative?.naming) ? payload.operative.naming : [],
     },
   };
 }
@@ -159,13 +159,45 @@ export default function TablaKPI({
   const [loadingRemote, setLoadingRemote] = useState(false);
   const [remoteError, setRemoteError] = useState("");
 
+  const moneyCurrency = remoteData?.moneyCurrency === "ARS" ? "ARS" : remoteData?.moneyCurrency === "USD" ? "USD" : "MIXED";
+  const currencyFormatter = useMemo(() => {
+    if (moneyCurrency === "MIXED") return null;
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: moneyCurrency,
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+    });
+  }, [moneyCurrency]);
+
+  const formatMoney = useMemo(() => {
+    if (!currencyFormatter) {
+      return (value) => numberFormatter.format(Number(value || 0));
+    }
+    return (value) => currencyFormatter.format(Number(value || 0));
+  }, [currencyFormatter]);
+
+  const allColumns = useMemo(
+    () =>
+      BASE_COLUMNS.map((column) => ({
+        ...column,
+        format:
+          column.type === "money"
+            ? formatMoney
+            : column.type === "percent"
+            ? (v) => percentFormatter.format(Number(v || 0))
+            : (v) => numberFormatter.format(Number(v || 0)),
+      })),
+    [formatMoney]
+  );
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KPI_COLUMNS_STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed) || parsed.length === 0) return;
-      const allowed = new Set(ALL_COLUMNS.map((col) => col.key));
+      const allowed = new Set(BASE_COLUMNS.map((col) => col.key));
       const next = parsed.filter((key) => allowed.has(key));
       if (next.length > 0) {
         setVisibleColumnKeys(next);
@@ -233,8 +265,8 @@ export default function TablaKPI({
   }, [sortedRows]);
 
   const operativeColumns = useMemo(
-    () => ALL_COLUMNS.filter((col) => visibleColumnKeys.includes(col.key)),
-    [visibleColumnKeys]
+    () => allColumns.filter((col) => visibleColumnKeys.includes(col.key)),
+    [allColumns, visibleColumnKeys]
   );
 
   const totals = useMemo(() => {
@@ -303,7 +335,7 @@ export default function TablaKPI({
   };
 
   const showAllColumns = () => {
-    setVisibleColumnKeys(ALL_COLUMNS.map((col) => col.key));
+    setVisibleColumnKeys(BASE_COLUMNS.map((col) => col.key));
   };
 
   const resetDefaultColumns = () => {
@@ -323,6 +355,9 @@ export default function TablaKPI({
             <span className="text-[11px] text-white/60">{filterSummary}</span>
             {loadingRemote ? <span className="text-xs text-cyan-300">Cargando datos reales...</span> : null}
             {remoteError ? <span className="text-xs text-amber-300">{remoteError}</span> : null}
+            {!remoteError ? (
+              <span className="text-[11px] text-white/55">Moneda: {moneyCurrency === "MIXED" ? "Mixta" : moneyCurrency}</span>
+            ) : null}
             {!loadingRemote && !remoteError && remoteData?.lastSync ? (
               <>
                 <span className="text-[11px] text-white/55">
@@ -342,7 +377,7 @@ export default function TablaKPI({
               level={level}
               levelLabels={LEVEL_LABELS}
               onLevelChange={setLevel}
-              allColumns={ALL_COLUMNS}
+              allColumns={allColumns}
               columns={operativeColumns}
               visibleColumnKeys={visibleColumnKeys}
               onToggleColumn={toggleColumn}

@@ -6,6 +6,10 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
 
 const COLUMN_SETS = {
   Bms: [
@@ -17,6 +21,7 @@ const COLUMN_SETS = {
     { key: 'name', label: 'Nombre' },
     { key: 'bm', label: 'Bm' },
     { key: 'metaId', label: 'Meta_ID' },
+    { key: 'currency', label: 'Moneda' },
     { key: 'status', label: 'Estado' },
   ],
   FanPage: [
@@ -88,6 +93,7 @@ export default function TablaPauta({
   const baseColumns = COLUMN_SETS[view] ?? COLUMN_SETS.Bms;
   const rows = rowsByView?.[view] ?? [];
   const [selectedByView, setSelectedByView] = useState({});
+  const [targetingDialog, setTargetingDialog] = useState({ open: false, content: '' });
 
   useEffect(() => {
     setSelectedByView((prev) => {
@@ -130,6 +136,37 @@ export default function TablaPauta({
       }
       return { ...prev, [view]: next };
     });
+  };
+
+  const openTargetingDialog = (value) => {
+    let parsed = value;
+    if (typeof value === 'string') {
+      try {
+        parsed = JSON.parse(value);
+      } catch {
+        parsed = value;
+      }
+    }
+    const content = typeof parsed === 'string' ? parsed : JSON.stringify(parsed || {}, null, 2);
+    setTargetingDialog({ open: true, content });
+  };
+
+  const closeTargetingDialog = () => setTargetingDialog({ open: false, content: '' });
+
+  const getCellValue = (row, columnKey) => {
+    if (columnKey === 'budget') {
+      return row.budget ?? row.presupuesto_diario ?? '-';
+    }
+    if (columnKey === 'targeting') {
+      const value = row[columnKey];
+      if (!value || value === '-') return '-';
+      return (
+        <Button size="small" variant="outlined" onClick={() => openTargetingDialog(value)}>
+          Ver
+        </Button>
+      );
+    }
+    return row[columnKey] ?? '-';
   };
 
   return (
@@ -219,12 +256,14 @@ export default function TablaPauta({
         </Table>
         </TableContainer>
       </div>
+      <Dialog open={targetingDialog.open} onClose={closeTargetingDialog} fullWidth maxWidth="md">
+        <DialogTitle>Segmentacion</DialogTitle>
+        <DialogContent>
+          <pre className="max-h-[60vh] overflow-auto rounded-md bg-slate-100 p-3 text-xs text-slate-800">
+            {targetingDialog.content}
+          </pre>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-  const getCellValue = (row, columnKey) => {
-    if (columnKey === 'budget') {
-      return row.budget ?? row.presupuesto_diario ?? '-';
-    }
-    return row[columnKey] ?? '-';
-  };

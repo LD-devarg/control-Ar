@@ -27,6 +27,13 @@ class BM(models.Model):
 
 
 class CuentaPublicitaria(models.Model):
+    MONEDA_USD = "USD"
+    MONEDA_ARS = "ARS"
+    MONEDA_CHOICES = (
+        (MONEDA_USD, "USD"),
+        (MONEDA_ARS, "ARS"),
+    )
+
     empresa = models.ForeignKey(
         "empresas.Empresa",
         on_delete=models.CASCADE,
@@ -40,6 +47,7 @@ class CuentaPublicitaria(models.Model):
     meta_id = models.CharField(max_length=100)
     nombre = models.CharField(max_length=120)
     estado = models.CharField(max_length=50)
+    moneda = models.CharField(max_length=3, choices=MONEDA_CHOICES, default=MONEDA_USD)
     creado_en = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -167,8 +175,9 @@ class Anuncio(models.Model):
 
 class PautaAsset(models.Model):
     empresa = models.ForeignKey("empresas.Empresa", on_delete=models.CASCADE)
+    nombre = models.CharField(max_length=160, blank=True, default="")
     tipo = models.CharField(max_length=20)  # image | video
-    s3_url = models.URLField()
+    s3_url = models.URLField(blank=True, default="")
     meta_asset_id = models.CharField(max_length=100, null=True, blank=True)  
     estado = models.CharField(max_length=30, default="pending")  # uploaded / error
     creado_en = models.DateTimeField(auto_now_add=True)
@@ -182,6 +191,8 @@ class Creative(models.Model):
         "pauta.FanPage",
         on_delete=models.PROTECT,
         related_name="creatives",
+        null=True,
+        blank=True,
     )
     instagram_account = models.ForeignKey(
         "pauta.InstagramAccount",
@@ -192,15 +203,16 @@ class Creative(models.Model):
     )
     nombre = models.CharField(max_length=120)
 
-    primary_text = models.TextField()
-    headline = models.CharField(max_length=255)
+    primary_text = models.TextField(blank=True, default="")
+    headline = models.CharField(max_length=255, blank=True, default="")
     descripcion = models.CharField(max_length=255, null=True, blank=True)
 
-    url_destino = models.URLField()
-    cta = models.CharField(max_length=50)
+    url_destino = models.URLField(blank=True, default="")
+    cta = models.CharField(max_length=50, blank=True, default="")
 
-    asset = models.ForeignKey("pauta.PautaAsset", on_delete=models.PROTECT)
+    asset = models.ForeignKey("pauta.PautaAsset", on_delete=models.PROTECT, null=True, blank=True)
     meta_id = models.CharField(max_length=100, null=True, blank=True)
+    estado = models.CharField(max_length=30, default="pending")
 
     creado_en = models.DateTimeField(auto_now_add=True)
 

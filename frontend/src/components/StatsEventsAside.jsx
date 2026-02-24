@@ -208,8 +208,8 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
               onClick={() => setSelectedEvent(item)}
               className={`w-full rounded-[18px] cursor-pointer px-4 py-2 text-left transition-all duration-200 ${
                 highlightedIds.includes(item.id)
-                  ? "border-cyan-400/70 bg-green-200/90"
-                  : "border-white/10 bg-black/20 hover:border-white/30"
+                  ? "border-cyan-400/70 bg-green-200/20"
+                  : "border-white/10 bg-gradient-to-r from-black to-black/80 hover:border-white/30 hover:bg-gradient-to-r hover:from-black/80 hover:to-black/60"
               }`}
             >
               <div className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-white/65">

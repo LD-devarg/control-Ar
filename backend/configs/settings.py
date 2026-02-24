@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -14,6 +15,16 @@ def env_bool(name: str, default: bool = False) -> bool:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
+
+def env_date(name: str, default: date) -> date:
+    value = os.getenv(name)
+    if not value:
+        return default
+    try:
+        return date.fromisoformat(value.strip())
+    except ValueError:
+        return default
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
@@ -22,6 +33,7 @@ SECRET_KEY = os.getenv(
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_bool("DEBUG", False)
+PAUTA_SYNC_START_DATE = env_date("PAUTA_SYNC_START_DATE", date(2025, 12, 1))
 
 allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(",") if host.strip()]

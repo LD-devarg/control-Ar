@@ -4,9 +4,11 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
 import requests
+from django.conf import settings
 from django.utils import timezone
 
 from apps.empresas.models import Empresa
+from apps.pauta import models as pauta_models
 from apps.pauta.models import (
     Anuncio,
     Campaña,
@@ -21,6 +23,7 @@ from apps.pauta.servicios.crypto import decrypt_token
 META_API_VERSION = "v18.0"
 META_TIMEOUT_SECONDS = 15
 TASK_KEY = "sync_pauta_estado_15m"
+PAUTA_SYNC_START_DATE = getattr(settings, "PAUTA_SYNC_START_DATE", None)
 
 
 def _safe_request(path: str, token: str, fields: str, params: dict | None = None) -> dict:
@@ -33,6 +36,328 @@ def _safe_request(path: str, token: str, fields: str, params: dict | None = None
     if not response.ok:
         raise RuntimeError(str(payload))
     return payload
+
+
+def _safe_paginated_request(path: str, token: str, fields: str, params: dict | None = None) -> list[dict]:
+    request_params = {"limit": 200}
+    if params:
+        request_params.update(params)
+
+    payload = _safe_request(path, token, fields, request_params)
+    rows: list[dict] = list(payload.get("data", []))
+    next_url = payload.get("paging", {}).get("next")
+    while next_url:
+        response = requests.get(next_url, timeout=META_TIMEOUT_SECONDS)
+        payload = response.json()
+        if not response.ok:
+            raise RuntimeError(str(payload))
+        rows.extend(payload.get("data", []))
+        next_url = payload.get("paging", {}).get("next")
+    return rows
+
+
+def _normalize_estado(value: str | None, fallback: str = "ACTIVE") -> str:
+    result = str(value or fallback).strip().upper()
+    return result or fallback
+
+
+def _upsert_asset(
+    *,
+    empresa_id: int,
+    meta_asset_id: str,
+    tipo: str,
+    nombre: str,
+    estado: str,
+) -> tuple[PautaAsset, bool]:
+    defaults = {
+        "tipo": tipo or "image",
+        "nombre": nombre or meta_asset_id,
+        "estado": estado or "uploaded",
+        "s3_url": "",
+    }
+    asset, created = PautaAsset.objects.get_or_create(
+        empresa_id=empresa_id,
+        meta_asset_id=meta_asset_id,
+        defaults=defaults,
+    )
+    if created:
+        return asset, True
+
+    changed = False
+    for field, next_value in defaults.items():
+        if getattr(asset, field) != next_value:
+            setattr(asset, field, next_value)
+            changed = True
+    if changed:
+        asset.save(update_fields=["tipo", "nombre", "estado", "s3_url"])
+    return asset, changed
+
+
+def _extract_creative_payload(data: dict) -> dict:
+    story = data.get("object_story_spec") or {}
+    link_data = story.get("link_data") or {}
+    video_data = story.get("video_data") or {}
+
+    page_id = str(story.get("page_id") or "").strip()
+    primary_text = link_data.get("message") or video_data.get("message") or ""
+    headline = link_data.get("name") or video_data.get("title") or ""
+    descripcion = link_data.get("description") or ""
+    url_destino = (
+        link_data.get("link")
+        or (video_data.get("call_to_action") or {}).get("value", {}).get("link")
+        or ""
+    )
+    cta = (
+        (link_data.get("call_to_action") or {}).get("type")
+        or (video_data.get("call_to_action") or {}).get("type")
+        or ""
+    )
+
+    asset_candidates: list[tuple[str, str]] = []
+    image_hash = str(link_data.get("image_hash") or "").strip()
+    video_id = str(video_data.get("video_id") or "").strip()
+    if image_hash:
+        asset_candidates.append(("image", image_hash))
+    if video_id:
+        asset_candidates.append(("video", video_id))
+
+    return {
+        "nombre": str(data.get("name") or data.get("id") or "").strip(),
+        "estado": _normalize_estado(data.get("effective_status") or data.get("status"), "ACTIVE"),
+        "page_id": page_id,
+        "primary_text": str(primary_text or "").strip(),
+        "headline": str(headline or "").strip(),
+        "descripcion": str(descripcion or "").strip(),
+        "url_destino": str(url_destino or "").strip(),
+        "cta": str(cta or "").strip(),
+        "asset_candidates": asset_candidates,
+    }
+
+
+def _sync_account_structure(cuenta: CuentaPublicitaria, token: str) -> dict[str, int]:
+    account_id = str(cuenta.meta_id)
+    if not account_id.startswith("act_"):
+        account_id = f"act_{account_id}"
+
+    empresa_id = cuenta.empresa_id
+    campana_model = getattr(pauta_models, "Campaña", Campaña)
+    fanpage_model = getattr(pauta_models, "FanPage")
+    adset_campaign_field_name = next(
+        (
+            field.name
+            for field in ConjuntoAnuncios._meta.fields
+            if getattr(field, "is_relation", False)
+            and (
+                getattr(field, "related_model", None) == campana_model
+                or (
+                    getattr(getattr(field, "related_model", None), "_meta", None) is not None
+                    and getattr(field.related_model._meta, "db_table", "") == getattr(campana_model._meta, "db_table", "")
+                )
+            )
+        ),
+        "campana",
+    )
+
+    counters = {
+        "campanias": 0,
+        "adsets": 0,
+        "ads": 0,
+        "assets": 0,
+        "creatives": 0,
+    }
+
+    campaign_rows = _safe_paginated_request(
+        f"{account_id}/campaigns",
+        token,
+        "id,name,status,effective_status,objective,start_time,stop_time",
+    )
+    campaign_map: dict[str, Campaña] = {}
+    for row in campaign_rows:
+        campaign_meta_id = str(row.get("id") or "").strip()
+        if not campaign_meta_id:
+            continue
+        campaign_start = _parse_date(row.get("start_time"))
+        if PAUTA_SYNC_START_DATE and campaign_start and campaign_start < PAUTA_SYNC_START_DATE:
+            continue
+
+        defaults = {
+            "nombre": str(row.get("name") or campaign_meta_id)[:120],
+            "estado": _normalize_estado(row.get("effective_status") or row.get("status")),
+            "objetivo": str(row.get("objective") or "")[:100],
+            "fecha_inicio": campaign_start,
+            "fecha_fin": _parse_date(row.get("stop_time")),
+        }
+        campaign, created = campana_model.objects.get_or_create(
+            empresa_id=empresa_id,
+            cuenta_publicitaria=cuenta,
+            meta_id=campaign_meta_id,
+            defaults=defaults,
+        )
+        changed = created
+        if not created:
+            update_fields = []
+            for field, value in defaults.items():
+                if getattr(campaign, field) != value:
+                    setattr(campaign, field, value)
+                    update_fields.append(field)
+            if update_fields:
+                campaign.save(update_fields=update_fields)
+                changed = True
+        campaign_map[campaign_meta_id] = campaign
+        if changed:
+            counters["campanias"] += 1
+
+    adset_rows = _safe_paginated_request(
+        f"{account_id}/adsets",
+        token,
+        "id,name,status,effective_status,daily_budget,start_time,end_time,campaign_id,targeting",
+    )
+    adset_map: dict[str, ConjuntoAnuncios] = {}
+    for row in adset_rows:
+        adset_meta_id = str(row.get("id") or "").strip()
+        campaign_meta_id = str(row.get("campaign_id") or "").strip()
+        if not adset_meta_id or not campaign_meta_id:
+            continue
+        campaign = campaign_map.get(campaign_meta_id)
+        if campaign is None:
+            continue
+        adset_start = _parse_date(row.get("start_time"))
+        if PAUTA_SYNC_START_DATE and adset_start and adset_start < PAUTA_SYNC_START_DATE:
+            continue
+
+        defaults = {
+            adset_campaign_field_name: campaign,
+            "nombre": str(row.get("name") or adset_meta_id)[:120],
+            "estado": _normalize_estado(row.get("effective_status") or row.get("status")),
+            "presupuesto_diario": _parse_budget_minor_units(row.get("daily_budget")),
+            "segmentacion": {"targeting": row.get("targeting") or {}},
+            "fecha_inicio": adset_start,
+            "fecha_fin": _parse_date(row.get("end_time")),
+        }
+        adset, created = ConjuntoAnuncios.objects.get_or_create(
+            empresa_id=empresa_id,
+            meta_id=adset_meta_id,
+            defaults=defaults,
+        )
+        changed = created
+        if not created:
+            update_fields = []
+            for field, value in defaults.items():
+                if getattr(adset, field) != value:
+                    setattr(adset, field, value)
+                    update_fields.append(field)
+            if update_fields:
+                adset.save(update_fields=update_fields)
+                changed = True
+        adset_map[adset_meta_id] = adset
+        if changed:
+            counters["adsets"] += 1
+
+    creative_cache: dict[str, Creative] = {}
+    ad_rows = _safe_paginated_request(
+        f"{account_id}/ads",
+        token,
+        "id,name,status,effective_status,adset_id,creative{id,name}",
+    )
+    for row in ad_rows:
+        ad_meta_id = str(row.get("id") or "").strip()
+        adset_meta_id = str(row.get("adset_id") or "").strip()
+        if not ad_meta_id or not adset_meta_id:
+            continue
+        adset = adset_map.get(adset_meta_id)
+        if adset is None:
+            continue
+
+        creative_data = row.get("creative") or {}
+        creative_meta_id = str(creative_data.get("id") or "").strip()
+        if not creative_meta_id:
+            continue
+
+        creative_obj = creative_cache.get(creative_meta_id)
+        if creative_obj is None:
+            creative_raw = _safe_request(
+                creative_meta_id,
+                token,
+                "id,name,status,object_story_spec",
+            )
+            creative_payload = _extract_creative_payload(creative_raw)
+            fanpage = None
+            if creative_payload["page_id"]:
+                fanpage = fanpage_model.objects.filter(
+                    empresa_id=empresa_id,
+                    meta_id=creative_payload["page_id"],
+                ).first()
+
+            linked_asset = None
+            for asset_tipo, asset_meta_id in creative_payload["asset_candidates"]:
+                asset, asset_changed = _upsert_asset(
+                    empresa_id=empresa_id,
+                    meta_asset_id=asset_meta_id,
+                    tipo=asset_tipo,
+                    nombre=asset_meta_id,
+                    estado="uploaded",
+                )
+                if asset_changed:
+                    counters["assets"] += 1
+                if linked_asset is None:
+                    linked_asset = asset
+
+            creative_defaults = {
+                "fanpage": fanpage,
+                "instagram_account": None,
+                "nombre": (creative_payload["nombre"] or creative_meta_id)[:120],
+                "primary_text": creative_payload["primary_text"],
+                "headline": creative_payload["headline"][:255],
+                "descripcion": creative_payload["descripcion"][:255] or None,
+                "url_destino": creative_payload["url_destino"],
+                "cta": creative_payload["cta"][:50],
+                "asset": linked_asset,
+                "estado": creative_payload["estado"],
+            }
+            creative_obj, created = Creative.objects.get_or_create(
+                empresa_id=empresa_id,
+                meta_id=creative_meta_id,
+                defaults=creative_defaults,
+            )
+            creative_changed = created
+            if not created:
+                update_fields = []
+                for field, value in creative_defaults.items():
+                    if getattr(creative_obj, field) != value:
+                        setattr(creative_obj, field, value)
+                        update_fields.append(field)
+                if update_fields:
+                    creative_obj.save(update_fields=update_fields)
+                    creative_changed = True
+            if creative_changed:
+                counters["creatives"] += 1
+            creative_cache[creative_meta_id] = creative_obj
+
+        ad_defaults = {
+            "conjunto_anuncios": adset,
+            "creative": creative_obj,
+            "nombre": str(row.get("name") or ad_meta_id)[:120],
+            "estado": _normalize_estado(row.get("effective_status") or row.get("status")),
+        }
+        ad, created = Anuncio.objects.get_or_create(
+            empresa_id=empresa_id,
+            meta_id=ad_meta_id,
+            defaults=ad_defaults,
+        )
+        ad_changed = created
+        if not created:
+            update_fields = []
+            for field, value in ad_defaults.items():
+                if getattr(ad, field) != value:
+                    setattr(ad, field, value)
+                    update_fields.append(field)
+            if update_fields:
+                ad.save(update_fields=update_fields)
+                ad_changed = True
+        if ad_changed:
+            counters["ads"] += 1
+
+    return counters
 
 
 def _parse_date(value: str | None):
@@ -68,11 +393,14 @@ def _sync_ad_account(cuenta: CuentaPublicitaria, token: str) -> bool:
     account_id = str(cuenta.meta_id)
     if not account_id.startswith("act_"):
         account_id = f"act_{account_id}"
-    data = _safe_request(account_id, token, "name,account_status")
+    data = _safe_request(account_id, token, "name,account_status,currency")
 
     changed = False
     next_estado = str(data.get("account_status", cuenta.estado))
     next_nombre = data.get("name") or cuenta.nombre
+    next_moneda = str(data.get("currency") or cuenta.moneda).upper()
+    if next_moneda not in {CuentaPublicitaria.MONEDA_USD, CuentaPublicitaria.MONEDA_ARS}:
+        next_moneda = cuenta.moneda
 
     if next_estado != cuenta.estado:
         cuenta.estado = next_estado
@@ -80,9 +408,12 @@ def _sync_ad_account(cuenta: CuentaPublicitaria, token: str) -> bool:
     if next_nombre != cuenta.nombre:
         cuenta.nombre = next_nombre
         changed = True
+    if next_moneda != cuenta.moneda:
+        cuenta.moneda = next_moneda
+        changed = True
 
     if changed:
-        cuenta.save(update_fields=["estado", "nombre"])
+        cuenta.save(update_fields=["estado", "nombre", "moneda"])
     return changed
 
 
@@ -248,45 +579,19 @@ def sync_pauta_estado_15m(*, empresa_ids: list[int] | None = None, force: bool =
                 except Exception as exc:
                     result["errores"].append({"empresa_id": empresa.id, "tipo": "cuenta", "id": cuenta.id, "error": str(exc)})
 
-            for campania in Campaña.objects.filter(empresa_id=empresa.id):
+            for cuenta in CuentaPublicitaria.objects.filter(empresa_id=empresa.id):
                 try:
-                    if _sync_campaign(campania, token):
-                        result["campanias_actualizadas"] += 1
+                    stats = _sync_account_structure(cuenta, token)
+                    result["campanias_actualizadas"] += stats["campanias"]
+                    result["adsets_actualizados"] += stats["adsets"]
+                    result["ads_actualizados"] += stats["ads"]
+                    result["assets_actualizados"] += stats["assets"]
+                    result["creatives_actualizados"] += stats["creatives"]
                     empresa_ok = True
                 except Exception as exc:
-                    result["errores"].append({"empresa_id": empresa.id, "tipo": "campania", "id": campania.id, "error": str(exc)})
-
-            for adset in ConjuntoAnuncios.objects.filter(empresa_id=empresa.id):
-                try:
-                    if _sync_adset(adset, token):
-                        result["adsets_actualizados"] += 1
-                    empresa_ok = True
-                except Exception as exc:
-                    result["errores"].append({"empresa_id": empresa.id, "tipo": "adset", "id": adset.id, "error": str(exc)})
-
-            for ad in Anuncio.objects.filter(empresa_id=empresa.id):
-                try:
-                    if _sync_ad(ad, token):
-                        result["ads_actualizados"] += 1
-                    empresa_ok = True
-                except Exception as exc:
-                    result["errores"].append({"empresa_id": empresa.id, "tipo": "ad", "id": ad.id, "error": str(exc)})
-
-            for asset in PautaAsset.objects.filter(empresa_id=empresa.id):
-                try:
-                    if _sync_asset(asset, token):
-                        result["assets_actualizados"] += 1
-                    empresa_ok = True
-                except Exception as exc:
-                    result["errores"].append({"empresa_id": empresa.id, "tipo": "asset", "id": asset.id, "error": str(exc)})
-
-            for creative in Creative.objects.filter(empresa_id=empresa.id):
-                try:
-                    if _sync_creative(creative, token):
-                        result["creatives_actualizados"] += 1
-                    empresa_ok = True
-                except Exception as exc:
-                    result["errores"].append({"empresa_id": empresa.id, "tipo": "creative", "id": creative.id, "error": str(exc)})
+                    result["errores"].append(
+                        {"empresa_id": empresa.id, "tipo": "estructura_cuenta", "id": cuenta.id, "error": str(exc)}
+                    )
 
             if empresa_ok:
                 result["empresas_procesadas"] += 1

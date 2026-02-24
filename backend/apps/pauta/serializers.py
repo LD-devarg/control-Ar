@@ -122,7 +122,7 @@ def _resolve_empresa_for_write(attrs, instance, request_user):
 class CuentaPublicitariaSerializer(serializers.ModelSerializer):
     class Meta:
         model = CuentaPublicitaria
-        fields = ["id", "empresa", "bm", "meta_id", "nombre", "estado", "creado_en"]
+        fields = ["id", "empresa", "bm", "meta_id", "nombre", "estado", "moneda", "creado_en"]
         read_only_fields = ["id", "creado_en"]
 
     def validate(self, attrs):
@@ -527,7 +527,7 @@ class InstagramAccountSerializer(serializers.ModelSerializer):
 class PautaAssetSerializer(serializers.ModelSerializer):
     class Meta:
         model = PautaAsset
-        fields = ["id", "empresa", "tipo", "s3_url", "meta_asset_id", "estado", "creado_en"]
+        fields = ["id", "empresa", "nombre", "tipo", "s3_url", "meta_asset_id", "estado", "creado_en"]
         read_only_fields = ["id", "creado_en"]
 
 
@@ -547,6 +547,7 @@ class CreativeSerializer(serializers.ModelSerializer):
             "cta",
             "asset",
             "meta_id",
+            "estado",
             "creado_en",
         ]
         read_only_fields = ["id", "creado_en"]

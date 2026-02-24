@@ -1,5 +1,7 @@
 from datetime import timedelta
+import re
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import viewsets
@@ -456,6 +458,9 @@ class PautaProvisioningViewSet(viewsets.ViewSet):
 
 class PautaKPIViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated, RoleBasedPermission]
+    SUPPORTED_MONEY_CURRENCIES = {"USD", "ARS"}
+    NAMING_TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+")
+    PAUTA_SYNC_START_DATE = getattr(settings, "PAUTA_SYNC_START_DATE", None)
 
     def has_role_permission(self, request, view):
         return _has_pauta_permission(request.user, self.action)
@@ -507,6 +512,22 @@ class PautaKPIViewSet(viewsets.ViewSet):
         if not den:
             return 0.0
         return float(num) / float(den)
+
+    @classmethod
+    def _extract_naming_tokens(cls, *names):
+        tokens = []
+        for name in names:
+            value = str(name or "").strip()
+            if not value:
+                continue
+            matches = cls.NAMING_TOKEN_RE.findall(value.upper())
+            if matches:
+                tokens.extend(matches)
+                continue
+            fallback = value.upper().replace("_", "-").replace(" ", "-")
+            if "-" in fallback and len(fallback) <= 48:
+                tokens.append(fallback)
+        return sorted(set(tokens))
 
     @staticmethod
     def _score_higher_better(actual, target):
@@ -562,6 +583,18 @@ class PautaKPIViewSet(viewsets.ViewSet):
         from_date, to_date = self._date_range(request)
         if from_date is None or to_date is None:
             return Response({"detail": "Rango de fechas invalido."}, status=400)
+        if self.PAUTA_SYNC_START_DATE:
+            if to_date < self.PAUTA_SYNC_START_DATE:
+                return Response(
+                    {
+                        "executive": {"cards": {}, "footer": {}, "daily_roas": [], "performance_score": 0.0},
+                        "operative": {"campaign": [], "adset": [], "ad": [], "naming": []},
+                        "money_currency": "USD",
+                        "last_sync": {},
+                    }
+                )
+            if from_date < self.PAUTA_SYNC_START_DATE:
+                from_date = self.PAUTA_SYNC_START_DATE
 
         qs = RendimientoPautaDiario.objects.filter(fecha__gte=from_date, fecha__lte=to_date)
         if empresa_id:
@@ -591,9 +624,41 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 "purchase_value_usd",
             )
         )
+        ad_meta_ids = {str(row.get("ad_meta_id") or "").strip() for row in rows if row.get("ad_meta_id")}
+        ads_by_meta_id = {}
+        if ad_meta_ids:
+            ad_qs = (
+                Anuncio.objects.filter(meta_id__in=ad_meta_ids)
+                .select_related("creative__asset")
+                .only("meta_id", "creative__nombre", "creative__asset__nombre")
+            )
+            if empresa_id:
+                ad_qs = ad_qs.filter(empresa_id=empresa_id)
+            for ad in ad_qs:
+                key = str(ad.meta_id or "").strip()
+                if key:
+                    ads_by_meta_id[key] = ad
+
+        account_currency_map = {
+            item["id"]: (str(item["moneda"] or "USD").upper() if str(item["moneda"] or "").upper() in self.SUPPORTED_MONEY_CURRENCIES else "USD")
+            for item in CuentaPublicitaria.objects.filter(
+                id__in={row["cuenta_publicitaria_id"] for row in rows if row.get("cuenta_publicitaria_id")}
+            ).values("id", "moneda")
+        }
 
         account_scope = request.query_params.get("account", "all")
         rows = self._apply_account_scope(rows, empresa_id, account_scope)
+        scoped_currencies = {
+            account_currency_map.get(row["cuenta_publicitaria_id"], "USD")
+            for row in rows
+            if row.get("cuenta_publicitaria_id")
+        }
+        if not scoped_currencies:
+            money_currency = "USD"
+        elif len(scoped_currencies) == 1:
+            money_currency = sorted(scoped_currencies)[0]
+        else:
+            money_currency = "MIXED"
 
         totals = {
             "inversion": 0.0,
@@ -608,7 +673,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
             "ftd": 0.0,
         }
         daily = {}
-        by_level = {"campaign": {}, "adset": {}, "ad": {}}
+        by_level = {"campaign": {}, "adset": {}, "ad": {}, "naming": {}}
 
         for row in rows:
             inversion = float(row["spend_usd"] or 0)
@@ -676,6 +741,50 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 item["contactos"] += contactos
                 item["ftd"] += ftd
 
+            ad_meta_id = str(row.get("ad_meta_id") or "").strip()
+            ad_record = ads_by_meta_id.get(ad_meta_id)
+            creative_name = ""
+            asset_name = ""
+            if ad_record and getattr(ad_record, "creative_id", None):
+                creative_name = ad_record.creative.nombre or ""
+                asset = getattr(ad_record.creative, "asset", None)
+                asset_name = asset.nombre if asset else ""
+            naming_tokens = self._extract_naming_tokens(
+                row.get("campaign_name"),
+                row.get("adset_name"),
+                row.get("ad_name"),
+                creative_name,
+                asset_name,
+            )
+            for token in naming_tokens:
+                bucket = by_level["naming"]
+                if token not in bucket:
+                    bucket[token] = {
+                        "id": token,
+                        "nombre": token,
+                        "inversion": 0.0,
+                        "ingresos": 0.0,
+                        "impressions": 0.0,
+                        "reach": 0.0,
+                        "clicks": 0.0,
+                        "link_clicks": 0.0,
+                        "web_visitors": 0.0,
+                        "leads": 0.0,
+                        "contactos": 0.0,
+                        "ftd": 0.0,
+                    }
+                item = bucket[token]
+                item["inversion"] += inversion
+                item["ingresos"] += ingresos
+                item["impressions"] += impressions
+                item["reach"] += reach
+                item["clicks"] += clicks
+                item["link_clicks"] += link_clicks
+                item["web_visitors"] += web_visitors
+                item["leads"] += leads
+                item["contactos"] += contactos
+                item["ftd"] += ftd
+
         def finalize(item):
             inversion = item["inversion"]
             ingresos = item["ingresos"]
@@ -704,6 +813,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
             "campaign": sorted([finalize(item) for item in by_level["campaign"].values()], key=lambda x: x["inversion"], reverse=True),
             "adset": sorted([finalize(item) for item in by_level["adset"].values()], key=lambda x: x["inversion"], reverse=True),
             "ad": sorted([finalize(item) for item in by_level["ad"].values()], key=lambda x: x["inversion"], reverse=True),
+            "naming": sorted([finalize(item) for item in by_level["naming"].values()], key=lambda x: x["inversion"], reverse=True),
         }
 
         inv = totals["inversion"]
@@ -798,6 +908,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 "to": to_date.isoformat(),
                 "period": request.query_params.get("period", "week"),
                 "account": account_scope,
+                "money_currency": money_currency,
                 "objectives": objectives,
                 "weights": PERFORMANCE_WEIGHTS,
                 "component_scores": component_scores,

@@ -123,7 +123,7 @@ function NuevosLeads() {
                         key={lead.id}
                         type="button"
                         onClick={() => handleOpen(lead)}
-                        className="w-full rounded-[18px] cursor-pointer border border-white/10 bg-black/20 px-4 py-2 text-left transition-all duration-200 hover:border-white/30"
+                        className="w-full rounded-[18px] cursor-pointer border border-white/10 bg-gradient-to-r from-black to-black/80 dark:bg-black/20 px-4 py-2 text-left transition-all duration-200 hover:border-white/30 hover:bg-gradient-to-r hover:from-black/80 hover:to-black/60"
                     >
                         <div className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-white/65">
                             <div className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] leading-none bg-sky-500/10 text-sky-300 border-sky-400/60">

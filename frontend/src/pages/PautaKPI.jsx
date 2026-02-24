@@ -15,6 +15,7 @@ import FilterDatePicker from "../components/DatePicker";
 import PerformanceObjectivesModal from "../components/PerformanceObjectivesModal.jsx";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { useTheme } from "@mui/material/styles";
 import { apiClient } from "../services/auth";
 import { getEffectiveTenantId } from "../services/tenant";
 
@@ -43,26 +44,9 @@ function isIpadDevice() {
     return isiPadUA || isiPadOSDesktopUA;
 }
 
-const fieldSx = {
-  minWidth: 90,
-  "& .MuiOutlinedInput-root": {
-    color: "#fff",
-    "& fieldset": { borderColor: "rgba(255,255,255,0.25)" },
-    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.45)" },
-    "&.Mui-focused fieldset": { borderColor: "#22d3ee" }
-  },
-  "& .MuiInputLabel-root": {
-    color: "rgba(255,255,255,0.75)"
-  },
-  "& .MuiInputLabel-root.Mui-focused": {
-    color: "#22d3ee"
-  },
-  "& .MuiSvgIcon-root": {
-    color: "rgba(255,255,255,0.75)"
-  }
-};
-
 function PautaKPI() {
+    const theme = useTheme();
+    const isDark = theme.palette.mode === "dark";
     const [modalOpen, setModalOpen] = useState(false);
     const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
     const [period, setPeriod] = useState("week");
@@ -94,10 +78,10 @@ function PautaKPI() {
     });
     const scoreTone =
         performanceScore >= 75
-            ? "text-emerald-300"
+            ? (isDark ? "text-emerald-300" : "text-emerald-700")
             : performanceScore >= 55
-                ? "text-amber-300"
-                : "text-rose-300";
+                ? (isDark ? "text-amber-300" : "text-amber-700")
+                : (isDark ? "text-rose-300" : "text-rose-700");
     const scoreBarClass =
         performanceScore >= 75
             ? "bg-emerald-400"
@@ -110,6 +94,25 @@ function PautaKPI() {
     const radialCircumference = 2 * Math.PI * radialNormalizedRadius;
     const radialOffset =
         radialCircumference - (Math.max(0, Math.min(100, performanceScore)) / 100) * radialCircumference;
+    const fieldSx = {
+        minWidth: 90,
+        "& .MuiOutlinedInput-root": {
+            color: isDark ? "#fff" : "#111827",
+            backgroundColor: isDark ? "transparent" : "#ffffff",
+            "& fieldset": { borderColor: isDark ? "rgba(255,255,255,0.25)" : "rgba(17,24,39,0.22)" },
+            "&:hover fieldset": { borderColor: isDark ? "rgba(255,255,255,0.45)" : "rgba(17,24,39,0.35)" },
+            "&.Mui-focused fieldset": { borderColor: "#22d3ee" },
+        },
+        "& .MuiInputLabel-root": {
+            color: isDark ? "rgba(255,255,255,0.75)" : "rgba(17,24,39,0.72)",
+        },
+        "& .MuiInputLabel-root.Mui-focused": {
+            color: "#22d3ee",
+        },
+        "& .MuiSvgIcon-root": {
+            color: isDark ? "rgba(255,255,255,0.75)" : "rgba(17,24,39,0.65)",
+        },
+    };
 
     useEffect(() => {
         if (typeof window === "undefined") return undefined;
@@ -223,15 +226,19 @@ function PautaKPI() {
     };
 
     const filterControls = (
-        <div className="app-scrollbar flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
+                <div className="app-scrollbar flex w-full flex-nowrap items-center gap-2 overflow-x-auto">
             <button
                     type="button"
                     onClick={() => setPerformanceModalOpen(true)}
-                    className="shrink-0 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-left hover:bg-white/5"
+                    className={`shrink-0 rounded-lg px-3 py-1.5 text-left ${
+                        isDark
+                            ? "border border-white/10 bg-black/40 hover:bg-white/5"
+                            : "border border-slate-300 bg-white shadow-sm hover:bg-slate-50"
+                    }`}
                 >
                     <div className="flex items-center gap-2">
                         <div>
-                            <p className="text-[10px] uppercase tracking-wide text-white/60">Performance score</p>
+                            <p className={`text-[10px] uppercase tracking-wide ${isDark ? "text-white/60" : "text-slate-500"}`}>Performance score</p>
                             <p className={`text-sm font-semibold ${scoreTone}`}>{performanceScore}/100</p>
                         </div>
                         <div className="relative h-9 w-9">
@@ -241,7 +248,7 @@ function PautaKPI() {
                                 className="-rotate-90"
                             >
                                 <circle
-                                    stroke="rgba(255,255,255,0.18)"
+                                    stroke={isDark ? "rgba(255,255,255,0.18)" : "rgba(15,23,42,0.18)"}
                                     fill="transparent"
                                     strokeWidth={radialStroke}
                                     r={radialNormalizedRadius}
@@ -324,13 +331,13 @@ function PautaKPI() {
             actions={
                 <div className="app-scrollbar flex w-full flex-nowrap items-center justify-end overflow-x-auto ">
                     {isCompactViewport ? (
-                        <Button
-                            variant="outlined"
-                            size="medium"
-                            onClick={() => setShowResponsiveFilters((prev) => !prev)}
-                            startIcon={<FilterListOutlinedIcon fontSize="small" />}
-                            className="shrink-0"
-                        >
+                            <Button
+                                variant="outlined"
+                                size="medium"
+                                onClick={() => setShowResponsiveFilters((prev) => !prev)}
+                                startIcon={<FilterListOutlinedIcon fontSize="small" />}
+                                className={`shrink-0 ${isDark ? "text-white border-white/30" : ""}`}
+                            >
                             {showResponsiveFilters ? "Ocultar" : "Filtros"}
                         </Button>
                     ) : null}

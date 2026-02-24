@@ -15,8 +15,34 @@ import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import { apiClient } from "../services/auth";
+import { mergeEmpresaParam } from "../services/tenant";
 
 const META_STATUS_OPTIONS = ["ACTIVE", "PAUSED", "ARCHIVED", "DELETED"];
+const MONEDA_OPTIONS = ["USD", "ARS"];
+const PAUTA_SYNC_START_DATE = new Date("2025-12-01T00:00:00");
+
+const parseDateSafe = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const isOnOrAfterSyncStart = (value) => {
+  const parsed = parseDateSafe(value);
+  if (!parsed) return true;
+  return parsed >= PAUTA_SYNC_START_DATE;
+};
+
+const getAdsetCampaignId = (item) =>
+  Number(
+    item?.["campaña"] ??
+      item?.["campaÃ±a"] ??
+      item?.["campaÃƒÂ±a"] ??
+      item?.["campana"] ??
+      item?.campana ??
+      item?.campaign ??
+      item?.campaign_id
+  );
 
 const ENDPOINTS_BY_VIEW = {
   Bms: "/bms/",
@@ -31,12 +57,12 @@ const ENDPOINTS_BY_VIEW = {
 
 const EDITABLE_FIELDS_BY_VIEW = {
   Bms: ["nombre", "meta_id", "estado", "empresas"],
-  "Ad Accounts": ["nombre", "meta_id", "estado"],
+  "Ad Accounts": ["nombre", "meta_id", "estado", "moneda"],
   FanPage: ["nombre", "meta_id", "estado"],
   Campaigns: ["nombre", "meta_id", "estado", "objetivo"],
   Adsets: ["nombre", "meta_id", "estado", "presupuesto_diario"],
-  Assets: ["s3_url", "meta_asset_id", "estado"],
-  Creatives: ["nombre", "primary_text", "headline", "descripcion", "url_destino", "cta", "meta_id"],
+  Assets: ["nombre", "meta_asset_id", "tipo", "estado", "s3_url"],
+  Creatives: ["nombre", "meta_id", "estado"],
   Ads: ["nombre", "meta_id", "estado"],
 };
 
@@ -53,7 +79,9 @@ const FIELD_LABELS = {
   descripcion: "Descripcion",
   url_destino: "URL destino",
   cta: "CTA",
+  tipo: "Tipo",
   empresas: "Empresas vinculadas",
+  moneda: "Moneda",
 };
 
 const COLUMN_SETS = {
@@ -67,6 +95,7 @@ const COLUMN_SETS = {
     { key: "name", label: "Nombre" },
     { key: "bm", label: "Bm" },
     { key: "metaId", label: "Meta_ID" },
+    { key: "currency", label: "Moneda" },
     { key: "status", label: "Estado" },
   ],
   FanPage: [
@@ -143,7 +172,8 @@ export default function PautaDatabase() {
   const pickerRef = useRef(null);
 
   const tabs = Object.keys(COLUMN_SETS);
-  const createTypes = [...tabs, "Credenciales Meta"];
+  const createTypes = ["Bms", "Ad Accounts", "FanPage", "Credenciales Meta"];
+  const createDefaultType = createTypes.includes(tab) ? tab : createTypes[0];
   const columnsForView = COLUMN_SETS[tab] ?? COLUMN_SETS.Bms;
 
   const selectedColumns = useMemo(() => {
@@ -227,11 +257,21 @@ export default function PautaDatabase() {
       const creatives = unwrapList(creativesRes?.data);
       const ads = unwrapList(adsRes?.data);
 
+      const campaignsFiltered = campaigns.filter((item) => isOnOrAfterSyncStart(item.fecha_inicio));
+      const campaignIdsFiltered = new Set(campaignsFiltered.map((item) => Number(item.id)));
+      const adsetsFiltered = adsets.filter((item) => {
+        const campaignId = getAdsetCampaignId(item);
+        const campaignLinked = Number.isFinite(campaignId) ? campaignIdsFiltered.has(campaignId) : true;
+        return campaignLinked && isOnOrAfterSyncStart(item.fecha_inicio);
+      });
+      const adsetIdsFiltered = new Set(adsetsFiltered.map((item) => Number(item.id)));
+      const adsFiltered = ads.filter((item) => adsetIdsFiltered.has(Number(item.conjunto_anuncios)));
+
       const bmNameById = Object.fromEntries(bms.map((item) => [item.id, item.nombre]));
       const empresaNameById = Object.fromEntries(empresas.map((item) => [item.id, item.nombre]));
       const adAccountNameById = Object.fromEntries(adAccounts.map((item) => [item.id, item.nombre]));
-      const campaignNameById = Object.fromEntries(campaigns.map((item) => [item.id, item.nombre]));
-      const adsetNameById = Object.fromEntries(adsets.map((item) => [item.id, item.nombre]));
+      const campaignNameById = Object.fromEntries(campaignsFiltered.map((item) => [item.id, item.nombre]));
+      const adsetNameById = Object.fromEntries(adsetsFiltered.map((item) => [item.id, item.nombre]));
       const fanpageNameById = Object.fromEntries(fanpages.map((item) => [item.id, item.nombre]));
       const instagramNameById = Object.fromEntries(
         unwrapList((await apiClient.get("/instagram-accounts/"))?.data).map((item) => [
@@ -257,6 +297,7 @@ export default function PautaDatabase() {
           name: item.nombre,
           bm: bmNameById[item.bm] || `#${item.bm}`,
           metaId: item.meta_id,
+          currency: item.moneda || "USD",
           status: item.estado,
           __raw: item,
         })),
@@ -267,7 +308,7 @@ export default function PautaDatabase() {
           status: item.estado,
           __raw: item,
         })),
-        Campaigns: campaigns.map((item) => ({
+        Campaigns: campaignsFiltered.map((item) => ({
           id: item.id,
           name: item.nombre,
           adAccount: adAccountNameById[item.cuenta_publicitaria] || `#${item.cuenta_publicitaria}`,
@@ -277,8 +318,8 @@ export default function PautaDatabase() {
           status: item.estado,
           __raw: item,
         })),
-        Adsets: adsets.map((item) => {
-          const campaignId = item["campaña"] || item["campaÃ±a"];
+        Adsets: adsetsFiltered.map((item) => {
+          const campaignId = getAdsetCampaignId(item);
           const targeting = item.segmentacion?.targeting || {};
           const genders = Array.isArray(targeting.genders)
             ? targeting.genders.map((value) => (value === 1 ? "Hombre" : value === 2 ? "Mujer" : value)).join(", ")
@@ -286,7 +327,10 @@ export default function PautaDatabase() {
           return {
             id: item.id,
             name: item.nombre,
-            campaign: campaignNameById[campaignId] || `#${campaignId}`,
+            campaign:
+              Number.isFinite(Number(campaignId))
+                ? campaignNameById[campaignId] || `#${campaignId}`
+                : "-",
             metaId: item.meta_id,
             budget: item.presupuesto_diario,
             createdAt: item.creado_en ? new Date(item.creado_en).toLocaleString("es-AR") : "-",
@@ -312,19 +356,19 @@ export default function PautaDatabase() {
         Creatives: creatives.map((item) => ({
           id: item.id,
           name: item.nombre,
-          fanpage: fanpageNameById[item.fanpage] || `#${item.fanpage}`,
+          fanpage: item.fanpage ? fanpageNameById[item.fanpage] || `#${item.fanpage}` : "-",
           instagram_account: item.instagram_account ? instagramNameById[item.instagram_account] || `#${item.instagram_account}` : "-",
           primary_text: item.primary_text,
           headline: item.headline,
           description: item.descripcion,
           metaId: item.meta_id,
           url_destino: item.url_destino,
-          asset: assetNameById[item.asset] || `#${item.asset}`,
+          asset: item.asset ? assetNameById[item.asset] || `#${item.asset}` : "-",
           cta: item.cta,
-          status: "-",
+          status: item.estado || "-",
           __raw: item,
         })),
-        Ads: ads.map((item) => ({
+        Ads: adsFiltered.map((item) => ({
           id: item.id,
           name: item.nombre,
           adset: adsetNameById[item.conjunto_anuncios] || `#${item.conjunto_anuncios}`,
@@ -346,6 +390,21 @@ export default function PautaDatabase() {
   useEffect(() => {
     loadRows();
   }, []);
+
+  const refreshFromMetaAndLoad = async () => {
+    setLoadingData(true);
+    setError("");
+    try {
+      await apiClient.post("/pauta-kpi/refresh/", null, {
+        params: mergeEmpresaParam({}),
+      });
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setError(detail ? `Sync Meta: ${detail}` : "No se pudo ejecutar sync con Meta. Mostrando datos locales.");
+    } finally {
+      await loadRows();
+    }
+  };
 
   const handleOpenCreateModal = () => setCreateModalOpen(true);
   const handleCloseCreateModal = () => setCreateModalOpen(false);
@@ -432,7 +491,7 @@ export default function PautaDatabase() {
             size="medium"
             color="primary"
             startIcon={<RefreshOutlinedIcon />}
-            onClick={loadRows}
+            onClick={refreshFromMetaAndLoad}
             disabled={loadingData}
           >
             {loadingData ? "Actualizando..." : "Refresh"}
@@ -558,7 +617,7 @@ export default function PautaDatabase() {
         open={createModalOpen}
         onClose={handleCloseCreateModal}
         types={createTypes}
-        defaultType={tab}
+        defaultType={createDefaultType}
         onCreated={handleCreated}
       />
 
@@ -586,7 +645,8 @@ export default function PautaDatabase() {
                 />
               );
             }
-            if (fieldName === "estado") {
+            if (fieldName === "estado" || fieldName === "moneda") {
+              const options = fieldName === "estado" ? META_STATUS_OPTIONS : MONEDA_OPTIONS;
               return (
                 <TextField
                   key={fieldName}
@@ -596,7 +656,7 @@ export default function PautaDatabase() {
                   value={editState.values[fieldName] ?? ""}
                   onChange={(event) => updateEditField(fieldName, event.target.value)}
                 >
-                  {META_STATUS_OPTIONS.map((item) => (
+                  {options.map((item) => (
                     <MenuItem key={item} value={item}>
                       {item}
                     </MenuItem>

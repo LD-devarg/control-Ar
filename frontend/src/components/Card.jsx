@@ -14,7 +14,7 @@ function Card({
 }) {
   const isKpi = variant === "kpi";
   const rootClasses = isKpi
-    ? "justify-self-start flex flex-col rounded-lg border border-white/15 bg-black/45 px-4 py-3"
+    ? "justify-self-start flex flex-col rounded-lg border border-white/15 bg-gradient-to-r from-black to-gray-900 px-4 py-3"
     : "justify-self-start flex flex-col shadow-lg shadow-black bg-gradient-to-r from-black to-gray-900 rounded-xl ps-4 pt-2";
   const titleClasses = isKpi ? "text-[11px] font-semibold uppercase tracking-wide text-white/70" : "text-white text-md font-light";
   const valueClasses = isKpi ? "text-cyan-300 font-semibold" : "text-blue-500 font-bold";

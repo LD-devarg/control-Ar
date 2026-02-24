@@ -8,6 +8,11 @@ const META_STATUS_OPTIONS = [
   { label: "Eliminada", value: "DELETED" },
 ];
 
+const CURRENCY_OPTIONS = [
+  { label: "USD", value: "USD" },
+  { label: "ARS", value: "ARS" },
+];
+
 const CAMPAIGN_BUYING_TYPE_OPTIONS = [
   { label: "Subasta", value: "AUCTION" },
   { label: "Reserva", value: "RESERVED" },
@@ -105,6 +110,7 @@ export const CREATE_FORM_CONFIG = {
       { name: "meta_id", label: "Meta ID", type: "text", required: true },
       { name: "nombre", label: "Nombre", type: "text", required: true },
       { name: "estado", label: "Estado", type: "select-static", options: META_STATUS_OPTIONS, required: true },
+      { name: "moneda", label: "Moneda", type: "select-static", options: CURRENCY_OPTIONS, default: "USD", required: true },
     ],
   },
   FanPage: {

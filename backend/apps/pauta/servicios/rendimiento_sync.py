@@ -6,6 +6,7 @@ import os
 from decimal import Decimal, InvalidOperation
 
 import requests
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -35,6 +36,7 @@ PURCHASE_ACTIONS = {
 WEB_VISITOR_ACTIONS = {"landing_page_view", "page_view"}
 LINK_CLICK_ACTIONS = {"link_click", "inline_link_click", "outbound_click"}
 TASK_KEY = "sync_pauta_kpi_15m"
+PAUTA_SYNC_START_DATE = getattr(settings, "PAUTA_SYNC_START_DATE", None)
 
 
 def _to_decimal(value, default="0") -> Decimal:
@@ -82,7 +84,7 @@ def _fetch_insights_rows(ad_account_id: str, token: str, day: dt.date) -> list[d
     url = f"https://graph.facebook.com/{META_API_VERSION}/{ad_account_id}/insights"
     params = {
         "fields": (
-            "account_id,account_name,campaign_id,campaign_name,adset_id,adset_name,"
+            "account_id,account_name,account_currency,campaign_id,campaign_name,adset_id,adset_name,"
             "ad_id,ad_name,spend,impressions,reach,clicks,actions,action_values"
         ),
         "level": "ad",
@@ -152,6 +154,16 @@ def _upsert_row(empresa: Empresa, cuenta: CuentaPublicitaria, fecha: dt.date, ro
 
 def sync_rendimientos_meta_diarios(*, empresa_ids: list[int] | None = None, force: bool = False) -> dict:
     fecha_objetivo = timezone.localdate()
+    if PAUTA_SYNC_START_DATE and fecha_objetivo < PAUTA_SYNC_START_DATE:
+        return {
+            "fecha": fecha_objetivo.isoformat(),
+            "empresas_evaluadas": 0,
+            "empresas_procesadas": 0,
+            "insertados": 0,
+            "actualizados": 0,
+            "errores": [],
+            "skipped": f"fecha_objetivo<{PAUTA_SYNC_START_DATE.isoformat()}",
+        }
 
     empresas_qs = Empresa.objects.filter(activo=True)
     if empresa_ids:
@@ -187,6 +199,10 @@ def sync_rendimientos_meta_diarios(*, empresa_ids: list[int] | None = None, forc
                 ad_account_id = f"act_{ad_account_id}"
 
             rows = _fetch_insights_rows(ad_account_id, token, fecha_objetivo)
+            account_currency = str((rows[0] or {}).get("account_currency") or "").upper() if rows else ""
+            if account_currency in {CuentaPublicitaria.MONEDA_USD, CuentaPublicitaria.MONEDA_ARS} and cuenta.moneda != account_currency:
+                cuenta.moneda = account_currency
+                cuenta.save(update_fields=["moneda"])
 
             with transaction.atomic():
                 for row in rows:

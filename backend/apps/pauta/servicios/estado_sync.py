@@ -19,6 +19,7 @@ from apps.pauta.models import (
     PautaAsset,
 )
 from apps.pauta.servicios.crypto import decrypt_token
+from apps.pauta.servicios.telegram_alerts import send_status_change_alert
 
 META_API_VERSION = "v18.0"
 META_TIMEOUT_SECONDS = 15
@@ -164,6 +165,7 @@ def _sync_account_structure(cuenta: CuentaPublicitaria, token: str) -> dict[str,
         "ads": 0,
         "assets": 0,
         "creatives": 0,
+        "alertas_telegram": 0,
     }
 
     campaign_rows = _safe_paginated_request(
@@ -193,6 +195,7 @@ def _sync_account_structure(cuenta: CuentaPublicitaria, token: str) -> dict[str,
             meta_id=campaign_meta_id,
             defaults=defaults,
         )
+        previous_status = str(getattr(campaign, "estado", "") or "")
         changed = created
         if not created:
             update_fields = []
@@ -206,6 +209,17 @@ def _sync_account_structure(cuenta: CuentaPublicitaria, token: str) -> dict[str,
         campaign_map[campaign_meta_id] = campaign
         if changed:
             counters["campanias"] += 1
+            if not created:
+                counters["alertas_telegram"] += send_status_change_alert(
+                    empresa_id=cuenta.empresa_id,
+                    empresa_nombre=cuenta.empresa.nombre,
+                    cuenta_nombre=cuenta.nombre,
+                    entity_type="Campaign",
+                    entity_name=campaign.nombre,
+                    meta_id=campaign_meta_id,
+                    previous_status=previous_status,
+                    next_status=campaign.estado,
+                )
 
     adset_rows = _safe_paginated_request(
         f"{account_id}/adsets",
@@ -239,6 +253,7 @@ def _sync_account_structure(cuenta: CuentaPublicitaria, token: str) -> dict[str,
             meta_id=adset_meta_id,
             defaults=defaults,
         )
+        previous_status = str(getattr(adset, "estado", "") or "")
         changed = created
         if not created:
             update_fields = []
@@ -252,6 +267,17 @@ def _sync_account_structure(cuenta: CuentaPublicitaria, token: str) -> dict[str,
         adset_map[adset_meta_id] = adset
         if changed:
             counters["adsets"] += 1
+            if not created:
+                counters["alertas_telegram"] += send_status_change_alert(
+                    empresa_id=cuenta.empresa_id,
+                    empresa_nombre=cuenta.empresa.nombre,
+                    cuenta_nombre=cuenta.nombre,
+                    entity_type="Adset",
+                    entity_name=adset.nombre,
+                    meta_id=adset_meta_id,
+                    previous_status=previous_status,
+                    next_status=adset.estado,
+                )
 
     creative_cache: dict[str, Creative] = {}
     ad_rows = _safe_paginated_request(
@@ -344,6 +370,7 @@ def _sync_account_structure(cuenta: CuentaPublicitaria, token: str) -> dict[str,
             meta_id=ad_meta_id,
             defaults=ad_defaults,
         )
+        previous_status = str(getattr(ad, "estado", "") or "")
         ad_changed = created
         if not created:
             update_fields = []
@@ -356,6 +383,17 @@ def _sync_account_structure(cuenta: CuentaPublicitaria, token: str) -> dict[str,
                 ad_changed = True
         if ad_changed:
             counters["ads"] += 1
+            if not created:
+                counters["alertas_telegram"] += send_status_change_alert(
+                    empresa_id=cuenta.empresa_id,
+                    empresa_nombre=cuenta.empresa.nombre,
+                    cuenta_nombre=cuenta.nombre,
+                    entity_type="Ad",
+                    entity_name=ad.nombre,
+                    meta_id=ad_meta_id,
+                    previous_status=previous_status,
+                    next_status=ad.estado,
+                )
 
     return counters
 
@@ -549,6 +587,7 @@ def sync_pauta_estado_15m(*, empresa_ids: list[int] | None = None, force: bool =
         "ads_actualizados": 0,
         "assets_actualizados": 0,
         "creatives_actualizados": 0,
+        "alertas_telegram_enviadas": 0,
         "errores": [],
     }
 
@@ -587,6 +626,7 @@ def sync_pauta_estado_15m(*, empresa_ids: list[int] | None = None, force: bool =
                     result["ads_actualizados"] += stats["ads"]
                     result["assets_actualizados"] += stats["assets"]
                     result["creatives_actualizados"] += stats["creatives"]
+                    result["alertas_telegram_enviadas"] += stats["alertas_telegram"]
                     empresa_ok = True
                 except Exception as exc:
                     result["errores"].append(

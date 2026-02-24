@@ -63,6 +63,8 @@ export default function Tenant() {
     const [beatModalEmpresa, setBeatModalEmpresa] = useState(null);
     const [beatTasksDraft, setBeatTasksDraft] = useState({});
     const [beatTasksSaving, setBeatTasksSaving] = useState(false);
+    const [telegramChatsDraft, setTelegramChatsDraft] = useState("");
+    const [telegramChatsSaving, setTelegramChatsSaving] = useState(false);
     const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
 
     const load = useCallback(async () => {
@@ -218,6 +220,7 @@ export default function Tenant() {
     const openBeatModal = (empresa) => {
         setBeatModalEmpresa(empresa);
         setBeatTasksDraft(buildBeatTasksDraft(empresa));
+        setTelegramChatsDraft(Array.isArray(empresa?.telegram_chat_ids) ? empresa.telegram_chat_ids.join("\n") : "");
     };
 
     const closeBeatModal = () => {
@@ -261,6 +264,43 @@ export default function Tenant() {
             });
         } finally {
             setBeatTasksSaving(false);
+        }
+    };
+
+    const handleSaveTelegramChats = async () => {
+        if (!beatModalEmpresa) return;
+        setTelegramChatsSaving(true);
+        try {
+            const nextChatIds = Array.from(
+                new Set(
+                    telegramChatsDraft
+                        .split(/[\n,]/g)
+                        .map((item) => String(item || "").trim())
+                        .filter(Boolean)
+                )
+            );
+            const updated = await updateEmpresa(beatModalEmpresa.id, {
+                telegram_chat_ids: nextChatIds,
+            });
+            setEmpresas((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+            if (selected?.id === updated.id) {
+                handleSelect(updated);
+            }
+            setBeatModalEmpresa(updated);
+            setToast({
+                open: true,
+                severity: "success",
+                message: `Chats de Telegram actualizados en ${updated.nombre}.`,
+            });
+        } catch (err) {
+            const detail = extractApiErrorMessage(err, "No se pudieron actualizar los chats de Telegram.");
+            setToast({
+                open: true,
+                severity: "error",
+                message: detail,
+            });
+        } finally {
+            setTelegramChatsSaving(false);
         }
     };
 
@@ -394,6 +434,17 @@ export default function Tenant() {
                             <div className="text-sm text-zinc-400">No hay tareas configurables.</div>
                         ) : null}
                     </div>
+
+                    <div className="mt-4">
+                        <div className="text-sm text-zinc-200 mb-1">Chat de Telegram (uno por linea o separados por coma)</div>
+                        <textarea
+                            value={telegramChatsDraft}
+                            onChange={(event) => setTelegramChatsDraft(event.target.value)}
+                            rows={4}
+                            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+                            placeholder="-4614226774"
+                        />
+                    </div>
                 </DialogContent>
                 <DialogActions>
                     <button
@@ -403,6 +454,14 @@ export default function Tenant() {
                         className="rounded-md border border-zinc-600 px-3 py-1 text-sm text-zinc-200"
                     >
                         Cerrar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSaveTelegramChats}
+                        disabled={telegramChatsSaving || !beatModalEmpresa}
+                        className="rounded-md border border-fuchsia-400/70 px-3 py-1 text-sm font-semibold text-fuchsia-300 disabled:opacity-50"
+                    >
+                        {telegramChatsSaving ? "Guardando chats..." : "Guardar chats"}
                     </button>
                     <button
                         type="button"

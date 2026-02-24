@@ -26,14 +26,29 @@ function formatDateTime(value) {
 function Health() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [bots, setBots] = useState([]);
+  const [botForm, setBotForm] = useState({
+    id: null,
+    nombre: "",
+    tipo: "BOT",
+    token: "",
+    activo: true,
+  });
+  const [savingBot, setSavingBot] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       setLoading(true);
       try {
-        const { data: response } = await apiClient.get("/health/");
-        if (mounted) setData(response);
+        const [{ data: response }, { data: botsResponse }] = await Promise.all([
+          apiClient.get("/health/"),
+          apiClient.get("/health/telegram-bots/"),
+        ]);
+        if (mounted) {
+          setData(response);
+          setBots(Array.isArray(botsResponse?.results) ? botsResponse.results : []);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -45,6 +60,47 @@ function Health() {
       clearInterval(timer);
     };
   }, []);
+
+  const handleBotEdit = (bot) => {
+    setBotForm({
+      id: bot?.id || null,
+      nombre: bot?.nombre || "",
+      tipo: bot?.tipo || "BOT",
+      token: "",
+      activo: Boolean(bot?.activo),
+    });
+  };
+
+  const resetBotForm = () => {
+    setBotForm({ id: null, nombre: "", tipo: "BOT", token: "", activo: true });
+  };
+
+  const saveBot = async () => {
+    if (!botForm.nombre.trim()) return;
+    if (!botForm.id && !botForm.token.trim()) return;
+    setSavingBot(true);
+    try {
+      const payload = {
+        ...(botForm.id ? { id: botForm.id } : {}),
+        nombre: botForm.nombre.trim(),
+        tipo: botForm.tipo || "BOT",
+        activo: Boolean(botForm.activo),
+        ...(botForm.token.trim() ? { token: botForm.token.trim() } : {}),
+      };
+      const { data: response } = botForm.id
+        ? await apiClient.patch("/health/telegram-bots/", payload)
+        : await apiClient.post("/health/telegram-bots/", payload);
+
+      setBots((prev) => {
+        const exists = prev.some((item) => item.id === response.id);
+        if (exists) return prev.map((item) => (item.id === response.id ? response : item));
+        return [response, ...prev];
+      });
+      resetBotForm();
+    } finally {
+      setSavingBot(false);
+    }
+  };
 
   return (
     <Page title="Health">
@@ -100,7 +156,7 @@ function Health() {
         />
       </div>
 
-      <div className="w-9/10 mt-2 grid grid-cols-1 xl:grid-cols-2 gap-4 pb-4">
+      <div className="w-full mt-2 grid grid-cols-1 xl:grid-cols-3 gap-4 pb-4">
         <div className="rounded-xl border border-white/10 bg-black/40 p-3">
           <div className="text-sm font-semibold text-white mb-2">Debug tareas Beat</div>
           <div className="overflow-auto max-h-72">
@@ -154,6 +210,89 @@ function Health() {
                     </td>
                     <td className="py-1 pr-2 text-[11px] text-amber-300">
                       {row.kpi_sync_last_error || row.estado_sync_last_error || "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+          <div className="text-sm font-semibold text-white mb-2">Telegram bots</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
+            <input
+              value={botForm.nombre}
+              onChange={(event) => setBotForm((prev) => ({ ...prev, nombre: event.target.value }))}
+              className="rounded border border-white/20 bg-black/30 px-2 py-1 text-sm text-white"
+              placeholder="Nombre del bot"
+            />
+            <select
+              value={botForm.tipo}
+              onChange={(event) => setBotForm((prev) => ({ ...prev, tipo: event.target.value }))}
+              className="rounded border border-white/20 bg-black/30 px-2 py-1 text-sm text-white"
+            >
+              <option value="BOT">BOT</option>
+            </select>
+            <input
+              value={botForm.token}
+              onChange={(event) => setBotForm((prev) => ({ ...prev, token: event.target.value }))}
+              className="rounded border border-white/20 bg-black/30 px-2 py-1 text-sm text-white md:col-span-2"
+              placeholder={botForm.id ? "Nuevo token (opcional)" : "Token del bot"}
+            />
+            <label className="text-xs text-white/80 flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={Boolean(botForm.activo)}
+                onChange={(event) => setBotForm((prev) => ({ ...prev, activo: event.target.checked }))}
+              />
+              Activo
+            </label>
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              type="button"
+              onClick={saveBot}
+              disabled={savingBot}
+              className="rounded border border-cyan-400/70 px-2 py-1 text-xs font-semibold text-cyan-300 disabled:opacity-50"
+            >
+              {savingBot ? "Guardando..." : botForm.id ? "Actualizar bot" : "Crear bot"}
+            </button>
+            <button
+              type="button"
+              onClick={resetBotForm}
+              disabled={savingBot}
+              className="rounded border border-white/30 px-2 py-1 text-xs font-semibold text-white/80 disabled:opacity-50"
+            >
+              Limpiar
+            </button>
+          </div>
+          <div className="overflow-auto max-h-72">
+            <table className="min-w-full text-xs">
+              <thead className="text-white/70">
+                <tr>
+                  <th className="text-left py-1 pr-2">Nombre</th>
+                  <th className="text-left py-1 pr-2">Tipo</th>
+                  <th className="text-left py-1 pr-2">Activo</th>
+                  <th className="text-left py-1 pr-2">Token</th>
+                  <th className="text-left py-1 pr-2">Accion</th>
+                </tr>
+              </thead>
+              <tbody className="text-white/80">
+                {bots.map((bot) => (
+                  <tr key={bot.id} className="border-t border-white/10">
+                    <td className="py-1 pr-2">{bot.nombre}</td>
+                    <td className="py-1 pr-2">{bot.tipo}</td>
+                    <td className="py-1 pr-2">{bot.activo ? "ON" : "OFF"}</td>
+                    <td className="py-1 pr-2">{bot.has_token ? "OK" : "NO"}</td>
+                    <td className="py-1 pr-2">
+                      <button
+                        type="button"
+                        onClick={() => handleBotEdit(bot)}
+                        className="rounded border border-white/30 px-2 py-0.5 text-[11px] text-white/80"
+                      >
+                        Editar
+                      </button>
                     </td>
                   </tr>
                 ))}

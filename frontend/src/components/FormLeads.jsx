@@ -2,8 +2,11 @@
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
+import InputAdornment from '@mui/material/InputAdornment';
 import "../assets/css/FormLeads.css";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { markClientesDirty } from "../services/operativo/clientes";
@@ -122,7 +125,7 @@ export default function NuevoLead({
     const whatsappUrl = useMemo(() => buildWhatsappUrl(whatsappNumber, messageText), [whatsappNumber, messageText]);
 
     const isNameValid = trimmedName.length > 1;
-    const isPhoneValid = phoneDigits.length >= 10;
+    const isPhoneValid = phoneDigits.length === 10;
     const canSubmit =
         Boolean(landingToken) &&
         Boolean(username) &&
@@ -204,7 +207,7 @@ export default function NuevoLead({
             if (!isNameValid) {
                 setError("Ingresá un nombre válido.");
             } else if (!isPhoneValid) {
-                setError("Ingresá un número válido (mínimo 10 dígitos).");
+                setError("Ingresá un número válido de 10 dígitos (con 0, sin 15).");
             } else if (!landingToken) {
                 setError("Landing inválida o sin token.");
             }
@@ -252,7 +255,8 @@ export default function NuevoLead({
     };
 
     const handlePhoneChange = (event) => {
-        setPhone(event.target.value);
+        const digitsOnly = String(event.target.value || "").replace(/\D/g, "").slice(0, 10);
+        setPhone(digitsOnly);
         if (error) setError("");
     };
 
@@ -285,13 +289,23 @@ export default function NuevoLead({
                 />
                 <TextField
                     required
-                    helperText="No compartiremos tu número con nadie."
+                    helperText="10 dígitos, con 0, sin 15."
                     id="celular"
                     label="Celular"
                     fullWidth
                     value={phone}
                     onChange={handlePhoneChange}
-                    InputProps={{ readOnly: isPreview }}
+                    InputProps={{
+                        readOnly: isPreview,
+                        endAdornment: (
+                            <InputAdornment position="end">
+                                <Tooltip title="10 dígitos, con 0, sin 15." arrow>
+                                    <InfoOutlinedIcon sx={{ color: "rgba(255,255,255,0.75)", fontSize: 18 }} />
+                                </Tooltip>
+                            </InputAdornment>
+                        ),
+                    }}
+                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
                     sx={{
                         "& .MuiOutlinedInput-root": {
                         marginBottom: "0",

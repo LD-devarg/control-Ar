@@ -8,6 +8,7 @@ from .models import (
     Usuario,
     UsuarioEmpresaAcceso,
     NotificacionEstructural,
+    TelegramBot,
 )
 from .permissions import is_admin_organizacional
 
@@ -35,6 +36,7 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "beat_activo",
             "beat_tasks_config",
             "beat_tasks_available",
+            "telegram_chat_ids",
             "kpi_sync_last_run_at",
             "kpi_sync_last_status",
             "kpi_sync_last_error",
@@ -77,6 +79,23 @@ class EmpresaSerializer(serializers.ModelSerializer):
                 {"meta_test_mode": "Solo superuser puede modificar test mode de Meta."}
             )
         return attrs
+
+    def validate_telegram_chat_ids(self, value):
+        if value in (None, []):
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError("telegram_chat_ids debe ser una lista.")
+        cleaned = []
+        seen = set()
+        for item in value:
+            chat_id = str(item).strip()
+            if not chat_id:
+                continue
+            if chat_id in seen:
+                continue
+            seen.add(chat_id)
+            cleaned.append(chat_id)
+        return cleaned
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
@@ -306,3 +325,25 @@ class NotificacionEstructuralSerializer(serializers.ModelSerializer):
             "organizacion",
         ]
         read_only_fields = fields
+
+
+class TelegramBotSerializer(serializers.ModelSerializer):
+    token = serializers.CharField(write_only=True, required=False, allow_blank=False)
+    has_token = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = TelegramBot
+        fields = [
+            "id",
+            "nombre",
+            "tipo",
+            "activo",
+            "token",
+            "has_token",
+            "creado_en",
+            "actualizado_en",
+        ]
+        read_only_fields = ["id", "has_token", "creado_en", "actualizado_en"]
+
+    def get_has_token(self, obj):
+        return bool(str(obj.token_encrypted or "").strip())

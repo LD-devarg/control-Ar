@@ -34,6 +34,12 @@ SECRET_KEY = os.getenv(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env_bool("DEBUG", False)
 PAUTA_SYNC_START_DATE = env_date("PAUTA_SYNC_START_DATE", date(2025, 12, 1))
+TELEGRAM_BOT_TOKEN = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
+TELEGRAM_ALERT_CHAT_IDS = [
+    item.strip()
+    for item in (os.getenv("TELEGRAM_ALERT_CHAT_IDS") or "").split(",")
+    if item.strip()
+]
 
 allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(",") if host.strip()]

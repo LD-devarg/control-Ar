@@ -13,7 +13,7 @@ from apps.empresas.views import (
 )
 from apps.empresas.auth_views import LoggedTokenObtainPairView
 from apps.operativo.views import ClienteViewSet, EventosMetaViewSet, LandingViewSet, CompraViewSet, RetiroViewSet, LandingVisitViewSet, StatsViewSet
-from apps.operativo.health import HealthView
+from apps.operativo.health import HealthView, TelegramBotView
 from apps.recursos.views import WhatsAppViewSet, TipoCambioViewSet
 from apps.pauta.views import (
     BMViewSet,
@@ -69,5 +69,6 @@ urlpatterns = [
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("admin/", admin.site.urls),
     path("health/", HealthView.as_view(), name="health"),
+    path("health/telegram-bots/", TelegramBotView.as_view(), name="health-telegram-bots"),
     path("", include(router.urls)),
 ]

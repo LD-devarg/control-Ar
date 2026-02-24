@@ -8,8 +8,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.empresas.models import Empresa
+from apps.empresas.models import Empresa, TelegramBot
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
+from apps.empresas.serializers import TelegramBotSerializer
+from apps.pauta.servicios.crypto import encrypt_token
 from configs.celery import app as celery_app
 
 try:
@@ -214,3 +216,60 @@ class HealthView(APIView):
                 "tasks": self._managed_tasks_status(),
             }
         )
+
+
+class TelegramBotView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @staticmethod
+    def _assert_superuser(request):
+        if not request.user.is_superuser:
+            return Response({"detail": "Solo superuser."}, status=403)
+        return None
+
+    def get(self, request):
+        forbidden = self._assert_superuser(request)
+        if forbidden:
+            return forbidden
+        rows = TelegramBot.objects.all().order_by("-actualizado_en", "-id")
+        return Response({"results": TelegramBotSerializer(rows, many=True).data})
+
+    def post(self, request):
+        forbidden = self._assert_superuser(request)
+        if forbidden:
+            return forbidden
+
+        serializer = TelegramBotSerializer(data=request.data, partial=False)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data.pop("token", None)
+        if not token:
+            return Response({"detail": "Campo 'token' requerido."}, status=400)
+
+        bot = TelegramBot(**serializer.validated_data)
+        bot.token_encrypted = encrypt_token(str(token).strip())
+        bot.save()
+        return Response(TelegramBotSerializer(bot).data, status=201)
+
+    def patch(self, request):
+        forbidden = self._assert_superuser(request)
+        if forbidden:
+            return forbidden
+
+        bot_id = request.data.get("id")
+        if not bot_id:
+            return Response({"detail": "Campo 'id' requerido."}, status=400)
+
+        bot = TelegramBot.objects.filter(id=bot_id).first()
+        if not bot:
+            return Response({"detail": "Bot no encontrado."}, status=404)
+
+        serializer = TelegramBotSerializer(bot, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        token = serializer.validated_data.pop("token", None)
+
+        for field, value in serializer.validated_data.items():
+            setattr(bot, field, value)
+        if token:
+            bot.token_encrypted = encrypt_token(str(token).strip())
+        bot.save()
+        return Response(TelegramBotSerializer(bot).data)

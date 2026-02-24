@@ -33,6 +33,7 @@ class Empresa(models.Model):
     workers_activos = models.BooleanField(default=False)
     beat_activo = models.BooleanField(default=True)
     beat_tasks_config = models.JSONField(default=dict, blank=True)
+    telegram_chat_ids = models.JSONField(default=list, blank=True)
     kpi_sync_last_run_at = models.DateTimeField(null=True, blank=True)
     kpi_sync_last_status = models.CharField(max_length=30, null=True, blank=True)
     kpi_sync_last_error = models.TextField(null=True, blank=True)
@@ -156,3 +157,24 @@ class NotificacionEstructural(models.Model):
 
     def __str__(self):
         return f"{self.tipo} - {self.mensaje}"
+
+
+class TelegramBot(models.Model):
+    TIPO_BOT = "BOT"
+    TIPO_CHOICES = [
+        (TIPO_BOT, "Bot"),
+    ]
+
+    nombre = models.CharField(max_length=120)
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES, default=TIPO_BOT)
+    token_encrypted = models.TextField(blank=True, default="")
+    activo = models.BooleanField(default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "empresas_telegram_bot"
+        ordering = ["-actualizado_en", "-id"]
+
+    def __str__(self):
+        return f"{self.nombre} ({self.tipo})"

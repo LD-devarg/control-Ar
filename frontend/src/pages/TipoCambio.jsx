@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Page from "../layouts/Page";
 import { apiClient } from "../services/auth";
+import Button from "@mui/material/Button";
+import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 
 function formatDateTime(value) {
   if (!value) return "-";
@@ -30,26 +32,22 @@ export default function TipoCambio() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const loadRows = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const { data } = await apiClient.get("/tipos-cambio/");
+      setRows(Array.isArray(data) ? data : []);
+    } catch (_err) {
+      setError("No se pudo cargar el historial de tipo de cambio.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const { data } = await apiClient.get("/tipos-cambio/");
-        if (!mounted) return;
-        setRows(Array.isArray(data) ? data : []);
-      } catch (_err) {
-        if (!mounted) return;
-        setError("No se pudo cargar el historial de tipo de cambio.");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    load();
-    return () => {
-      mounted = false;
-    };
+    loadRows();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const sortedRows = useMemo(() => {
@@ -61,7 +59,21 @@ export default function TipoCambio() {
   }, [rows]);
 
   return (
-    <Page title="Tipo de Cambio">
+    <Page
+      title="Tipo de Cambio"
+      actions={
+        <Button
+          variant="outlined"
+          size="medium"
+          color="primary"
+          startIcon={<RefreshOutlinedIcon />}
+          onClick={loadRows}
+          disabled={loading}
+        >
+          {loading ? "Actualizando..." : "Refresh"}
+        </Button>
+      }
+    >
       <div className="w-full rounded-2xl bg-white p-4 dark:bg-neutral-900 md:p-6">
         <div className="mt-4 overflow-x-auto rounded-xl border border-slate-300/60 dark:border-zinc-700">
           <table className="min-w-full text-sm">

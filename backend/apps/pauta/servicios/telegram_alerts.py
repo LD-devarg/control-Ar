@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import requests
+from django.utils import timezone
 
 from apps.empresas.models import Empresa, TelegramBot
 from apps.pauta.servicios.crypto import decrypt_token
@@ -28,6 +29,12 @@ def _resolve_active_bot_token() -> str:
         return decrypt_token(bot.token_encrypted)
     except Exception:
         return ""
+
+
+def _resolve_telegram_target(empresa_id: int | None) -> tuple[str, list[str]]:
+    token = _resolve_active_bot_token()
+    chat_ids = _normalized_chat_ids(empresa_id)
+    return token, chat_ids
 
 
 def _build_message(
@@ -62,8 +69,7 @@ def send_status_change_alert(
     previous_status: str,
     next_status: str,
 ) -> int:
-    token = _resolve_active_bot_token()
-    chat_ids = _normalized_chat_ids(empresa_id)
+    token, chat_ids = _resolve_telegram_target(empresa_id)
     if not token or not chat_ids:
         return 0
 
@@ -94,3 +100,33 @@ def send_status_change_alert(
         except Exception:
             continue
     return sent
+
+
+def send_test_alert(*, empresa_id: int, empresa_nombre: str) -> dict:
+    token, chat_ids = _resolve_telegram_target(empresa_id)
+    if not token:
+        return {"ok": False, "sent": 0, "error": "No hay bot activo con token configurado."}
+    if not chat_ids:
+        return {"ok": False, "sent": 0, "error": "La empresa no tiene chat_ids de Telegram configurados."}
+
+    text = (
+        "Test Telegram\n"
+        f"Empresa: {empresa_nombre}\n"
+        f"Timestamp: {timezone.now().isoformat()}"
+    )
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+    sent = 0
+    for chat_id in chat_ids:
+        try:
+            response = requests.post(
+                url,
+                json={"chat_id": chat_id, "text": text},
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            if response.ok:
+                sent += 1
+        except Exception:
+            continue
+
+    return {"ok": sent > 0, "sent": sent, "error": None if sent > 0 else "No se pudo enviar a ningun chat_id."}

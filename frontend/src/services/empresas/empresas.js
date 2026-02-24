@@ -21,3 +21,10 @@ export async function setEmpresaMetaTestMode(id, enabled) {
   });
   return data;
 }
+
+export async function sendEmpresaTelegramTest(empresaId) {
+  const { data } = await apiClient.post("/health/telegram-test/", {
+    empresa_id: Number(empresaId),
+  });
+  return data;
+}

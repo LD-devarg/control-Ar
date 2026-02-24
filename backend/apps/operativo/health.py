@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from apps.empresas.models import Empresa, TelegramBot
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
 from apps.empresas.serializers import TelegramBotSerializer
+from apps.pauta.servicios.telegram_alerts import send_test_alert
 from apps.pauta.servicios.crypto import encrypt_token
 from configs.celery import app as celery_app
 
@@ -273,3 +274,34 @@ class TelegramBotView(APIView):
             bot.token_encrypted = encrypt_token(str(token).strip())
         bot.save()
         return Response(TelegramBotSerializer(bot).data)
+
+
+class TelegramTestView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not request.user.is_superuser:
+            return Response({"detail": "Solo superuser."}, status=403)
+
+        empresa_id = request.data.get("empresa_id")
+        try:
+            empresa_id = int(empresa_id)
+        except Exception:
+            return Response({"detail": "Campo 'empresa_id' requerido."}, status=400)
+
+        empresa = Empresa.objects.filter(id=empresa_id).only("id", "nombre").first()
+        if not empresa:
+            return Response({"detail": "Empresa no encontrada."}, status=404)
+
+        result = send_test_alert(empresa_id=empresa.id, empresa_nombre=empresa.nombre)
+        status_code = 200 if result.get("ok") else 400
+        return Response(
+            {
+                "ok": bool(result.get("ok")),
+                "empresa_id": empresa.id,
+                "empresa_nombre": empresa.nombre,
+                "sent": int(result.get("sent") or 0),
+                "error": result.get("error"),
+            },
+            status=status_code,
+        )

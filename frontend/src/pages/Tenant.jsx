@@ -11,6 +11,7 @@ import {
     fetchEmpresas,
     createEmpresa,
     updateEmpresa,
+    sendEmpresaTelegramTest,
 } from "../services/empresas/empresas";
 import { fetchOrganizaciones } from "../services/empresas/organizaciones";
 import { getCurrentUser } from "../services/auth";
@@ -65,6 +66,7 @@ export default function Tenant() {
     const [beatTasksSaving, setBeatTasksSaving] = useState(false);
     const [telegramChatsDraft, setTelegramChatsDraft] = useState("");
     const [telegramChatsSaving, setTelegramChatsSaving] = useState(false);
+    const [telegramTestSending, setTelegramTestSending] = useState(false);
     const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
 
     const load = useCallback(async () => {
@@ -304,6 +306,28 @@ export default function Tenant() {
         }
     };
 
+    const handleSendTelegramTest = async () => {
+        if (!beatModalEmpresa) return;
+        setTelegramTestSending(true);
+        try {
+            const result = await sendEmpresaTelegramTest(beatModalEmpresa.id);
+            setToast({
+                open: true,
+                severity: "success",
+                message: `Test enviado. Chats alcanzados: ${result?.sent ?? 0}.`,
+            });
+        } catch (err) {
+            const detail = extractApiErrorMessage(err, "No se pudo enviar el test de Telegram.");
+            setToast({
+                open: true,
+                severity: "error",
+                message: detail,
+            });
+        } finally {
+            setTelegramTestSending(false);
+        }
+    };
+
     return (
         <Page title="Empresas">
             <div className="flex flex-col w-full gap-4 md:gap-6 p-3 md:p-6">
@@ -462,6 +486,14 @@ export default function Tenant() {
                         className="rounded-md border border-fuchsia-400/70 px-3 py-1 text-sm font-semibold text-fuchsia-300 disabled:opacity-50"
                     >
                         {telegramChatsSaving ? "Guardando chats..." : "Guardar chats"}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSendTelegramTest}
+                        disabled={telegramTestSending || !beatModalEmpresa}
+                        className="rounded-md border border-indigo-400/70 px-3 py-1 text-sm font-semibold text-indigo-300 disabled:opacity-50"
+                    >
+                        {telegramTestSending ? "Enviando test..." : "Probar Telegram"}
                     </button>
                     <button
                         type="button"

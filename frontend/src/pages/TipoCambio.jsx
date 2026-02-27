@@ -75,7 +75,7 @@ export default function TipoCambio() {
       }
     >
       <div className="w-full rounded-2xl bg-white p-4 dark:bg-neutral-900 md:p-6">
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-300/60 dark:border-zinc-700">
+        <div className="mt-4 max-h-[70vh] overflow-x-auto overflow-y-auto rounded-xl border border-slate-300/60 dark:border-zinc-700">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-100/80 dark:bg-zinc-800/90">
               <tr>

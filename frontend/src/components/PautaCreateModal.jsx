@@ -241,7 +241,9 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
         ];
       }
       if (!fieldsForRemote.length) return;
-      const remoteFields = fieldsForRemote.filter((field) => field.type === "select-remote");
+      const remoteFields = fieldsForRemote.filter(
+        (field) => field.type === "select-remote" || field.type === "multiselect-remote"
+      );
       if (remoteFields.length === 0) return;
 
       const loadId = ++remoteLoadIdRef.current;
@@ -251,9 +253,10 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
         const next = await fetchRemoteOptions(remoteFields);
         if (loadId !== remoteLoadIdRef.current) return;
         setRemoteOptions(next || {});
-      } catch {
+      } catch (err) {
         if (loadId !== remoteLoadIdRef.current) return;
-        setError("No se pudieron cargar las opciones relacionadas.");
+        const detail = err?.response?.data?.detail;
+        setError(detail || err?.message || "No se pudieron cargar las opciones relacionadas.");
       } finally {
         if (loadId === remoteLoadIdRef.current) {
           setLoadingRemote(false);

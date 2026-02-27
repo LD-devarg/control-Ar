@@ -48,18 +48,23 @@ export function clearClientesCache() {
 
 export async function fetchClientes() {
   const tenantId = getEffectiveTenantId();
-  if (!tenantId) {
-    throw new Error("Empresa no disponible para el contexto actual.");
+  if (tenantId) {
+    const cached = readCache(tenantId);
+    if (cached && !isDirty(tenantId)) {
+      return cached;
+    }
   }
 
-  const cached = readCache(tenantId);
-  if (cached && !isDirty(tenantId)) {
-    return cached;
+  const params = {};
+  if (tenantId) {
+    params.empresa = tenantId;
   }
 
-  const { data } = await apiClient.get(`/clientes/`, {
-    params: { empresa__id: tenantId },
-  });
-  writeCache(tenantId, data);
-  return data;
+  const { data } = await apiClient.get(`/clientes/`, { params });
+  const rows = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+
+  if (tenantId) {
+    writeCache(tenantId, rows);
+  }
+  return rows;
 }

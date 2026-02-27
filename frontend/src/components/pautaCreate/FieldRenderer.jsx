@@ -52,6 +52,11 @@ function FieldRenderer({
         multiple
         disableCloseOnSelect
         options={fieldOptions}
+        noOptionsText={
+          field.source === "/empresas/"
+            ? "Sin empresas disponibles para tu usuario"
+            : "No hay opciones"
+        }
         value={selectedOptions}
         onChange={(_, next) => onChange(field.name, (next || []).map((item) => item.id))}
         getOptionLabel={(option) => buildOptionLabel(option, field)}

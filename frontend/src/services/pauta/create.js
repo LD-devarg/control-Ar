@@ -377,16 +377,38 @@ function applyMetaDraftToProvisioning(payload, createMetaDraft) {
 }
 
 export async function fetchRemoteOptions(fields = []) {
-  const remoteFields = fields.filter((field) => field.type === "select-remote");
+  const remoteFields = fields.filter(
+    (field) => field.type === "select-remote" || field.type === "multiselect-remote"
+  );
   if (remoteFields.length === 0) return {};
 
-  const responses = await Promise.all(remoteFields.map((field) => apiClient.get(field.source)));
+  const responses = await Promise.allSettled(
+    remoteFields.map((field) =>
+      apiClient.get(field.source, {
+        params: { _ts: Date.now() },
+      })
+    )
+  );
   const next = {};
+  const failures = [];
 
   remoteFields.forEach((field, index) => {
-    const payload = responses[index]?.data;
-    next[field.name] = Array.isArray(payload) ? payload : [];
+    const result = responses[index];
+    const payload = result?.status === "fulfilled" ? result?.value?.data : null;
+    if (result?.status === "rejected") {
+      const detail = result?.reason?.response?.data?.detail || result?.reason?.message || "error desconocido";
+      failures.push(`${field.label || field.name}: ${detail}`);
+    }
+    next[field.name] = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.results)
+        ? payload.results
+        : [];
   });
+
+  if (failures.length > 0) {
+    throw new Error(`No se pudieron cargar opciones remotas. ${failures.join(" | ")}`);
+  }
 
   return next;
 }

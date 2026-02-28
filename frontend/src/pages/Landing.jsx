@@ -1,12 +1,14 @@
 ﻿import "../assets/css/Landing.css";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import PreviewControls from "../components/PreviewControls";
 
 const NuevoLead = lazy(() => import("../components/FormLeads"));
 const DisclaimerLanding = lazy(() => import("../components/DisclaimerLanding"));
 
 const PREVIEW_MESSAGE_TYPE = "landing-preview:update";
 const PREVIEW_READY_TYPE = "landing-preview:ready";
+const PREVIEW_STORAGE_KEY = "landing_preview_payload_v1";
 
 function normalizeWhatsappNumber(rawNumber) {
     if (!rawNumber) return "";
@@ -23,16 +25,16 @@ function buildFakeWinner() {
     const surnameInitial = surnames[Math.floor(Math.random() * surnames.length)];
     const amount = Math.floor(Math.random() * 700000) + 30000;
     const formattedAmount = new Intl.NumberFormat("es-AR").format(amount);
-    return `?? ${name} ${surnameInitial}. ganó $${formattedAmount} ??`;
+    return `🎉 ${name} ${surnameInitial}. ganó $${formattedAmount} 🎉`;
 }
 
 function normalizePreviewLanding(payload = {}) {
     return {
         titulo: payload.titulo || "BONO DE BIENVENIDA",
-        bono: payload.bono || "?? 100% ??",
+        bono: payload.bono || "🎁 100% 🎉",
         subtitulo: payload.subtitulo || "REGISTRATE AHORA Y DUPLICAMOS TU PRIMER DEPÓSITO",
         texto_boton: payload.texto_boton || "JUGÁ AHORA",
-        texto_info: payload.texto_info || "??Atención personalizada las 24hs.",
+        texto_info: payload.texto_info || "💬 Atención personalizada las 24hs.",
         texto_whatsapp: payload.texto_whatsapp || "",
         mostrar_disclaimer: payload.mostrar_disclaimer !== false,
         mostrar_ticker: payload.mostrar_ticker !== false,
@@ -50,12 +52,42 @@ function normalizePreviewLanding(payload = {}) {
     };
 }
 
+function parseGradient(gradient) {
+    if (!gradient || typeof gradient !== "string") return null;
+    const match = gradient.match(
+        /linear-gradient\(\s*([0-9.]+)deg\s*,\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))\s*(?:[0-9.]+%?)?\s*,\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))/
+    );
+    if (!match) return null;
+    return {
+        angle: Number(match[1]),
+        from: match[2],
+        to: match[3],
+    };
+}
+
+function buildGradient(angle, from, to) {
+    return `linear-gradient(${angle}deg, ${from} 0%, ${to} 100%)`;
+}
+
 export default function Landing() {
     const [landing, setLanding] = useState(null);
     const [whatsappNumber, setWhatsappNumber] = useState("");
     const [visitSent, setVisitSent] = useState(false);
     const [bgReady, setBgReady] = useState(false);
     const [bgUrl, setBgUrl] = useState("");
+    const [previewPanelOpen, setPreviewPanelOpen] = useState(true);
+    const [previewUi, setPreviewUi] = useState({
+        bgType: "gradient",
+        bgGradientAngle: 135,
+        bgGradientFrom: "#0b1f3a",
+        bgGradientTo: "#111827",
+        bgColor: "#0f172a",
+        colorTitulo: "#ffffff",
+        colorSubtitulo: "#ffffff",
+        colorKeyword: "#ffe600",
+        colorBono: "#ffe600",
+        colorInfo: "#ffffff",
+    });
     const pixelLoadedRef = useRef(null);
     const rotatingWhatsappRef = useRef(false);
 
@@ -85,11 +117,28 @@ export default function Landing() {
     useEffect(() => {
         if (!isPreviewMode) return undefined;
 
+        try {
+            const cached = localStorage.getItem(PREVIEW_STORAGE_KEY);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                setLanding(normalizePreviewLanding(parsed || {}));
+                setVisitSent(true);
+            }
+        } catch {
+            // ignore preview cache errors
+        }
+
         const handlePreviewMessage = (event) => {
             if (event.origin !== window.location.origin) return;
             const message = event?.data;
             if (message?.type !== PREVIEW_MESSAGE_TYPE) return;
-            setLanding(normalizePreviewLanding(message.payload || {}));
+            const normalized = normalizePreviewLanding(message.payload || {});
+            setLanding(normalized);
+            try {
+                localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(normalized));
+            } catch {
+                // ignore preview cache errors
+            }
             setWhatsappNumber("");
             setVisitSent(true);
         };
@@ -144,7 +193,56 @@ export default function Landing() {
             mounted = false;
         };
     }, [token, isPreviewMode]);
+
     const hasLandingData = Boolean(landing);
+
+    useEffect(() => {
+        if (!isPreviewMode || !landing) return;
+        const parsed = parseGradient(landing.bg_gradient);
+        setPreviewUi({
+            bgType: landing.bg_type || "gradient",
+            bgGradientAngle: parsed?.angle ?? 135,
+            bgGradientFrom: parsed?.from ?? "#0b1f3a",
+            bgGradientTo: parsed?.to ?? "#111827",
+            bgColor: landing.bg_color || "#0f172a",
+            colorTitulo: landing.color_titulo || "#ffffff",
+            colorSubtitulo: landing.color_subtitulo || "#ffffff",
+            colorKeyword: landing.color_keyword || "#ffe600",
+            colorBono: landing.color_bono || "#ffe600",
+            colorInfo: landing.color_info || "#ffffff",
+        });
+    }, [isPreviewMode, landing]);
+
+    const handlePreviewUiChange = useCallback((patch) => {
+        if (!isPreviewMode) return;
+        setPreviewUi((prev) => {
+            const nextUi = { ...prev, ...patch };
+            setLanding((prevLanding) => {
+                if (!prevLanding) return prevLanding;
+                const nextLanding = {
+                    ...prevLanding,
+                    bg_type: nextUi.bgType,
+                    bg_color: nextUi.bgColor,
+                    color_titulo: nextUi.colorTitulo,
+                    color_subtitulo: nextUi.colorSubtitulo,
+                    color_keyword: nextUi.colorKeyword,
+                    color_bono: nextUi.colorBono,
+                    color_info: nextUi.colorInfo,
+                    bg_gradient: buildGradient(nextUi.bgGradientAngle, nextUi.bgGradientFrom, nextUi.bgGradientTo),
+                };
+                try {
+                    localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(nextLanding));
+                } catch {
+                    // ignore preview cache errors
+                }
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({ type: PREVIEW_MESSAGE_TYPE, payload: nextLanding }, window.location.origin);
+                }
+                return nextLanding;
+            });
+            return nextUi;
+        });
+    }, [isPreviewMode]);
 
     useEffect(() => {
         if (isPreviewMode) return;
@@ -249,10 +347,10 @@ export default function Landing() {
     }, [fetchWhatsappPeek, token, isPreviewMode]);
 
     const titleText = hasLandingData ? (landing?.titulo || "BONO DE BIENVENIDA") : "";
-    const bonusText = hasLandingData ? (landing?.bono || "?? 100% ??") : "";
+    const bonusText = hasLandingData ? (landing?.bono || "🎁 100% 🎉") : "";
     const subtitleText = hasLandingData ? (landing?.subtitulo || "REGISTRATE AHORA Y DUPLICAMOS TU PRIMER DEPÓSITO") : "";
     const buttonText = hasLandingData ? (landing?.texto_boton || "JUGÁ AHORA") : "";
-    const infoText = hasLandingData ? (landing?.texto_info || "??Atención personalizada las 24hs.") : "";
+    const infoText = hasLandingData ? (landing?.texto_info || "💬 Atención personalizada las 24hs.") : "";
     const whatsappTemplate = hasLandingData ? (landing?.texto_whatsapp || "") : "";
     const bgDesktop = landing?.background_horizontal || null;
     const bgMobile = landing?.background_vertical || null;
@@ -413,7 +511,32 @@ export default function Landing() {
                     {hasLandingData ? (landing?.footer_text || "© 2026 ControlAR. Todos los derechos reservados.") : ""}
                 </span>
             </div>
+            {isPreviewMode ? (
+                <div className="fixed top-4 right-4 z-[90] flex items-start gap-2">
+                    {previewPanelOpen ? (
+                        <PreviewControls
+                            bgType={previewUi.bgType}
+                            bgGradientAngle={previewUi.bgGradientAngle}
+                            bgGradientFrom={previewUi.bgGradientFrom}
+                            bgGradientTo={previewUi.bgGradientTo}
+                            bgColor={previewUi.bgColor}
+                            colorTitulo={previewUi.colorTitulo}
+                            colorSubtitulo={previewUi.colorSubtitulo}
+                            colorKeyword={previewUi.colorKeyword}
+                            colorBono={previewUi.colorBono}
+                            colorInfo={previewUi.colorInfo}
+                            onFormChange={handlePreviewUiChange}
+                        />
+                    ) : null}
+                    <button
+                        type="button"
+                        onClick={() => setPreviewPanelOpen((prev) => !prev)}
+                        className="rounded-full border border-white/30 bg-black/70 px-3 py-2 text-xs font-semibold text-white hover:bg-black/80"
+                    >
+                        {previewPanelOpen ? "Ocultar panel" : "Mostrar panel"}
+                    </button>
+                </div>
+            ) : null}
         </div>
     );
 }
-

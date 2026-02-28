@@ -12,8 +12,11 @@ import UploadButton from "../components/UploadButton";
 import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
 import { apiClient } from "../services/auth";
-import PreviewLanding from "../components/PreviewLanding";
 import { useTenant } from "../context/TenantContext";
+
+const PREVIEW_MESSAGE_TYPE = "landing-preview:update";
+const PREVIEW_READY_TYPE = "landing-preview:ready";
+const PREVIEW_STORAGE_KEY = "landing_preview_payload_v1";
 
 const EMPTY_FORM = {
     nombre: "",
@@ -104,6 +107,48 @@ const resolvePublicBaseUrl = (inputUrl, fallbackOrigin) => {
     }
 };
 
+const extractApiErrorMessage = (error, fallbackMessage) => {
+    const data = error?.response?.data;
+    if (!data) return fallbackMessage;
+    if (typeof data === "string") return data;
+    if (typeof data?.detail === "string") return data.detail;
+    if (Array.isArray(data)) {
+        const first = data.find((item) => typeof item === "string");
+        return first || fallbackMessage;
+    }
+    if (typeof data === "object") {
+        const values = Object.values(data).flat();
+        const firstText = values.find((value) => typeof value === "string");
+        if (firstText) return firstText;
+    }
+    return fallbackMessage;
+};
+
+const buildPreviewPayload = (form, previewUrls, currentGradient) => ({
+    titulo: form?.titulo || "",
+    bono: form?.bonoActivo || "",
+    subtitulo: form?.subtitulo || "",
+    texto_boton: form?.textoBoton || "",
+    texto_info: form?.textoInfo || "",
+    texto_whatsapp: form?.textoWhatsapp || "",
+    mostrar_disclaimer: form?.mostrarDisclaimer !== false,
+    mostrar_ticker: form?.mostrarTicker !== false,
+    color_titulo: form?.colorTitulo || "#ffffff",
+    color_subtitulo: form?.colorSubtitulo || "#ffffff",
+    color_keyword: form?.colorKeyword || "#ffe600",
+    color_bono: form?.colorBono || "#ffe600",
+    color_info: form?.colorInfo || "#ffffff",
+    bg_type: form?.bgType || "gradient",
+    bg_color: form?.bgColor || "#0f172a",
+    bg_gradient:
+        form?.bgGradient ||
+        currentGradient ||
+        "linear-gradient(135deg, #0b1f3a 0%, #111827 100%)",
+    background_vertical: previewUrls?.vertical || "",
+    background_horizontal: previewUrls?.horizontal || "",
+    footer_text: "© 2026 ControlAR. Todos los derechos reservados.",
+});
+
 function LandingConfig() {
     const { tenantId } = useTenant();
     const [selectedLanding, setSelectedLanding] = useState(null);
@@ -115,12 +160,11 @@ function LandingConfig() {
     const [initialActivo, setInitialActivo] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
-    const [showPreview, setShowPreview] = useState(false);
-    const [previewDevice, setPreviewDevice] = useState("desktop");
     const [previewUrls, setPreviewUrls] = useState({ vertical: "", horizontal: "" });
     const [uploadKey, setUploadKey] = useState(0);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const previewObjectUrlsRef = useRef({ vertical: null, horizontal: null });
+    const previewWindowRef = useRef(null);
 
     const clearPreviewObjectUrls = useCallback(() => {
         const current = previewObjectUrlsRef.current;
@@ -243,8 +287,8 @@ function LandingConfig() {
             }
         } catch (error) {
             const status = error?.response?.status;
-            const detail = error?.response?.data?.detail;
-            showToast("error", `Error (${status || "?"}): ${detail || "No se pudieron cargar las landings."}`);
+            const detail = extractApiErrorMessage(error, "No se pudieron cargar las landings.");
+            showToast("error", `Error (${status || "?"}): ${detail}`);
         }
     }, [handleSelectLanding, showToast]);
 
@@ -260,8 +304,8 @@ function LandingConfig() {
             setCredencialesMetaOptions(options);
         } catch (error) {
             const status = error?.response?.status;
-            const detail = error?.response?.data?.detail;
-            showToast("error", `Error (${status || "?"}): ${detail || "No se pudieron cargar las credenciales Meta."}`);
+            const detail = extractApiErrorMessage(error, "No se pudieron cargar las credenciales Meta.");
+            showToast("error", `Error (${status || "?"}): ${detail}`);
         }
     }, [showToast]);
 
@@ -284,6 +328,10 @@ function LandingConfig() {
     const currentGradient = useMemo(
         () => buildGradient(form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo),
         [form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo]
+    );
+    const previewPayload = useMemo(
+        () => buildPreviewPayload(form, previewUrls, currentGradient),
+        [form, previewUrls, currentGradient]
     );
     const isComplete =
         form.nombre.trim() !== "" &&
@@ -410,16 +458,14 @@ function LandingConfig() {
             }
         } catch (error) {
             const status = error?.response?.status;
-            const detail = error?.response?.data?.detail;
-            const message = detail ? `${detail}` : "No se pudo guardar la landing.";
+            const message = extractApiErrorMessage(error, "No se pudo guardar la landing.");
+            console.error("Landing save error", error?.response?.data || error);
             showToast("error", `Error (${status || "?"}): ${message}`);
         } finally {
             setSubmitting(false);
         }
     };
 
-    const previewBackground =
-        form.bgType === "gradient" ? currentGradient : form.bgColor;
     const publicBaseUrl = useMemo(
         () => resolvePublicBaseUrl(form.url, origin),
         [form.url, origin]
@@ -427,6 +473,48 @@ function LandingConfig() {
     const publicLandingUrl = selectedLanding?.token
         ? `${publicBaseUrl}/landing?landing_token=${selectedLanding.token}`
         : "";
+    const previewUrl = `${origin}/landing?preview=1`;
+
+    const sendPreviewUpdate = useCallback(() => {
+        try {
+            localStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify(previewPayload));
+        } catch {
+            // ignore storage errors
+        }
+        const win = previewWindowRef.current;
+        if (!win || win.closed) return;
+        win.postMessage({ type: PREVIEW_MESSAGE_TYPE, payload: previewPayload }, window.location.origin);
+    }, [previewPayload]);
+
+    const openPreviewWindow = useCallback(() => {
+        const existing = previewWindowRef.current;
+        if (existing && !existing.closed) {
+            existing.focus();
+            sendPreviewUpdate();
+            return;
+        }
+        const opened = window.open(previewUrl, "landing-preview-window");
+        if (!opened) {
+            showToast("error", "No se pudo abrir la ventana de preview. Revisá el bloqueador de popups.");
+            return;
+        }
+        previewWindowRef.current = opened;
+    }, [previewUrl, sendPreviewUpdate, showToast]);
+
+    useEffect(() => {
+        sendPreviewUpdate();
+    }, [sendPreviewUpdate]);
+
+    useEffect(() => {
+        const onMessage = (event) => {
+            if (event.origin !== window.location.origin) return;
+            if (event?.data?.type !== PREVIEW_READY_TYPE) return;
+            if (previewWindowRef.current && event.source !== previewWindowRef.current) return;
+            sendPreviewUpdate();
+        };
+        window.addEventListener("message", onMessage);
+        return () => window.removeEventListener("message", onMessage);
+    }, [sendPreviewUpdate]);
 
     return (
         <Page title="Configuración de Landing Page">
@@ -790,21 +878,11 @@ function LandingConfig() {
                                 height: "100%",
                             }}
                             disabled={previewDisabled}
-                            onClick={() => setShowPreview((prev) => !prev)}
+                            onClick={openPreviewWindow}
                             >
                                 Vista Previa
                             </Button>
                         </div>
-                        <PreviewLanding
-                            open={showPreview}
-                            onClose={() => setShowPreview(false)}
-                            device={previewDevice}
-                            onDeviceChange={setPreviewDevice}
-                            form={form}
-                            previewUrls={previewUrls}
-                            previewBackground={previewBackground}
-                            onFormChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))}
-                        />
                     </div>
                 </div>
             </div>

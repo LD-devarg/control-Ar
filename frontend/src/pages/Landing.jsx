@@ -1,8 +1,12 @@
 ﻿import "../assets/css/Landing.css";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+
 const NuevoLead = lazy(() => import("../components/FormLeads"));
 const DisclaimerLanding = lazy(() => import("../components/DisclaimerLanding"));
+
+const PREVIEW_MESSAGE_TYPE = "landing-preview:update";
+const PREVIEW_READY_TYPE = "landing-preview:ready";
 
 function normalizeWhatsappNumber(rawNumber) {
     if (!rawNumber) return "";
@@ -14,14 +18,36 @@ function buildFakeWinner() {
         "Juan", "Analia", "Carlos", "Micaela", "Diego", "Lucia", "Facundo", "Rocio",
         "Marcos", "Sofia", "Nicolas", "Camila", "Matias", "Florencia", "Gonzalo", "Valentina", "Federico", "Vanesa", "Cristian", "Agustina", "Alejandro", "Natalia",
     ];
-    const surnames = [
-        "S", "P", "R", "M", "G", "T", "L", "F", "V", "C", "A", "N",
-    ];
+    const surnames = ["S", "P", "R", "M", "G", "T", "L", "F", "V", "C", "A", "N"];
     const name = names[Math.floor(Math.random() * names.length)];
     const surnameInitial = surnames[Math.floor(Math.random() * surnames.length)];
     const amount = Math.floor(Math.random() * 700000) + 30000;
     const formattedAmount = new Intl.NumberFormat("es-AR").format(amount);
-    return `💰 ${name} ${surnameInitial}. ganó $${formattedAmount} 🎉`;
+    return `?? ${name} ${surnameInitial}. ganó $${formattedAmount} ??`;
+}
+
+function normalizePreviewLanding(payload = {}) {
+    return {
+        titulo: payload.titulo || "BONO DE BIENVENIDA",
+        bono: payload.bono || "?? 100% ??",
+        subtitulo: payload.subtitulo || "REGISTRATE AHORA Y DUPLICAMOS TU PRIMER DEPÓSITO",
+        texto_boton: payload.texto_boton || "JUGÁ AHORA",
+        texto_info: payload.texto_info || "??Atención personalizada las 24hs.",
+        texto_whatsapp: payload.texto_whatsapp || "",
+        mostrar_disclaimer: payload.mostrar_disclaimer !== false,
+        mostrar_ticker: payload.mostrar_ticker !== false,
+        color_titulo: payload.color_titulo || "#ffffff",
+        color_subtitulo: payload.color_subtitulo || "#ffffff",
+        color_keyword: payload.color_keyword || "#ffe600",
+        color_bono: payload.color_bono || "#ffe600",
+        color_info: payload.color_info || "#ffffff",
+        bg_type: payload.bg_type || "gradient",
+        bg_color: payload.bg_color || "#0f172a",
+        bg_gradient: payload.bg_gradient || "linear-gradient(135deg, #0b1f3a 0%, #0f172a 40%, #111827 100%)",
+        background_vertical: payload.background_vertical || "",
+        background_horizontal: payload.background_horizontal || "",
+        footer_text: payload.footer_text || "© 2026 ControlAR. Todos los derechos reservados.",
+    };
 }
 
 export default function Landing() {
@@ -33,10 +59,9 @@ export default function Landing() {
     const pixelLoadedRef = useRef(null);
     const rotatingWhatsappRef = useRef(false);
 
-    const token = useMemo(() => {
-        const params = new URLSearchParams(window.location.search);
-        return params.get("landing_token");
-    }, []);
+    const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
+    const token = useMemo(() => searchParams.get("landing_token"), [searchParams]);
+    const isPreviewMode = useMemo(() => searchParams.get("preview") === "1", [searchParams]);
     const fakeWinners = useMemo(() => Array.from({ length: 12 }, () => buildFakeWinner()), []);
 
     const resolveBackgroundUrl = (desktopUrl, mobileUrl) => {
@@ -48,15 +73,36 @@ export default function Landing() {
     };
 
     const fetchWhatsappPeek = useCallback(async () => {
+        if (isPreviewMode) return "";
         if (!token) return "";
         const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
         const response = await axios.get(`${baseUrl}/landings/whatsapp-rotacion/`, {
             params: { landing_token: token },
         });
         return normalizeWhatsappNumber(response.data?.numero);
-    }, [token]);
+    }, [token, isPreviewMode]);
 
     useEffect(() => {
+        if (!isPreviewMode) return undefined;
+
+        const handlePreviewMessage = (event) => {
+            if (event.origin !== window.location.origin) return;
+            const message = event?.data;
+            if (message?.type !== PREVIEW_MESSAGE_TYPE) return;
+            setLanding(normalizePreviewLanding(message.payload || {}));
+            setWhatsappNumber("");
+            setVisitSent(true);
+        };
+
+        window.addEventListener("message", handlePreviewMessage);
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: PREVIEW_READY_TYPE }, window.location.origin);
+        }
+        return () => window.removeEventListener("message", handlePreviewMessage);
+    }, [isPreviewMode]);
+
+    useEffect(() => {
+        if (isPreviewMode) return undefined;
         let mounted = true;
         const cacheKey = token ? `landing_cache_${token}` : null;
         if (cacheKey) {
@@ -89,7 +135,7 @@ export default function Landing() {
                         }
                     }
                 }
-            } catch (error) {
+            } catch {
                 // keep last valid landing if fetch fails
             }
         };
@@ -97,10 +143,11 @@ export default function Landing() {
         return () => {
             mounted = false;
         };
-    }, [token]);
+    }, [token, isPreviewMode]);
     const hasLandingData = Boolean(landing);
 
     useEffect(() => {
+        if (isPreviewMode) return;
         const pixelId = landing?.pixel_id;
         if (!pixelId) return;
         if (pixelLoadedRef.current === pixelId) return;
@@ -133,9 +180,10 @@ export default function Landing() {
         } else {
             window.setTimeout(loadPixel, 500);
         }
-    }, [landing]);
+    }, [landing, isPreviewMode]);
 
     useEffect(() => {
+        if (isPreviewMode) return;
         if (!token || visitSent) return;
         let cancelled = false;
         const sendVisit = async () => {
@@ -153,9 +201,10 @@ export default function Landing() {
         return () => {
             cancelled = true;
         };
-    }, [token, visitSent]);
+    }, [token, visitSent, isPreviewMode]);
 
     useEffect(() => {
+        if (isPreviewMode) return undefined;
         let mounted = true;
         const fetchWhatsapp = async () => {
             if (!token) return;
@@ -164,7 +213,7 @@ export default function Landing() {
                 if (mounted) {
                     setWhatsappNumber(nextNumber);
                 }
-            } catch (error) {
+            } catch {
                 if (mounted) {
                     setWhatsappNumber("");
                 }
@@ -174,9 +223,10 @@ export default function Landing() {
         return () => {
             mounted = false;
         };
-    }, [fetchWhatsappPeek, token]);
+    }, [fetchWhatsappPeek, token, isPreviewMode]);
 
     const handleWhatsappOpened = useCallback(async () => {
+        if (isPreviewMode) return;
         if (!token || rotatingWhatsappRef.current) return;
         rotatingWhatsappRef.current = true;
         try {
@@ -196,13 +246,13 @@ export default function Landing() {
         } finally {
             rotatingWhatsappRef.current = false;
         }
-    }, [fetchWhatsappPeek, token]);
+    }, [fetchWhatsappPeek, token, isPreviewMode]);
 
     const titleText = hasLandingData ? (landing?.titulo || "BONO DE BIENVENIDA") : "";
-    const bonusText = hasLandingData ? (landing?.bono || "🎁 100% 🎁") : "";
+    const bonusText = hasLandingData ? (landing?.bono || "?? 100% ??") : "";
     const subtitleText = hasLandingData ? (landing?.subtitulo || "REGISTRATE AHORA Y DUPLICAMOS TU PRIMER DEPÓSITO") : "";
     const buttonText = hasLandingData ? (landing?.texto_boton || "JUGÁ AHORA") : "";
-    const infoText = hasLandingData ? (landing?.texto_info || "🤳Atención personalizada las 24hs.") : "";
+    const infoText = hasLandingData ? (landing?.texto_info || "??Atención personalizada las 24hs.") : "";
     const whatsappTemplate = hasLandingData ? (landing?.texto_whatsapp || "") : "";
     const bgDesktop = landing?.background_horizontal || null;
     const bgMobile = landing?.background_vertical || null;
@@ -217,6 +267,7 @@ export default function Landing() {
     const colorInfo = landing?.color_info || "#ffffff";
     const showTicker = hasLandingData && landing?.mostrar_ticker !== false;
     const keyword = "DUPLICAMOS";
+
     const renderSubtitle = () => {
         if (!subtitleText) return null;
         const index = subtitleText.toUpperCase().indexOf(keyword);
@@ -274,10 +325,7 @@ export default function Landing() {
         preloadLink.href = bgUrl;
     }, [bgUrl]);
 
-    const layoutBackground =
-        bgType === "gradient"
-            ? bgGradient
-            : bgColor;
+    const layoutBackground = bgType === "gradient" ? bgGradient : bgColor;
 
     return (
         <div
@@ -315,13 +363,13 @@ export default function Landing() {
                     {hasLandingData ? (
                         <div className="landing-title-container">
                             <h1
-                            className="mt-2 mb-4 text-center font-bold landing-fade-in"
-                            style={{ color: colorTitulo }}
-                            >{titleText}</h1>
+                                className="mt-2 mb-4 text-center font-bold landing-fade-in"
+                                style={{ color: colorTitulo }}
+                            >
+                                {titleText}
+                            </h1>
                             <div className="landing-bono-pulse">
-                                <span className="landing-bono"
-                                style={{ color: colorBono }}
-                                > {bonusText} </span>
+                                <span className="landing-bono" style={{ color: colorBono }}> {bonusText} </span>
                             </div>
                             <h2 className="font-bold" style={{ color: colorSubtitulo }}>{renderSubtitle()}</h2>
                         </div>
@@ -332,10 +380,11 @@ export default function Landing() {
                             <div className="landing-skeleton-line landing-skeleton-subtitle" />
                         </div>
                     )}
+
                     {hasLandingData ? (
                         <Suspense fallback={<div className="landing-form-fallback" />}>
                             <NuevoLead
-                                landingToken={token}
+                                landingToken={isPreviewMode ? "preview" : token}
                                 bonusText={bonusText}
                                 whatsappNumber={whatsappNumber}
                                 onWhatsappOpened={handleWhatsappOpened}
@@ -343,11 +392,13 @@ export default function Landing() {
                                 infoText={infoText}
                                 whatsappTemplate={whatsappTemplate}
                                 infoColor={colorInfo}
+                                isPreview={isPreviewMode}
                             />
                         </Suspense>
                     ) : (
                         <div className="landing-form-fallback" />
                     )}
+
                     {hasLandingData && landing?.mostrar_disclaimer !== false ? (
                         <div className="flex justify-center w-full lg:w-2/3 mt-8 lg:mt-10 landing-fade-in">
                             <Suspense fallback={null}>
@@ -357,9 +408,12 @@ export default function Landing() {
                     ) : null}
                 </div>
             </section>
-                <div className="w-full py-1 flex justify-center">
-                    <span className="text-sm" style={{ color: colorInfo }}>{hasLandingData ? (landing?.footer_text || "\u00A9 2026 ControlAR. Todos los derechos reservados.") : ""}</span>
-                </div>
+            <div className="w-full py-1 flex justify-center">
+                <span className="text-sm" style={{ color: colorInfo }}>
+                    {hasLandingData ? (landing?.footer_text || "© 2026 ControlAR. Todos los derechos reservados.") : ""}
+                </span>
+            </div>
         </div>
     );
 }
+

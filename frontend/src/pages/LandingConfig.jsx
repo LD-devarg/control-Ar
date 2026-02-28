@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "../assets/css/LandingConfig.css";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
@@ -120,6 +120,30 @@ function LandingConfig() {
     const [previewUrls, setPreviewUrls] = useState({ vertical: "", horizontal: "" });
     const [uploadKey, setUploadKey] = useState(0);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const previewObjectUrlsRef = useRef({ vertical: null, horizontal: null });
+
+    const clearPreviewObjectUrls = useCallback(() => {
+        const current = previewObjectUrlsRef.current;
+        if (current.vertical) {
+            URL.revokeObjectURL(current.vertical);
+            current.vertical = null;
+        }
+        if (current.horizontal) {
+            URL.revokeObjectURL(current.horizontal);
+            current.horizontal = null;
+        }
+    }, []);
+
+    const setPreviewUrlFromFile = useCallback((key, file) => {
+        if (!file) return;
+        const current = previewObjectUrlsRef.current;
+        if (current[key]) {
+            URL.revokeObjectURL(current[key]);
+        }
+        const objectUrl = URL.createObjectURL(file);
+        current[key] = objectUrl;
+        setPreviewUrls((prev) => ({ ...prev, [key]: objectUrl }));
+    }, []);
 
     const commonTextFieldSx = {
         "& fieldset": {
@@ -148,9 +172,12 @@ function LandingConfig() {
         setToast({ open: true, severity, message });
     }, []);
 
+    useEffect(() => () => clearPreviewObjectUrls(), [clearPreviewObjectUrls]);
+
     const handleSelectLanding = useCallback((value) => {
         setSelectedLanding(value);
         setUploadKey((prev) => prev + 1);
+        clearPreviewObjectUrls();
         if (!value) {
             const empty = cloneEmptyForm();
             setForm(empty);
@@ -294,6 +321,7 @@ function LandingConfig() {
 
     const handleCancel = () => {
         setSelectedLanding(null);
+        clearPreviewObjectUrls();
         const empty = cloneEmptyForm();
         setForm(empty);
         setInitialForm(empty);
@@ -665,7 +693,10 @@ function LandingConfig() {
                                 <UploadButton
                                     key={`upload-vertical-${uploadKey}`}
                                     label="Fondo Vertical (Mobile)"
-                                    onUpload={(file) => setForm((prev) => ({ ...prev, backgroundVertical: file }))}
+                                    onUpload={(file) => {
+                                        setForm((prev) => ({ ...prev, backgroundVertical: file }));
+                                        setPreviewUrlFromFile("vertical", file);
+                                    }}
                                     sx={{
                                         gridColumn: "span 2",
                                         width: "100%",
@@ -689,7 +720,10 @@ function LandingConfig() {
                             <UploadButton
                                 key={`upload-horizontal-${uploadKey}`}
                                 label="Fondo Horizontal (Desktop)"
-                                onUpload={(file) => setForm((prev) => ({ ...prev, backgroundHorizontal: file }))}
+                                onUpload={(file) => {
+                                    setForm((prev) => ({ ...prev, backgroundHorizontal: file }));
+                                    setPreviewUrlFromFile("horizontal", file);
+                                }}
                                 sx={{
                                     gridColumn: "span 2",
                                     width: "100%",
@@ -794,3 +828,9 @@ function LandingConfig() {
 }
 
 export default LandingConfig;
+
+
+
+
+
+

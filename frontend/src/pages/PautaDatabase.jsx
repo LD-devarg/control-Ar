@@ -48,6 +48,7 @@ const ENDPOINTS_BY_VIEW = {
   Bms: "/bms/",
   "Ad Accounts": "/cuentas-publicitarias/",
   FanPage: "/fanpages/",
+  "Credenciales Meta": "/credenciales-meta/",
   Campaigns: "/campanas/",
   Adsets: "/conjuntos-anuncios/",
   Assets: "/pauta-assets/",
@@ -59,6 +60,7 @@ const EDITABLE_FIELDS_BY_VIEW = {
   Bms: ["nombre", "meta_id", "estado", "empresas"],
   "Ad Accounts": ["nombre", "meta_id", "estado", "moneda"],
   FanPage: ["nombre", "meta_id", "estado"],
+  "Credenciales Meta": ["bm", "nombre", "pixel_id", "app_id", "token_acceso_encrypted"],
   Campaigns: ["nombre", "meta_id", "estado", "objetivo"],
   Adsets: ["nombre", "meta_id", "estado", "presupuesto_diario"],
   Assets: ["nombre", "meta_asset_id", "tipo", "estado", "s3_url"],
@@ -82,6 +84,10 @@ const FIELD_LABELS = {
   tipo: "Tipo",
   empresas: "Empresas vinculadas",
   moneda: "Moneda",
+  bm: "BM",
+  pixel_id: "Pixel ID",
+  app_id: "App ID",
+  token_acceso_encrypted: "Token de acceso",
 };
 
 const COLUMN_SETS = {
@@ -102,6 +108,13 @@ const COLUMN_SETS = {
     { key: "name", label: "Nombre" },
     { key: "metaId", label: "Meta_ID" },
     { key: "status", label: "Estado" },
+  ],
+  "Credenciales Meta": [
+    { key: "name", label: "Nombre" },
+    { key: "bm", label: "BM" },
+    { key: "pixelId", label: "Pixel ID" },
+    { key: "appId", label: "App ID" },
+    { key: "tokenConfigured", label: "Token" },
   ],
   Campaigns: [
     { key: "name", label: "Nombre" },
@@ -167,6 +180,7 @@ export default function PautaDatabase() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingRow, setDeletingRow] = useState(false);
   const [empresasOptions, setEmpresasOptions] = useState([]);
+  const [bmsOptions, setBmsOptions] = useState([]);
   const [editState, setEditState] = useState({ open: false, view: "", row: null, values: {} });
   const [deleteState, setDeleteState] = useState({ open: false, view: "", row: null });
   const pickerRef = useRef(null);
@@ -229,6 +243,7 @@ export default function PautaDatabase() {
         empresasRes,
         adAccountsRes,
         fanpagesRes,
+        credencialesMetaRes,
         campaignsRes,
         adsetsRes,
         assetsRes,
@@ -239,6 +254,7 @@ export default function PautaDatabase() {
         apiClient.get("/empresas/"),
         apiClient.get("/cuentas-publicitarias/"),
         apiClient.get("/fanpages/"),
+        apiClient.get("/credenciales-meta/"),
         apiClient.get("/campanas/"),
         apiClient.get("/conjuntos-anuncios/"),
         apiClient.get("/pauta-assets/"),
@@ -247,10 +263,12 @@ export default function PautaDatabase() {
       ]);
 
       const bms = unwrapList(bmsRes?.data);
+      setBmsOptions(bms);
       const empresas = unwrapList(empresasRes?.data);
       setEmpresasOptions(empresas);
       const adAccounts = unwrapList(adAccountsRes?.data);
       const fanpages = unwrapList(fanpagesRes?.data);
+      const credencialesMeta = unwrapList(credencialesMetaRes?.data);
       const campaigns = unwrapList(campaignsRes?.data);
       const adsets = unwrapList(adsetsRes?.data);
       const assets = unwrapList(assetsRes?.data);
@@ -306,6 +324,15 @@ export default function PautaDatabase() {
           name: item.nombre,
           metaId: item.meta_id,
           status: item.estado,
+          __raw: item,
+        })),
+        "Credenciales Meta": credencialesMeta.map((item) => ({
+          id: item.id,
+          name: item.nombre,
+          bm: bmNameById[item.bm] || `#${item.bm}`,
+          pixelId: item.pixel_id || "-",
+          appId: item.app_id || "-",
+          tokenConfigured: item.token_configurado ? "Configurado" : "Sin token",
           __raw: item,
         })),
         Campaigns: campaignsFiltered.map((item) => ({
@@ -447,6 +474,13 @@ export default function PautaDatabase() {
       const editableFields = EDITABLE_FIELDS_BY_VIEW[editState.view] || [];
       const payload = {};
       editableFields.forEach((fieldName) => {
+        if (fieldName === "token_acceso_encrypted") {
+          const nextToken = String(editState.values[fieldName] ?? "").trim();
+          if (nextToken) {
+            payload[fieldName] = nextToken;
+          }
+          return;
+        }
         payload[fieldName] = editState.values[fieldName];
       });
       await apiClient.patch(`${endpoint}${rowId}/`, payload);
@@ -664,13 +698,33 @@ export default function PautaDatabase() {
                 </TextField>
               );
             }
+            if (fieldName === "bm") {
+              return (
+                <TextField
+                  key={fieldName}
+                  select
+                  label={FIELD_LABELS[fieldName] || fieldName}
+                  size="small"
+                  value={editState.values[fieldName] ?? ""}
+                  onChange={(event) => updateEditField(fieldName, Number(event.target.value))}
+                >
+                  {bmsOptions.map((item) => (
+                    <MenuItem key={item.id} value={item.id}>
+                      {item.nombre || `#${item.id}`}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              );
+            }
             return (
               <TextField
                 key={fieldName}
                 label={FIELD_LABELS[fieldName] || fieldName}
                 size="small"
+                type={fieldName === "token_acceso_encrypted" ? "password" : "text"}
                 value={editState.values[fieldName] ?? ""}
                 onChange={(event) => updateEditField(fieldName, event.target.value)}
+                placeholder={fieldName === "token_acceso_encrypted" ? "Dejar vacio para mantener el token actual" : ""}
               />
             );
           })}

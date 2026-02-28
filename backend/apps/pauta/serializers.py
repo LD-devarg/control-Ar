@@ -442,14 +442,27 @@ class GastoDiarioSerializer(serializers.ModelSerializer):
 
 class CredencialesMetaSerializer(serializers.ModelSerializer):
     token_acceso_encrypted = serializers.CharField(write_only=True)
+    token_configurado = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = CredencialesMeta
-        fields = ["id", "empresa", "bm", "nombre", "pixel_id", "app_id", "token_acceso_encrypted"]
+        fields = [
+            "id",
+            "empresa",
+            "bm",
+            "nombre",
+            "pixel_id",
+            "app_id",
+            "token_acceso_encrypted",
+            "token_configurado",
+        ]
         read_only_fields = ["id"]
         extra_kwargs = {
             "app_id": {"required": False, "allow_blank": True, "allow_null": True},
         }
+
+    def get_token_configurado(self, obj):
+        return bool(getattr(obj, "token_acceso_encrypted", ""))
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -477,8 +490,8 @@ class CredencialesMetaSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
-        token = validated_data.get("token_acceso_encrypted")
-        if token:
+        token = validated_data.pop("token_acceso_encrypted", None)
+        if token not in (None, ""):
             validated_data["token_acceso_encrypted"] = encrypt_token(token)
         return super().update(instance, validated_data)
 

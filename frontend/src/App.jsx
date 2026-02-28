@@ -17,6 +17,7 @@ import Health from './pages/Health.jsx'
 import Tenant from './pages/Tenant.jsx'
 import Users from './pages/Users.jsx'
 import Organizaciones from './pages/Organizaciones.jsx'
+import DemoApp from './pages/DemoApp.jsx'
 import { canAccessPath, getDefaultPath } from './services/access'
 import { getCurrentUser } from './services/auth'
 
@@ -94,6 +95,7 @@ function App() {
             <Route path="/usuarios" element={<GuardedRoute path="/usuarios" element={<Users />} />} />
           </Route>
           <Route path="/landing" element={<Landing />} />
+          <Route path="/demo/*" element={<DemoApp />} />
         </Routes>
       </div>
     </>

@@ -130,3 +130,45 @@ def send_test_alert(*, empresa_id: int, empresa_nombre: str) -> dict:
             continue
 
     return {"ok": sent > 0, "sent": sent, "error": None if sent > 0 else "No se pudo enviar a ningun chat_id."}
+
+
+def send_lead_queue_alert(
+    *,
+    empresa_id: int | None,
+    empresa_nombre: str,
+    queue_size: int,
+    oldest_pending_ms: int,
+    threshold_ms: int,
+    source: str = "landing_form",
+) -> dict:
+    token, chat_ids = _resolve_telegram_target(empresa_id)
+    if not token or not chat_ids:
+        return {"ok": False, "sent": 0, "error": "Telegram no configurado para la empresa."}
+
+    oldest_minutes = round(max(oldest_pending_ms, 0) / 60000, 2)
+    threshold_minutes = round(max(threshold_ms, 0) / 60000, 2)
+    text = (
+        "Alerta Leads\n"
+        f"Empresa: {empresa_nombre}\n"
+        f"Fuente: {source}\n"
+        f"Leads pendientes: {max(int(queue_size or 0), 0)}\n"
+        f"Antiguedad maxima: {oldest_minutes} min\n"
+        f"Umbral: {threshold_minutes} min\n"
+        f"Timestamp: {timezone.now().isoformat()}"
+    )
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+    sent = 0
+    for chat_id in chat_ids:
+        try:
+            response = requests.post(
+                url,
+                json={"chat_id": chat_id, "text": text},
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            if response.ok:
+                sent += 1
+        except Exception:
+            continue
+
+    return {"ok": sent > 0, "sent": sent, "error": None if sent > 0 else "No se pudo enviar a ningun chat_id."}

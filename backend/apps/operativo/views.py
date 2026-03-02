@@ -6,6 +6,7 @@ from django.db import models, transaction
 from django.db.models import Sum, Min, Subquery, Count, Value, DecimalField, IntegerField
 from django.db.models import Exists, OuterRef
 from django.db.models.functions import Coalesce
+from django.core.cache import cache
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -37,6 +38,7 @@ from .serializers import (
 from .servicios.calculos import calcular_compra
 from .servicios.enviador import enviar_evento_meta
 from apps.pauta.servicios.insights import fetch_meta_page_views
+from apps.pauta.servicios.telegram_alerts import send_lead_queue_alert
 from apps.pauta.models import GastoDiario
 from .realtime import publish_empresa_event
 
@@ -359,6 +361,72 @@ class LandingViewSet(viewsets.ModelViewSet):
         landing = get_object_or_404(Landing, token=token, activo=True)
         serializer = self.get_serializer(landing)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], permission_classes=[AllowAny], url_path="queue-alert")
+    def queue_alert(self, request):
+        token = request.data.get("landing_token")
+        if not token:
+            raise ValidationError("landing_token requerido")
+
+        landing = get_object_or_404(Landing, token=token, activo=True)
+
+        try:
+            queue_size = max(int(request.data.get("queue_size") or 0), 0)
+        except (TypeError, ValueError):
+            queue_size = 0
+        try:
+            oldest_pending_ms = max(int(request.data.get("oldest_pending_ms") or 0), 0)
+        except (TypeError, ValueError):
+            oldest_pending_ms = 0
+        try:
+            threshold_ms = max(int(request.data.get("threshold_ms") or 0), 0)
+        except (TypeError, ValueError):
+            threshold_ms = 0
+        source = str(request.data.get("source") or "landing_form")[:50]
+
+        dedup_key = f"lead_queue_alert:{landing.id}"
+        if cache.get(dedup_key):
+            return Response({"ok": True, "deduped": True})
+
+        cache.set(dedup_key, True, timeout=30 * 60)
+
+        empresa = landing.empresa
+        telegram_result = send_lead_queue_alert(
+            empresa_id=empresa.id,
+            empresa_nombre=empresa.nombre,
+            queue_size=queue_size,
+            oldest_pending_ms=oldest_pending_ms,
+            threshold_ms=threshold_ms,
+            source=source,
+        )
+
+        publish_empresa_event(
+            empresa_id=empresa.id,
+            event_type="lead_queue_alert",
+            payload={
+                "landing_id": landing.id,
+                "landing_nombre": landing.nombre,
+                "queue_size": queue_size,
+                "oldest_pending_ms": oldest_pending_ms,
+                "threshold_ms": threshold_ms,
+                "source": source,
+                "telegram_sent": int(telegram_result.get("sent") or 0),
+                "created_at": timezone.now().isoformat(),
+            },
+        )
+
+        return Response(
+            {
+                "ok": True,
+                "deduped": False,
+                "telegram": {
+                    "ok": bool(telegram_result.get("ok")),
+                    "sent": int(telegram_result.get("sent") or 0),
+                    "error": telegram_result.get("error"),
+                },
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
 
 
 class LandingVisitViewSet(viewsets.ModelViewSet):

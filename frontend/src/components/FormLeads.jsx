@@ -12,7 +12,10 @@ import axios from "axios";
 import { markClientesDirty } from "../services/operativo/clientes";
 
 const QUEUE_KEY = "pending_clients";
-const RETRY_DELAYS = [];
+const RETRY_DELAYS = [2000, 5000, 15000, 30000, 60000, 300000];
+const ALERT_THRESHOLD_MS = 5 * 60 * 1000;
+const ALERT_INTERVAL_MS = 60 * 1000;
+const ALERT_DEDUP_MS = 30 * 60 * 1000;
 
 function generateIdempotencyKey() {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -59,6 +62,13 @@ function saveQueue(queue) {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
+function toMillis(value) {
+    if (!value) return 0;
+    const dt = new Date(value);
+    const ms = dt.getTime();
+    return Number.isFinite(ms) ? ms : 0;
+}
+
 function getCookieValue(name) {
     if (typeof document === "undefined") return "";
     const parts = document.cookie.split("; ");
@@ -99,9 +109,10 @@ export default function NuevoLead({
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
     const [error, setError] = useState("");
-    const [sending, setSending] = useState(false);
+    const sendingRef = useRef(false);
     const retryIndexRef = useRef(0);
     const retryTimerRef = useRef(null);
+    const healthTimerRef = useRef(null);
 
     const phoneDigits = useMemo(() => phone.replace(/\D/g, ""), [phone]);
     const trimmedName = useMemo(() => name.trim(), [name]);
@@ -133,17 +144,116 @@ export default function NuevoLead({
         isPhoneValid;
 
     const scheduleRetry = () => {
-        return;
+        if (retryTimerRef.current) return;
+        const delay = RETRY_DELAYS[Math.min(retryIndexRef.current, RETRY_DELAYS.length - 1)] || 300000;
+        retryTimerRef.current = setTimeout(() => {
+            retryTimerRef.current = null;
+            tryFlushQueue();
+        }, delay);
+    };
+
+    const sendWithBeacon = (baseUrl, payload) => {
+        if (typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") return false;
+        try {
+            const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+            return navigator.sendBeacon(`${baseUrl}/clientes/`, blob);
+        } catch {
+            return false;
+        }
+    };
+
+    const sendWithKeepalive = async (baseUrl, payload) => {
+        if (typeof fetch === "undefined") return;
+        await fetch(`${baseUrl}/clientes/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            keepalive: true,
+            credentials: "omit",
+        });
+    };
+
+    const sendQueueAlert = (landingTokenToAlert, queueSize, oldestPendingMs) => {
+        if (!landingTokenToAlert) return;
+        const now = Date.now();
+        const dedupKey = `lead_queue_alert_last_${landingTokenToAlert}`;
+        let lastTs = 0;
+        try {
+            lastTs = Number(localStorage.getItem(dedupKey) || "0");
+        } catch {
+            lastTs = 0;
+        }
+        if (now - lastTs < ALERT_DEDUP_MS) return;
+
+        const payload = {
+            landing_token: landingTokenToAlert,
+            queue_size: queueSize,
+            oldest_pending_ms: Math.max(0, Math.round(oldestPendingMs)),
+            threshold_ms: ALERT_THRESHOLD_MS,
+            source: "landing_form",
+        };
+        const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+        const beaconSent = (() => {
+            if (typeof navigator === "undefined" || typeof navigator.sendBeacon !== "function") return false;
+            try {
+                const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+                return navigator.sendBeacon(`${baseUrl}/landings/queue-alert/`, blob);
+            } catch {
+                return false;
+            }
+        })();
+
+        if (!beaconSent && typeof fetch !== "undefined") {
+            fetch(`${baseUrl}/landings/queue-alert/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+                keepalive: true,
+                credentials: "omit",
+            }).catch(() => {
+                // alert is best-effort only
+            });
+        }
+
+        try {
+            localStorage.setItem(dedupKey, String(now));
+        } catch {
+            // ignore storage errors
+        }
+    };
+
+    const checkQueueHealth = () => {
+        const queue = loadQueue();
+        if (!queue.length) return;
+        const now = Date.now();
+        const statsByLanding = new Map();
+
+        queue.forEach((item) => {
+            const lt = item?.landing_token;
+            if (!lt) return;
+            const current = statsByLanding.get(lt) || { count: 0, oldest: now };
+            const queuedAt = toMillis(item?.queued_at) || now;
+            current.count += 1;
+            current.oldest = Math.min(current.oldest, queuedAt);
+            statsByLanding.set(lt, current);
+        });
+
+        statsByLanding.forEach((stats, lt) => {
+            const oldestPendingMs = now - stats.oldest;
+            if (oldestPendingMs >= ALERT_THRESHOLD_MS) {
+                sendQueueAlert(lt, stats.count, oldestPendingMs);
+            }
+        });
     };
 
     const tryFlushQueue = async () => {
-        if (sending) return;
+        if (sendingRef.current) return;
         const queue = loadQueue();
         if (!queue.length) {
             retryIndexRef.current = 0;
             return;
         }
-        setSending(true);
+        sendingRef.current = true;
         try {
             const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
             const remaining = [];
@@ -162,9 +272,14 @@ export default function NuevoLead({
             saveQueue(remaining);
             if (remaining.length === 0) {
                 retryIndexRef.current = 0;
+                if (retryTimerRef.current) {
+                    clearTimeout(retryTimerRef.current);
+                    retryTimerRef.current = null;
+                }
             } else {
                 retryIndexRef.current = Math.min(retryIndexRef.current + 1, RETRY_DELAYS.length);
                 scheduleRetry();
+                checkQueueHealth();
             }
             if (anySuccess && typeof window !== "undefined") {
                 window.dispatchEvent(new CustomEvent("leads:refresh"));
@@ -179,17 +294,51 @@ export default function NuevoLead({
                 throw lastError;
             }
         } finally {
-            setSending(false);
+            sendingRef.current = false;
         }
     };
 
     useEffect(() => {
         if (isPreview) return undefined;
         tryFlushQueue();
+        checkQueueHealth();
+        const handleOnline = () => {
+            tryFlushQueue();
+        };
+        const handleHidden = () => {
+            if (document.visibilityState !== "hidden") return;
+            const queue = loadQueue();
+            if (!queue.length) return;
+            const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+            queue.slice(0, 20).forEach((item) => {
+                sendWithBeacon(baseUrl, item);
+            });
+        };
+        const handlePageHide = () => {
+            const queue = loadQueue();
+            if (!queue.length) return;
+            const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+            queue.slice(0, 20).forEach((item) => {
+                sendWithBeacon(baseUrl, item);
+            });
+        };
+        window.addEventListener("online", handleOnline);
+        document.addEventListener("visibilitychange", handleHidden);
+        window.addEventListener("pagehide", handlePageHide);
+        healthTimerRef.current = setInterval(() => {
+            checkQueueHealth();
+        }, ALERT_INTERVAL_MS);
         return () => {
+            window.removeEventListener("online", handleOnline);
+            document.removeEventListener("visibilitychange", handleHidden);
+            window.removeEventListener("pagehide", handlePageHide);
             if (retryTimerRef.current) {
                 clearTimeout(retryTimerRef.current);
                 retryTimerRef.current = null;
+            }
+            if (healthTimerRef.current) {
+                clearInterval(healthTimerRef.current);
+                healthTimerRef.current = null;
             }
         };
     }, [isPreview]);
@@ -229,6 +378,7 @@ export default function NuevoLead({
 
         const payload = {
             idempotency_key: generateIdempotencyKey(),
+            queued_at: new Date().toISOString(),
             landing_token: landingToken,
             nombre: trimmedName,
             contacto: phoneDigits,
@@ -239,7 +389,13 @@ export default function NuevoLead({
             ...(eventSourceUrl ? { event_source_url: eventSourceUrl } : {}),
         };
         enqueueClient(payload);
+        const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+        sendWithBeacon(baseUrl, payload);
+        sendWithKeepalive(baseUrl, payload).catch(() => {
+            // keepalive is best-effort only
+        });
         tryFlushQueue();
+        checkQueueHealth();
 
         window.open(whatsappUrl, "_blank", "noopener,noreferrer");
         if (typeof onWhatsappOpened === "function") {

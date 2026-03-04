@@ -12,7 +12,7 @@ from apps.empresas.views import (
     NotificacionEstructuralViewSet,
 )
 from apps.empresas.auth_views import LoggedTokenObtainPairView
-from apps.operativo.views import ClienteViewSet, EventosMetaViewSet, LandingViewSet, CompraViewSet, RetiroViewSet, LandingVisitViewSet, StatsViewSet
+from apps.operativo.views import ClienteViewSet, EventosMetaViewSet, LandingViewSet, CompraViewSet, RetiroViewSet, LandingVisitViewSet, StatsViewSet, KommoWebhookViewSet
 from apps.operativo.health import HealthView, TelegramBotView, TelegramTestView
 from apps.recursos.views import WhatsAppViewSet, TipoCambioViewSet
 from apps.pauta.views import (
@@ -46,6 +46,7 @@ router.register(r"compras", CompraViewSet, basename="compra")
 router.register(r"retiros", RetiroViewSet, basename="retiro")
 router.register(r"landing-visits", LandingVisitViewSet, basename="landing-visit")
 router.register(r"stats", StatsViewSet, basename="stats")
+router.register(r"kommo-webhooks", KommoWebhookViewSet, basename="kommo-webhook")
 router.register(r"whatsapps", WhatsAppViewSet, basename="whatsapp")
 router.register(r"tipos-cambio", TipoCambioViewSet, basename="tipo-cambio")
 router.register(r"bms", BMViewSet, basename="bm")

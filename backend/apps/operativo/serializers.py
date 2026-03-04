@@ -312,6 +312,61 @@ class EventosMetaCreateSerializer(serializers.Serializer):
         return data
 
 
+class KommoLeadWebhookSerializer(serializers.Serializer):
+    dedup_key = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    cliente_id = serializers.IntegerField(required=False)
+    cliente_uuid = serializers.UUIDField(required=False)
+    landing_token = serializers.UUIDField(required=False)
+    empresa_id = serializers.IntegerField(required=False)
+    contacto = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    nombre = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    username = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    fbp = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    fbc = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    event_source_url = serializers.URLField(max_length=1024, required=False, allow_blank=True)
+
+    def validate(self, data):
+        if not any(
+            [
+                data.get("cliente_id"),
+                data.get("cliente_uuid"),
+                data.get("contacto"),
+                data.get("phone"),
+            ]
+        ):
+            raise serializers.ValidationError(
+                "Enviar cliente_id, cliente_uuid, contacto o phone para identificar el lead."
+            )
+        return data
+
+
+class KommoContactWebhookSerializer(serializers.Serializer):
+    dedup_key = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    cliente_id = serializers.IntegerField(required=False)
+    cliente_uuid = serializers.UUIDField(required=False)
+    landing_token = serializers.UUIDField(required=False)
+    empresa_id = serializers.IntegerField(required=False)
+    contacto = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    fbp = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    fbc = serializers.CharField(max_length=255, required=False, allow_blank=True)
+
+    def validate(self, data):
+        if not any(
+            [
+                data.get("cliente_id"),
+                data.get("cliente_uuid"),
+                data.get("contacto"),
+                data.get("phone"),
+            ]
+        ):
+            raise serializers.ValidationError(
+                "Enviar cliente_id, cliente_uuid, contacto o phone para identificar el contacto."
+            )
+        return data
+
+
 class CompraSerializer(serializers.ModelSerializer):
     cliente_nombre = serializers.CharField(source="cliente.nombre", read_only=True)
     cliente_username = serializers.CharField(source="cliente.username", read_only=True)

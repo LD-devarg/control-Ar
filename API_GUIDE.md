@@ -40,8 +40,12 @@ Respuesta:
 }
 ```
 
-### Crear lead (cliente) desde landing (crea evento lead automaticamente)
+### Crear lead (cliente) desde landing (solo alta de cliente)
 `POST /clientes/`
+
+Comportamiento:
+- Si `empresa.kommo_enabled=false`: crea cliente + evento `lead` (legacy).
+- Si `empresa.kommo_enabled=true`: crea cliente y el `lead` se confirma por webhook Kommo.
 
 Body:
 ```json
@@ -54,7 +58,53 @@ Body:
 }
 ```
 
-### Crear evento Meta (contact/purchase)
+### Confirmar lead via webhook de Kommo
+`POST /kommo-webhooks/lead-confirm/`
+Header opcional recomendado: `X-Kommo-Secret: <KOMMO_WEBHOOK_SECRET>`
+Acepta:
+- JSON plano (cliente_id/cliente_uuid/phone)
+- Formato nativo Kommo `application/x-www-form-urlencoded` (`account`, `leads`, `contacts`)
+- Si solo llega `lead_id/contact_id`, puede resolver telefono via API de Kommo con `KOMMO_ACCESS_TOKEN`
+- En modo multitenant, la cuenta Kommo se mapea por `account.id` o `account.subdomain` contra la Empresa:
+  - `empresa.kommo_account_id`
+  - `empresa.kommo_subdomain`
+- Si la empresa tiene `kommo_enabled=false`, el webhook se ignora.
+- El secret se valida por tenant (`empresa.kommo_webhook_secret`) y si no existe usa fallback global `KOMMO_WEBHOOK_SECRET`.
+
+Body (ejemplo):
+```json
+{
+  "dedup_key": "kommo-evt-123",
+  "landing_token": "<TOKEN>",
+  "cliente_id": 1
+}
+```
+
+Alternativas de identificacion de cliente:
+- `cliente_uuid`
+- `contacto` o `phone` (opcionalmente con `empresa_id` o `landing_token`)
+- En payload nativo Kommo, se toma `custom_fields_values` (ej: `PHONE`, `cliente_id`, `cliente_uuid`, `landing_token`)
+
+### Crear contacto via webhook de Kommo
+`POST /kommo-webhooks/contact/`
+Header opcional recomendado: `X-Kommo-Secret: <KOMMO_WEBHOOK_SECRET>`
+Acepta:
+- JSON plano (cliente_id/cliente_uuid/phone)
+- Formato nativo Kommo `application/x-www-form-urlencoded` (`account`, `contacts`, `leads`)
+- Si solo llega `lead_id/contact_id`, puede resolver telefono via API de Kommo con `KOMMO_ACCESS_TOKEN`
+- En modo multitenant, la cuenta Kommo se mapea por `account.id` o `account.subdomain` contra la Empresa.
+- Si la empresa tiene `kommo_enabled=false`, el webhook se ignora.
+- El secret se valida por tenant (`empresa.kommo_webhook_secret`) y fallback global `KOMMO_WEBHOOK_SECRET`.
+
+Body (ejemplo):
+```json
+{
+  "dedup_key": "kommo-evt-456",
+  "cliente_id": 1
+}
+```
+
+### Crear evento Meta manual (contact/purchase)
 `POST /eventos-meta/`
 
 Body:
@@ -92,6 +142,12 @@ Para purchase (con value):
 - `POST /empresas/`
 - `PATCH /empresas/:id/`
 - `DELETE /empresas/:id/`
+- Campos de integracion Kommo por empresa:
+  - `kommo_enabled` (bool)
+  - `kommo_subdomain` (string opcional, unico)
+  - `kommo_account_id` (numero opcional, unico)
+  - `kommo_access_token` (string opcional, write-only)
+  - `kommo_webhook_secret` (string opcional, write-only)
 - Reglas de negocio:
   - Si una empresa se asigna a una `organizacion`, se valida cupo (`organizacion.cupos`).
   - No se puede crear/mover una empresa a una organizacion inactiva.

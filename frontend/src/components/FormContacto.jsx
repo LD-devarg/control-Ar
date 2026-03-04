@@ -20,7 +20,7 @@ export default function FormContacto() {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
-  const { tenantId: empresaId } = useTenant();
+  const { tenantId: empresaId, kommoEnabled } = useTenant();
   const fieldSx = {
     '& .MuiInputBase-input': { color },
     '& .MuiInputLabel-root': { color },
@@ -127,7 +127,10 @@ export default function FormContacto() {
     };
   }, [empresaId]);
 
-  const canSubmit = useMemo(() => Boolean(selectedCliente?.id) && Boolean(empresaId), [selectedCliente, empresaId]);
+  const canSubmit = useMemo(
+    () => Boolean(selectedCliente?.id) && Boolean(empresaId) && !kommoEnabled,
+    [selectedCliente, empresaId, kommoEnabled]
+  );
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -156,6 +159,11 @@ export default function FormContacto() {
 
   return (
     <Stack spacing={2} className="form-stack">
+      {kommoEnabled ? (
+        <Alert severity="info" variant="outlined">
+          Esta empresa usa integracion Kommo. Los contactos se registran automaticamente por webhook.
+        </Alert>
+      ) : null}
         <Autocomplete
         disablePortal
         id="combo-box-demo"

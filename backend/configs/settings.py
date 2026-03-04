@@ -40,6 +40,8 @@ TELEGRAM_ALERT_CHAT_IDS = [
     for item in (os.getenv("TELEGRAM_ALERT_CHAT_IDS") or "").split(",")
     if item.strip()
 ]
+KOMMO_WEBHOOK_SECRET = (os.getenv("KOMMO_WEBHOOK_SECRET") or "").strip()
+KOMMO_ACCESS_TOKEN = (os.getenv("KOMMO_ACCESS_TOKEN") or "").strip()
 
 allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(",") if host.strip()]

@@ -132,6 +132,49 @@ class LandingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "La credencial Meta seleccionada no pertenece a la organizacion de la landing."
             )
+        size_fields = (
+            "size_titulo",
+            "size_subtitulo",
+            "size_keyword",
+            "size_bono",
+            "size_info",
+            "size_boton",
+            "size_form",
+        )
+        for field_name in size_fields:
+            if field_name not in attrs:
+                continue
+            try:
+                size_value = float(attrs[field_name])
+            except (TypeError, ValueError):
+                raise serializers.ValidationError({field_name: "Valor invalido."})
+            if size_value < 0.6 or size_value > 6:
+                raise serializers.ValidationError({field_name: "Debe estar entre 0.6 y 6."})
+        if "form_bg_opacity" in attrs:
+            try:
+                opacity = float(attrs["form_bg_opacity"])
+            except (TypeError, ValueError):
+                raise serializers.ValidationError({"form_bg_opacity": "Valor invalido."})
+            if opacity < 0 or opacity > 1:
+                raise serializers.ValidationError({"form_bg_opacity": "Debe estar entre 0 y 1."})
+        weight_fields = (
+            "weight_titulo",
+            "weight_subtitulo",
+            "weight_keyword",
+            "weight_bono",
+            "weight_info",
+            "weight_boton",
+            "weight_form",
+        )
+        for field_name in weight_fields:
+            if field_name not in attrs:
+                continue
+            try:
+                weight_value = int(attrs[field_name])
+            except (TypeError, ValueError):
+                raise serializers.ValidationError({field_name: "Valor invalido."})
+            if weight_value < 100 or weight_value > 900:
+                raise serializers.ValidationError({field_name: "Debe estar entre 100 y 900."})
         return attrs
 
     def validate_url(self, value):
@@ -151,6 +194,15 @@ class LandingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Variables no permitidas: {invalid_text}. Usa solo: {allowed_text}."
             )
+        return value
+
+    def validate_font_scale(self, value):
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            raise serializers.ValidationError("font_scale invalido.")
+        if number < 0.8 or number > 1.6:
+            raise serializers.ValidationError("font_scale debe estar entre 0.8 y 1.6.")
         return value
 
     class Meta:
@@ -175,6 +227,32 @@ class LandingSerializer(serializers.ModelSerializer):
             "color_keyword",
             "color_bono",
             "color_info",
+            "form_bg_color",
+            "form_bg_opacity",
+            "form_field_border_color",
+            "font_family",
+            "font_scale",
+            "font_titulo",
+            "font_subtitulo",
+            "font_keyword",
+            "font_bono",
+            "font_info",
+            "font_boton",
+            "font_form",
+            "size_titulo",
+            "size_subtitulo",
+            "size_keyword",
+            "size_bono",
+            "size_info",
+            "size_boton",
+            "size_form",
+            "weight_titulo",
+            "weight_subtitulo",
+            "weight_keyword",
+            "weight_bono",
+            "weight_info",
+            "weight_boton",
+            "weight_form",
             "bg_type",
             "bg_color",
             "bg_gradient",

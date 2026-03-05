@@ -45,7 +45,7 @@ Respuesta:
 
 Comportamiento:
 - Si `empresa.kommo_enabled=false`: crea cliente + evento `lead` (legacy).
-- Si `empresa.kommo_enabled=true`: crea cliente y el `lead` se confirma por webhook Kommo.
+- Si `empresa.kommo_enabled=true`: crea cliente y el contacto se confirma por webhook Kommo.
 
 Body:
 ```json
@@ -70,6 +70,9 @@ Acepta:
   - `empresa.kommo_subdomain`
 - Si la empresa tiene `kommo_enabled=false`, el webhook se ignora.
 - El secret se valida por tenant (`empresa.kommo_webhook_secret`) y si no existe usa fallback global `KOMMO_WEBHOOK_SECRET`.
+- En este endpoint, `Lead agregado` de Kommo se registra como evento `contact`.
+- Antiduplicado de negocio por ventana: si el cliente ya tuvo `contact` reciente, se ignora.
+  - Configurable con `KOMMO_CONTACT_DEDUP_DAYS` (default `7`).
 
 Body (ejemplo):
 ```json
@@ -84,6 +87,7 @@ Alternativas de identificacion de cliente:
 - `cliente_uuid`
 - `contacto` o `phone` (opcionalmente con `empresa_id` o `landing_token`)
 - En payload nativo Kommo, se toma `custom_fields_values` (ej: `PHONE`, `cliente_id`, `cliente_uuid`, `landing_token`)
+- Matching principal: telefono normalizado (exacto y por sufijo, ej. ultimos 10 digitos).
 
 ### Crear contacto via webhook de Kommo
 `POST /kommo-webhooks/contact/`
@@ -202,7 +206,7 @@ Body:
 }
 ```
 
-> La compra no crea evento automatico. El evento purchase se env?a desde `/eventos-meta/`.
+> La compra no crea evento automatico. El evento purchase se envía desde `/eventos-meta/`.
 
 ### Recursos
 - `GET /whatsapps/`
@@ -212,7 +216,7 @@ Body:
 ### Pauta
 - `GET /bms/`
 - `GET /cuentas-publicitarias/`
-- `GET /campa?as/`
+- `GET /campanas/`
 - `GET /conjuntos-anuncios/`
 - `GET /anuncios/`
 - `GET /gastos-diarios/`
@@ -226,7 +230,7 @@ Body:
 #### Orden recomendado de creaci?n (Pauta)
 1. `POST /bms/`
 2. `POST /cuentas-publicitarias/` (depende de BM)
-3. `POST /campa?as/` (depende de cuenta publicitaria)
+3. `POST /campanas/` (depende de cuenta publicitaria)
 4. `POST /conjuntos-anuncios/` (depende de campa?a)
 5. `POST /fanpages/` (depende de BM) *si usas creatives*
 6. `POST /pauta-assets/`
@@ -238,7 +242,7 @@ Body:
   - si `meta_id` viene vacio, el backend crea en Meta con estado `PAUSED` y guarda `estado=pending` local.
 - `POST /pauta-provisioning/`
   - soporta:
-    - crear `campa?a + adsets + ads` en un solo request
+    - crear `campana + adsets + ads` en un solo request
     - crear `adsets + ads` sobre campa?a existente
     - crear `ads` sobre adset existente
 

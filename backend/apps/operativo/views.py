@@ -261,41 +261,40 @@ class ClienteViewSet(viewsets.ModelViewSet):
         landing = serializer.validated_data["landing"]
         cliente = serializer.save()
 
-        if not bool(getattr(landing.empresa, "kommo_enabled", False)):
-            evento = EventosMeta.objects.create(
-                id_evento=uuid.uuid4(),
-                cliente=cliente,
-                empresa=landing.empresa,
-                landing=landing,
-                operador=None,
-                tipo="lead",
-                data={
-                    "phone": cliente.contacto,
-                    "external_id": str(cliente.uuid),
-                    "event_source_url": cliente.event_source_url,
-                },
-                fbp=request.data.get("fbp"),
-                fbc=request.data.get("fbc"),
-            )
-            try:
-                enviar_evento_meta(evento, request=request)
-            except Exception as exc:
-                evento.estado_envio = "fallido"
-                evento.respuesta_meta = {"error": str(exc)}
-                evento.save(update_fields=["estado_envio", "respuesta_meta"])
+        evento = EventosMeta.objects.create(
+            id_evento=uuid.uuid4(),
+            cliente=cliente,
+            empresa=landing.empresa,
+            landing=landing,
+            operador=None,
+            tipo="lead",
+            data={
+                "phone": cliente.contacto,
+                "external_id": str(cliente.uuid),
+                "event_source_url": cliente.event_source_url,
+            },
+            fbp=request.data.get("fbp"),
+            fbc=request.data.get("fbc"),
+        )
+        try:
+            enviar_evento_meta(evento, request=request)
+        except Exception as exc:
+            evento.estado_envio = "fallido"
+            evento.respuesta_meta = {"error": str(exc)}
+            evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
-            publish_empresa_event(
-                empresa_id=landing.empresa_id,
-                event_type="lead_created",
-                payload={
-                    "id": evento.id,
-                    "cliente": cliente.id,
-                    "cliente_nombre": cliente.nombre,
-                    "cliente_username": cliente.username,
-                    "cliente_contacto": cliente.contacto,
-                    "creado_en": evento.creado_en.isoformat(),
-                },
-            )
+        publish_empresa_event(
+            empresa_id=landing.empresa_id,
+            event_type="lead_created",
+            payload={
+                "id": evento.id,
+                "cliente": cliente.id,
+                "cliente_nombre": cliente.nombre,
+                "cliente_username": cliente.username,
+                "cliente_contacto": cliente.contacto,
+                "creado_en": evento.creado_en.isoformat(),
+            },
+        )
 
         output = ClienteSerializer(cliente)
         return Response(output.data, status=status.HTTP_201_CREATED)
@@ -314,6 +313,25 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             return None
         return get_object_or_404(Landing, token=landing_token, activo=True)
 
+    def _phone_candidates(self, value):
+        digits = self._normalize_phone(value)
+        if not digits:
+            return []
+        candidates = [digits]
+        if len(digits) > 10:
+            candidates.append(digits[-10:])
+        if len(digits) > 8:
+            candidates.append(digits[-8:])
+        # keep order and unique
+        seen = set()
+        result = []
+        for item in candidates:
+            if item in seen:
+                continue
+            seen.add(item)
+            result.append(item)
+        return result
+
     def _resolve_cliente(self, data, landing=None):
         cliente_id = data.get("cliente_id")
         if cliente_id:
@@ -323,18 +341,27 @@ class KommoWebhookViewSet(viewsets.ViewSet):
         if cliente_uuid:
             return Cliente.objects.filter(uuid=cliente_uuid).first()
 
-        contacto_value = self._normalize_phone(data.get("contacto") or data.get("phone"))
-        if not contacto_value:
+        phone_candidates = self._phone_candidates(data.get("contacto") or data.get("phone"))
+        if not phone_candidates:
             return None
 
-        filters = {"contacto": contacto_value}
+        filters = {}
         empresa_id = data.get("empresa_id")
         if empresa_id:
             filters["empresa_id"] = empresa_id
         elif landing:
             filters["empresa_id"] = landing.empresa_id
 
-        return Cliente.objects.filter(**filters).order_by("-id").first()
+        base_qs = Cliente.objects.filter(**filters)
+        by_exact = base_qs.filter(contacto__in=phone_candidates).order_by("-id").first()
+        if by_exact:
+            return by_exact
+
+        # fallback: match by suffix in case Kommo phone carries country/mobile prefixes
+        q = models.Q()
+        for candidate in phone_candidates:
+            q |= models.Q(contacto__endswith=candidate)
+        return base_qs.filter(q).order_by("-id").first()
 
     def _event_payload(self, cliente, data, include_value=False):
         payload = {
@@ -357,6 +384,23 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             return True
         cache.set(cache_key, True, timeout=24 * 60 * 60)
         return False
+
+    def _contact_dedup_days(self):
+        try:
+            return max(int(getattr(settings, "KOMMO_CONTACT_DEDUP_DAYS", 7) or 7), 0)
+        except (TypeError, ValueError):
+            return 7
+
+    def _has_recent_contact(self, cliente):
+        days = self._contact_dedup_days()
+        if days <= 0:
+            return False
+        since = timezone.now() - timedelta(days=days)
+        return EventosMeta.objects.filter(
+            cliente=cliente,
+            tipo="contact",
+            creado_en__gte=since,
+        ).exists()
 
     def _as_dict(self, value):
         if isinstance(value, dict):
@@ -626,13 +670,26 @@ class KommoWebhookViewSet(viewsets.ViewSet):
                 status=status.HTTP_202_ACCEPTED,
             )
 
+        if self._has_recent_contact(cliente):
+            return Response(
+                {
+                    "ok": True,
+                    "deduped_window": True,
+                    "detail": f"Contacto ya registrado en la ventana de {self._contact_dedup_days()} dias.",
+                    "cliente_id": cliente.id,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # En Kommo, "Lead agregado" representa el primer mensaje/contacto.
+        # Lo mapeamos a evento "contact" en ControlAR.
         evento = EventosMeta.objects.create(
             id_evento=uuid.uuid4(),
             cliente=cliente,
             empresa=cliente.empresa,
             landing=landing,
             operador=None,
-            tipo="lead",
+            tipo="contact",
             data=self._event_payload(cliente, data),
             fbp=data.get("fbp") or cliente.fbp,
             fbc=data.get("fbc") or cliente.fbc,
@@ -646,7 +703,7 @@ class KommoWebhookViewSet(viewsets.ViewSet):
 
         publish_empresa_event(
             empresa_id=cliente.empresa_id,
-            event_type="lead_created",
+            event_type="contact_created",
             payload={
                 "id": evento.id,
                 "cliente": cliente.id,
@@ -983,9 +1040,6 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         landing = serializer.validated_data.get("landing")
         empresa_id = serializer.validated_data["empresa_id"]
         tipo = serializer.validated_data["tipo"]
-        empresa = Empresa.objects.filter(id=empresa_id).only("id", "kommo_enabled").first()
-        if tipo == "contact" and empresa and empresa.kommo_enabled:
-            raise ValidationError("Esta empresa usa integracion Kommo: el contacto se crea por webhook de Kommo.")
         operador = request.user if request.user.is_authenticated else None
 
         value = serializer.validated_data.get("value")

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&family=Lato:wght@400;700;900&family=Merriweather:wght@400;700;900&family=Montserrat:wght@400;700;900&family=Nunito:wght@400;700;900&family=Oswald:wght@400;700&family=Poppins:wght@400;700;900&family=Raleway:wght@400;700;900&family=Roboto:wght@400;700;900&family=Ubuntu:wght@400;700;900&display=swap');
+
 .landing-layout {
     display: flex;
     flex-direction: column;
@@ -5,7 +7,8 @@
     height: 100dvh;
     overflow: hidden;
     color: #ffffff;
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--landing-font-family, 'Roboto', sans-serif);
+    font-size: calc(1rem * var(--landing-font-scale, 1));
     background: var(--landing-bg-gradient, linear-gradient(135deg, #c129a3 0%, #b700ff 100%));
 }
 
@@ -136,13 +139,11 @@
     font-size: 2.5rem;
     margin-bottom: 0;
     color: rgb(255, 255, 0);
-    font-family: 'Impact', sans-serif;
 }
 .landing-container .landing-bono {
     font-size: 3rem;
     margin-bottom: 0;
     color: rgb(255, 255, 0);
-    font-family: 'Impact', sans-serif;
 }
 
 .landing-container h2 {

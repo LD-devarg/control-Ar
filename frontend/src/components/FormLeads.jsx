@@ -1,4 +1,3 @@
-﻿import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
@@ -10,6 +9,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { markClientesDirty } from "../services/operativo/clientes";
+import { getLandingFontStack } from "../constants/landingTypography";
 
 const QUEUE_KEY = "pending_clients";
 const RETRY_DELAYS = [2000, 5000, 15000, 30000, 60000, 300000];
@@ -104,6 +104,18 @@ export default function NuevoLead({
     bonusText,
     whatsappTemplate = "",
     infoColor,
+    formBgColor,
+    formBgOpacity,
+    formFieldBorderColor,
+    formTextFontFamily,
+    formTextFontSize,
+    formTextFontWeight,
+    buttonFontFamily,
+    buttonFontSize,
+    buttonFontWeight,
+    infoFontFamily,
+    infoFontSize,
+    infoFontWeight,
     isPreview = false,
 }) {
     const [name, setName] = useState("");
@@ -122,7 +134,55 @@ export default function NuevoLead({
     }, [trimmedName, phoneDigits]);
 
     const finalButtonText = buttonText || "JUGÁ AHORA";
-    const finalInfoText = infoText || "🤳Atención personalizada las 24hs.";
+    const finalInfoText = infoText || "Atencion personalizada las 24hs.";
+    const formTextFontStack = useMemo(() => getLandingFontStack(formTextFontFamily), [formTextFontFamily]);
+    const buttonFontStack = useMemo(() => getLandingFontStack(buttonFontFamily), [buttonFontFamily]);
+    const infoFontStack = useMemo(() => getLandingFontStack(infoFontFamily), [infoFontFamily]);
+    const resolvedFormSize = useMemo(() => {
+        const numeric = Number(formTextFontSize || 1);
+        if (!Number.isFinite(numeric)) return 1;
+        return Math.min(4, Math.max(0.8, numeric));
+    }, [formTextFontSize]);
+    const resolvedButtonSize = useMemo(() => {
+        const numeric = Number(buttonFontSize || 1.2);
+        if (!Number.isFinite(numeric)) return 1.2;
+        return Math.min(4, Math.max(0.8, numeric));
+    }, [buttonFontSize]);
+    const resolvedInfoSize = useMemo(() => {
+        const numeric = Number(infoFontSize || 1);
+        if (!Number.isFinite(numeric)) return 1;
+        return Math.min(4, Math.max(0.8, numeric));
+    }, [infoFontSize]);
+    const resolvedFormWeight = useMemo(() => {
+        const numeric = Number(formTextFontWeight || 400);
+        if (!Number.isFinite(numeric)) return 400;
+        return Math.min(900, Math.max(100, numeric));
+    }, [formTextFontWeight]);
+    const resolvedButtonWeight = useMemo(() => {
+        const numeric = Number(buttonFontWeight || 700);
+        if (!Number.isFinite(numeric)) return 700;
+        return Math.min(900, Math.max(100, numeric));
+    }, [buttonFontWeight]);
+    const resolvedInfoWeight = useMemo(() => {
+        const numeric = Number(infoFontWeight || 700);
+        if (!Number.isFinite(numeric)) return 700;
+        return Math.min(900, Math.max(100, numeric));
+    }, [infoFontWeight]);
+    const resolvedFormOpacity = useMemo(() => {
+        const numeric = Number(formBgOpacity ?? 0.7);
+        if (!Number.isFinite(numeric)) return 0.7;
+        return Math.min(1, Math.max(0, numeric));
+    }, [formBgOpacity]);
+    const resolvedFormBg = useMemo(() => {
+        const cleanHex = String(formBgColor || "#000000");
+        const hex = cleanHex.startsWith("#") ? cleanHex.slice(1) : cleanHex;
+        if (!/^[0-9a-fA-F]{6}$/.test(hex)) return `rgba(0, 0, 0, ${resolvedFormOpacity})`;
+        const r = Number.parseInt(hex.slice(0, 2), 16);
+        const g = Number.parseInt(hex.slice(2, 4), 16);
+        const b = Number.parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${resolvedFormOpacity})`;
+    }, [formBgColor, resolvedFormOpacity]);
+    const resolvedFieldBorder = formFieldBorderColor || "#e014ff";
     const messageText = useMemo(
         () =>
             renderWhatsappMessage(whatsappTemplate, {
@@ -417,8 +477,16 @@ export default function NuevoLead({
     };
 
     return (
-        <div className="flex flex-col items-center rounded-xl shadow-xl bg-black/70 w-8/10 lg:w-3/10 h-6/10 lg:h-7/10 p-2 m-4">
-            <h3 className='text-white text-xl lg:text-2xl my-1'>Contactanos</h3>
+        <div
+            className="flex flex-col items-center rounded-xl shadow-xl w-8/10 lg:w-3/10 h-6/10 lg:h-7/10 p-2 m-4"
+            style={{ backgroundColor: resolvedFormBg, fontFamily: formTextFontStack }}
+        >
+            <h3
+                className='text-white text-xl lg:text-2xl my-1'
+                style={{ fontFamily: formTextFontStack, fontSize: `${1.5 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}
+            >
+                Contactanos
+            </h3>
             <Stack spacing={0.5} direction="column" className="form-leads-stack">
                 <TextField
                 className='textfield'
@@ -435,12 +503,12 @@ export default function NuevoLead({
                         marginBottom: "10px",
                     borderRadius: "20px",
                     backgroundColor: "rgba(49, 36, 146, 0.12)",
-                    "& fieldset": { borderColor: "rgba(224, 20, 255, 0.84)" },
+                    "& fieldset": { borderColor: resolvedFieldBorder },
                     "&:hover fieldset": { borderColor: "#fff" },
                     "&.Mui-focused fieldset": { borderColor: "#fff" },
                     },
-                    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)" },
-                    "& .MuiInputBase-input": { color: "#fff" },
+                    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
+                    "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
                 }}
                 />
                 <TextField
@@ -466,18 +534,18 @@ export default function NuevoLead({
                         marginBottom: "0",
                             borderRadius: "20px",
                             backgroundColor: "rgba(49, 36, 146, 0.12)",
-                            "& fieldset": { borderColor: "rgba(224, 20, 255, 0.84)" },
+                            "& fieldset": { borderColor: resolvedFieldBorder },
                         "&:hover fieldset": { borderColor: "#fff" },
                         "&.Mui-focused fieldset": { borderColor: "#fff" },
                         },
-                        "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)" },
-                        "& .MuiInputBase-input": { color: "#fff" },
+                        "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
+                        "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
                         "& .MuiFormHelperText-root": { color: "rgba(255,255,255,0.6)" },
                     }}
                     />
             </Stack>
-            <span className='text-xs mt-1 text-white/70'>No compartiremos tu número con nadie.</span>
-            {error ? <span className='text-red-400 text-xs mt-2'>{error}</span> : null}
+            <span className='text-xs mt-1 text-white/70' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>No compartiremos tu número con nadie.</span>
+            {error ? <span className='text-red-400 text-xs mt-2' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>{error}</span> : null}
             <div className={`landing-submit-wrap ${canSubmit ? "is-active" : ""}`}>
                 <Button variant="contained" startIcon={<WhatsAppIcon />}
                 onClick={handleWhatsappClick}
@@ -489,8 +557,9 @@ export default function NuevoLead({
                     border: "none",
                     borderRadius: "20px",
                     padding: "10px 20px",
-                    fontWeight: "bold",
-                    fontSize: "1.2rem",
+                    fontWeight: resolvedButtonWeight,
+                    fontSize: `${resolvedButtonSize}rem`,
+                    fontFamily: buttonFontStack,
                     background: "linear-gradient(135deg, #2bd528 0%, #038f0c 100%)",
                     boxShadow: "0 4px 15px rgba(255, 203, 13, 0.4), 0 2px 5px rgba(0, 0, 0, 0.2)",
                     "&:hover": {
@@ -506,6 +575,6 @@ export default function NuevoLead({
                     {finalButtonText}
                 </Button>
             </div>
-            <span className='font-bold text-md mt-4 lg:mt-5' style={{ color: infoColor || "#ffffff" }}>{finalInfoText}</span>
+            <span className='font-bold text-md mt-4 lg:mt-5' style={{ color: infoColor || "#ffffff", fontFamily: infoFontStack, fontSize: `${resolvedInfoSize}rem`, fontWeight: resolvedInfoWeight }}>{finalInfoText}</span>
         </div>);
 }

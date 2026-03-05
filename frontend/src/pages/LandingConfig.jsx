@@ -13,6 +13,7 @@ import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
 import { apiClient } from "../services/auth";
 import { useTenant } from "../context/TenantContext";
+import { LANDING_TEXT_STYLE_DEFAULTS } from "../constants/landingTypography";
 
 const PREVIEW_MESSAGE_TYPE = "landing-preview:update";
 const PREVIEW_READY_TYPE = "landing-preview:ready";
@@ -34,6 +35,30 @@ const EMPTY_FORM = {
     colorKeyword: "#ffe600",
     colorBono: "#ffe600",
     colorInfo: "#ffffff",
+    formBgColor: LANDING_TEXT_STYLE_DEFAULTS.formBgColor,
+    formBgOpacity: LANDING_TEXT_STYLE_DEFAULTS.formBgOpacity,
+    formFieldBorderColor: LANDING_TEXT_STYLE_DEFAULTS.formFieldBorderColor,
+    fontTitulo: LANDING_TEXT_STYLE_DEFAULTS.fontTitulo,
+    fontSubtitulo: LANDING_TEXT_STYLE_DEFAULTS.fontSubtitulo,
+    fontKeyword: LANDING_TEXT_STYLE_DEFAULTS.fontKeyword,
+    fontBono: LANDING_TEXT_STYLE_DEFAULTS.fontBono,
+    fontInfo: LANDING_TEXT_STYLE_DEFAULTS.fontInfo,
+    fontBoton: LANDING_TEXT_STYLE_DEFAULTS.fontBoton,
+    fontForm: LANDING_TEXT_STYLE_DEFAULTS.fontForm,
+    sizeTitulo: LANDING_TEXT_STYLE_DEFAULTS.sizeTitulo,
+    sizeSubtitulo: LANDING_TEXT_STYLE_DEFAULTS.sizeSubtitulo,
+    sizeKeyword: LANDING_TEXT_STYLE_DEFAULTS.sizeKeyword,
+    sizeBono: LANDING_TEXT_STYLE_DEFAULTS.sizeBono,
+    sizeInfo: LANDING_TEXT_STYLE_DEFAULTS.sizeInfo,
+    sizeBoton: LANDING_TEXT_STYLE_DEFAULTS.sizeBoton,
+    sizeForm: LANDING_TEXT_STYLE_DEFAULTS.sizeForm,
+    weightTitulo: LANDING_TEXT_STYLE_DEFAULTS.weightTitulo,
+    weightSubtitulo: LANDING_TEXT_STYLE_DEFAULTS.weightSubtitulo,
+    weightKeyword: LANDING_TEXT_STYLE_DEFAULTS.weightKeyword,
+    weightBono: LANDING_TEXT_STYLE_DEFAULTS.weightBono,
+    weightInfo: LANDING_TEXT_STYLE_DEFAULTS.weightInfo,
+    weightBoton: LANDING_TEXT_STYLE_DEFAULTS.weightBoton,
+    weightForm: LANDING_TEXT_STYLE_DEFAULTS.weightForm,
     bgType: "gradient",
     bgColor: "#0f172a",
     bgGradient: "linear-gradient(135deg, #0b1f3a 0%, #111827 100%)",
@@ -71,6 +96,30 @@ const FIELD_MAP = [
     { formKey: "colorKeyword", apiKey: "color_keyword" },
     { formKey: "colorBono", apiKey: "color_bono" },
     { formKey: "colorInfo", apiKey: "color_info" },
+    { formKey: "formBgColor", apiKey: "form_bg_color" },
+    { formKey: "formBgOpacity", apiKey: "form_bg_opacity", normalize: (value) => String(Number(value || 0.7).toFixed(2)) },
+    { formKey: "formFieldBorderColor", apiKey: "form_field_border_color" },
+    { formKey: "fontTitulo", apiKey: "font_titulo" },
+    { formKey: "fontSubtitulo", apiKey: "font_subtitulo" },
+    { formKey: "fontKeyword", apiKey: "font_keyword" },
+    { formKey: "fontBono", apiKey: "font_bono" },
+    { formKey: "fontInfo", apiKey: "font_info" },
+    { formKey: "fontBoton", apiKey: "font_boton" },
+    { formKey: "fontForm", apiKey: "font_form" },
+    { formKey: "sizeTitulo", apiKey: "size_titulo", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.sizeTitulo).toFixed(2)) },
+    { formKey: "sizeSubtitulo", apiKey: "size_subtitulo", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.sizeSubtitulo).toFixed(2)) },
+    { formKey: "sizeKeyword", apiKey: "size_keyword", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.sizeKeyword).toFixed(2)) },
+    { formKey: "sizeBono", apiKey: "size_bono", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.sizeBono).toFixed(2)) },
+    { formKey: "sizeInfo", apiKey: "size_info", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.sizeInfo).toFixed(2)) },
+    { formKey: "sizeBoton", apiKey: "size_boton", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.sizeBoton).toFixed(2)) },
+    { formKey: "sizeForm", apiKey: "size_form", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.sizeForm).toFixed(2)) },
+    { formKey: "weightTitulo", apiKey: "weight_titulo", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.weightTitulo)) },
+    { formKey: "weightSubtitulo", apiKey: "weight_subtitulo", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.weightSubtitulo)) },
+    { formKey: "weightKeyword", apiKey: "weight_keyword", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.weightKeyword)) },
+    { formKey: "weightBono", apiKey: "weight_bono", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.weightBono)) },
+    { formKey: "weightInfo", apiKey: "weight_info", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.weightInfo)) },
+    { formKey: "weightBoton", apiKey: "weight_boton", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.weightBoton)) },
+    { formKey: "weightForm", apiKey: "weight_form", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.weightForm)) },
     { formKey: "bgType", apiKey: "bg_type" },
     { formKey: "bgColor", apiKey: "bg_color" },
 ];
@@ -89,6 +138,23 @@ const parseGradient = (value) => {
 
 const buildGradient = (angle, from, to) =>
     `linear-gradient(${angle}deg, ${from} 0%, ${to} 100%)`;
+
+const toColorInputValue = (value, fallback) => (
+    /^#[0-9a-fA-F]{6}$/.test(String(value || "")) ? value : fallback
+);
+
+const toNumberValue = (value, fallback) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+};
+
+const fileToDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 
 const ensureAbsoluteUrl = (value) => {
     const raw = (value || "").trim();
@@ -138,6 +204,30 @@ const buildPreviewPayload = (form, previewUrls, currentGradient) => ({
     color_keyword: form?.colorKeyword || "#ffe600",
     color_bono: form?.colorBono || "#ffe600",
     color_info: form?.colorInfo || "#ffffff",
+    form_bg_color: toColorInputValue(form?.formBgColor, "#000000"),
+    form_bg_opacity: toNumberValue(form?.formBgOpacity, LANDING_TEXT_STYLE_DEFAULTS.formBgOpacity),
+    form_field_border_color: toColorInputValue(form?.formFieldBorderColor, "#e014ff"),
+    font_titulo: form?.fontTitulo || LANDING_TEXT_STYLE_DEFAULTS.fontTitulo,
+    font_subtitulo: form?.fontSubtitulo || LANDING_TEXT_STYLE_DEFAULTS.fontSubtitulo,
+    font_keyword: form?.fontKeyword || LANDING_TEXT_STYLE_DEFAULTS.fontKeyword,
+    font_bono: form?.fontBono || LANDING_TEXT_STYLE_DEFAULTS.fontBono,
+    font_info: form?.fontInfo || LANDING_TEXT_STYLE_DEFAULTS.fontInfo,
+    font_boton: form?.fontBoton || LANDING_TEXT_STYLE_DEFAULTS.fontBoton,
+    font_form: form?.fontForm || LANDING_TEXT_STYLE_DEFAULTS.fontForm,
+    size_titulo: toNumberValue(form?.sizeTitulo, LANDING_TEXT_STYLE_DEFAULTS.sizeTitulo),
+    size_subtitulo: toNumberValue(form?.sizeSubtitulo, LANDING_TEXT_STYLE_DEFAULTS.sizeSubtitulo),
+    size_keyword: toNumberValue(form?.sizeKeyword, LANDING_TEXT_STYLE_DEFAULTS.sizeKeyword),
+    size_bono: toNumberValue(form?.sizeBono, LANDING_TEXT_STYLE_DEFAULTS.sizeBono),
+    size_info: toNumberValue(form?.sizeInfo, LANDING_TEXT_STYLE_DEFAULTS.sizeInfo),
+    size_boton: toNumberValue(form?.sizeBoton, LANDING_TEXT_STYLE_DEFAULTS.sizeBoton),
+    size_form: toNumberValue(form?.sizeForm, LANDING_TEXT_STYLE_DEFAULTS.sizeForm),
+    weight_titulo: toNumberValue(form?.weightTitulo, LANDING_TEXT_STYLE_DEFAULTS.weightTitulo),
+    weight_subtitulo: toNumberValue(form?.weightSubtitulo, LANDING_TEXT_STYLE_DEFAULTS.weightSubtitulo),
+    weight_keyword: toNumberValue(form?.weightKeyword, LANDING_TEXT_STYLE_DEFAULTS.weightKeyword),
+    weight_bono: toNumberValue(form?.weightBono, LANDING_TEXT_STYLE_DEFAULTS.weightBono),
+    weight_info: toNumberValue(form?.weightInfo, LANDING_TEXT_STYLE_DEFAULTS.weightInfo),
+    weight_boton: toNumberValue(form?.weightBoton, LANDING_TEXT_STYLE_DEFAULTS.weightBoton),
+    weight_form: toNumberValue(form?.weightForm, LANDING_TEXT_STYLE_DEFAULTS.weightForm),
     bg_type: form?.bgType || "gradient",
     bg_color: form?.bgColor || "#0f172a",
     bg_gradient:
@@ -163,30 +253,18 @@ function LandingConfig() {
     const [previewUrls, setPreviewUrls] = useState({ vertical: "", horizontal: "" });
     const [uploadKey, setUploadKey] = useState(0);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const previewObjectUrlsRef = useRef({ vertical: null, horizontal: null });
     const previewWindowRef = useRef(null);
 
-    const clearPreviewObjectUrls = useCallback(() => {
-        const current = previewObjectUrlsRef.current;
-        if (current.vertical) {
-            URL.revokeObjectURL(current.vertical);
-            current.vertical = null;
-        }
-        if (current.horizontal) {
-            URL.revokeObjectURL(current.horizontal);
-            current.horizontal = null;
-        }
-    }, []);
+    const clearPreviewObjectUrls = useCallback(() => {}, []);
 
-    const setPreviewUrlFromFile = useCallback((key, file) => {
+    const setPreviewUrlFromFile = useCallback(async (key, file) => {
         if (!file) return;
-        const current = previewObjectUrlsRef.current;
-        if (current[key]) {
-            URL.revokeObjectURL(current[key]);
+        try {
+            const dataUrl = await fileToDataUrl(file);
+            setPreviewUrls((prev) => ({ ...prev, [key]: dataUrl }));
+        } catch {
+            // ignore preview file read errors
         }
-        const objectUrl = URL.createObjectURL(file);
-        current[key] = objectUrl;
-        setPreviewUrls((prev) => ({ ...prev, [key]: objectUrl }));
     }, []);
 
     const commonTextFieldSx = {
@@ -248,6 +326,33 @@ function LandingConfig() {
             colorKeyword: value.color_keyword || EMPTY_FORM.colorKeyword,
             colorBono: value.color_bono || EMPTY_FORM.colorBono,
             colorInfo: value.color_info || EMPTY_FORM.colorInfo,
+            formBgColor: toColorInputValue(value.form_bg_color, EMPTY_FORM.formBgColor),
+            formBgOpacity: toNumberValue(value.form_bg_opacity, EMPTY_FORM.formBgOpacity),
+            formFieldBorderColor: toColorInputValue(
+                value.form_field_border_color,
+                EMPTY_FORM.formFieldBorderColor
+            ),
+            fontTitulo: value.font_titulo || value.font_family || EMPTY_FORM.fontTitulo,
+            fontSubtitulo: value.font_subtitulo || value.font_family || EMPTY_FORM.fontSubtitulo,
+            fontKeyword: value.font_keyword || value.font_family || EMPTY_FORM.fontKeyword,
+            fontBono: value.font_bono || value.font_family || EMPTY_FORM.fontBono,
+            fontInfo: value.font_info || value.font_family || EMPTY_FORM.fontInfo,
+            fontBoton: value.font_boton || value.font_family || EMPTY_FORM.fontBoton,
+            fontForm: value.font_form || value.font_family || EMPTY_FORM.fontForm,
+            sizeTitulo: toNumberValue(value.size_titulo, EMPTY_FORM.sizeTitulo),
+            sizeSubtitulo: toNumberValue(value.size_subtitulo, EMPTY_FORM.sizeSubtitulo),
+            sizeKeyword: toNumberValue(value.size_keyword, EMPTY_FORM.sizeKeyword),
+            sizeBono: toNumberValue(value.size_bono, EMPTY_FORM.sizeBono),
+            sizeInfo: toNumberValue(value.size_info, EMPTY_FORM.sizeInfo),
+            sizeBoton: toNumberValue(value.size_boton, EMPTY_FORM.sizeBoton),
+            sizeForm: toNumberValue(value.size_form, EMPTY_FORM.sizeForm),
+            weightTitulo: toNumberValue(value.weight_titulo, EMPTY_FORM.weightTitulo),
+            weightSubtitulo: toNumberValue(value.weight_subtitulo, EMPTY_FORM.weightSubtitulo),
+            weightKeyword: toNumberValue(value.weight_keyword, EMPTY_FORM.weightKeyword),
+            weightBono: toNumberValue(value.weight_bono, EMPTY_FORM.weightBono),
+            weightInfo: toNumberValue(value.weight_info, EMPTY_FORM.weightInfo),
+            weightBoton: toNumberValue(value.weight_boton, EMPTY_FORM.weightBoton),
+            weightForm: toNumberValue(value.weight_form, EMPTY_FORM.weightForm),
             bgType: value.bg_type || EMPTY_FORM.bgType,
             bgColor: value.bg_color || EMPTY_FORM.bgColor,
             bgGradient: value.bg_gradient || EMPTY_FORM.bgGradient,
@@ -508,9 +613,63 @@ function LandingConfig() {
     useEffect(() => {
         const onMessage = (event) => {
             if (event.origin !== window.location.origin) return;
-            if (event?.data?.type !== PREVIEW_READY_TYPE) return;
-            if (previewWindowRef.current && event.source !== previewWindowRef.current) return;
-            sendPreviewUpdate();
+            if (previewWindowRef.current && event.source !== previewWindowRef.current) {
+                return;
+            }
+            const messageType = event?.data?.type;
+            if (messageType === PREVIEW_READY_TYPE) {
+                sendPreviewUpdate();
+                return;
+            }
+            if (messageType !== PREVIEW_MESSAGE_TYPE) return;
+            const payload = event?.data?.payload || {};
+            setForm((prev) => ({
+                ...prev,
+                bgType: payload.bg_type || prev.bgType,
+                bgColor: payload.bg_color || prev.bgColor,
+                colorTitulo: payload.color_titulo || prev.colorTitulo,
+                colorSubtitulo: payload.color_subtitulo || prev.colorSubtitulo,
+                colorKeyword: payload.color_keyword || prev.colorKeyword,
+                colorBono: payload.color_bono || prev.colorBono,
+                colorInfo: payload.color_info || prev.colorInfo,
+                formBgColor: toColorInputValue(payload.form_bg_color, prev.formBgColor),
+                formBgOpacity: toNumberValue(payload.form_bg_opacity, prev.formBgOpacity),
+                formFieldBorderColor: toColorInputValue(
+                    payload.form_field_border_color,
+                    prev.formFieldBorderColor
+                ),
+                fontTitulo: payload.font_titulo || prev.fontTitulo,
+                fontSubtitulo: payload.font_subtitulo || prev.fontSubtitulo,
+                fontKeyword: payload.font_keyword || prev.fontKeyword,
+                fontBono: payload.font_bono || prev.fontBono,
+                fontInfo: payload.font_info || prev.fontInfo,
+                fontBoton: payload.font_boton || prev.fontBoton,
+                fontForm: payload.font_form || prev.fontForm,
+                sizeTitulo: toNumberValue(payload.size_titulo, prev.sizeTitulo),
+                sizeSubtitulo: toNumberValue(payload.size_subtitulo, prev.sizeSubtitulo),
+                sizeKeyword: toNumberValue(payload.size_keyword, prev.sizeKeyword),
+                sizeBono: toNumberValue(payload.size_bono, prev.sizeBono),
+                sizeInfo: toNumberValue(payload.size_info, prev.sizeInfo),
+                sizeBoton: toNumberValue(payload.size_boton, prev.sizeBoton),
+                sizeForm: toNumberValue(payload.size_form, prev.sizeForm),
+                weightTitulo: toNumberValue(payload.weight_titulo, prev.weightTitulo),
+                weightSubtitulo: toNumberValue(payload.weight_subtitulo, prev.weightSubtitulo),
+                weightKeyword: toNumberValue(payload.weight_keyword, prev.weightKeyword),
+                weightBono: toNumberValue(payload.weight_bono, prev.weightBono),
+                weightInfo: toNumberValue(payload.weight_info, prev.weightInfo),
+                weightBoton: toNumberValue(payload.weight_boton, prev.weightBoton),
+                weightForm: toNumberValue(payload.weight_form, prev.weightForm),
+                bgGradient: payload.bg_gradient || prev.bgGradient,
+            }));
+            const parsed = parseGradient(payload.bg_gradient || "");
+            if (parsed) {
+                setForm((prev) => ({
+                    ...prev,
+                    bgGradientAngle: parsed.angle,
+                    bgGradientFrom: parsed.from,
+                    bgGradientTo: parsed.to,
+                }));
+            }
         };
         window.addEventListener("message", onMessage);
         return () => window.removeEventListener("message", onMessage);

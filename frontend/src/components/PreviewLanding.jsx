@@ -21,6 +21,30 @@ function buildPreviewPayload(form, previewUrls) {
     color_keyword: form?.colorKeyword || "#ffe600",
     color_bono: form?.colorBono || "#ffe600",
     color_info: form?.colorInfo || "#ffffff",
+    form_bg_color: form?.formBgColor || "#000000",
+    form_bg_opacity: Number(form?.formBgOpacity || 0.7),
+    form_field_border_color: form?.formFieldBorderColor || "#e014ff",
+    font_titulo: form?.fontTitulo || "roboto",
+    font_subtitulo: form?.fontSubtitulo || "roboto",
+    font_keyword: form?.fontKeyword || "roboto",
+    font_bono: form?.fontBono || "roboto",
+    font_info: form?.fontInfo || "roboto",
+    font_boton: form?.fontBoton || "roboto",
+    font_form: form?.fontForm || "roboto",
+    size_titulo: Number(form?.sizeTitulo || 2.5),
+    size_subtitulo: Number(form?.sizeSubtitulo || 1.5),
+    size_keyword: Number(form?.sizeKeyword || 2),
+    size_bono: Number(form?.sizeBono || 3),
+    size_info: Number(form?.sizeInfo || 1),
+    size_boton: Number(form?.sizeBoton || 1.2),
+    size_form: Number(form?.sizeForm || 1),
+    weight_titulo: Number(form?.weightTitulo || 800),
+    weight_subtitulo: Number(form?.weightSubtitulo || 700),
+    weight_keyword: Number(form?.weightKeyword || 700),
+    weight_bono: Number(form?.weightBono || 800),
+    weight_info: Number(form?.weightInfo || 700),
+    weight_boton: Number(form?.weightBoton || 700),
+    weight_form: Number(form?.weightForm || 400),
     bg_type: form?.bgType || "gradient",
     bg_color: form?.bgColor || "#0f172a",
     bg_gradient:
@@ -153,6 +177,30 @@ function PreviewLanding({
             colorKeyword={form.colorKeyword}
             colorBono={form.colorBono}
             colorInfo={form.colorInfo}
+            formBgColor={form.formBgColor}
+            formBgOpacity={form.formBgOpacity}
+            formFieldBorderColor={form.formFieldBorderColor}
+            fontTitulo={form.fontTitulo}
+            fontSubtitulo={form.fontSubtitulo}
+            fontKeyword={form.fontKeyword}
+            fontBono={form.fontBono}
+            fontInfo={form.fontInfo}
+            fontBoton={form.fontBoton}
+            fontForm={form.fontForm}
+            sizeTitulo={form.sizeTitulo}
+            sizeSubtitulo={form.sizeSubtitulo}
+            sizeKeyword={form.sizeKeyword}
+            sizeBono={form.sizeBono}
+            sizeInfo={form.sizeInfo}
+            sizeBoton={form.sizeBoton}
+            sizeForm={form.sizeForm}
+            weightTitulo={form.weightTitulo}
+            weightSubtitulo={form.weightSubtitulo}
+            weightKeyword={form.weightKeyword}
+            weightBono={form.weightBono}
+            weightInfo={form.weightInfo}
+            weightBoton={form.weightBoton}
+            weightForm={form.weightForm}
             onFormChange={onFormChange}
           />
         </div>

@@ -2,6 +2,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import PreviewControls from "../components/PreviewControls";
+import { getLandingFontStack, LANDING_TEXT_STYLE_DEFAULTS } from "../constants/landingTypography";
 
 const NuevoLead = lazy(() => import("../components/FormLeads"));
 const DisclaimerLanding = lazy(() => import("../components/DisclaimerLanding"));
@@ -9,6 +10,11 @@ const DisclaimerLanding = lazy(() => import("../components/DisclaimerLanding"));
 const PREVIEW_MESSAGE_TYPE = "landing-preview:update";
 const PREVIEW_READY_TYPE = "landing-preview:ready";
 const PREVIEW_STORAGE_KEY = "landing_preview_payload_v1";
+
+function toNumberValue(value, fallback) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+}
 
 function normalizeWhatsappNumber(rawNumber) {
     if (!rawNumber) return "";
@@ -43,6 +49,30 @@ function normalizePreviewLanding(payload = {}) {
         color_keyword: payload.color_keyword || "#ffe600",
         color_bono: payload.color_bono || "#ffe600",
         color_info: payload.color_info || "#ffffff",
+        form_bg_color: payload.form_bg_color || LANDING_TEXT_STYLE_DEFAULTS.formBgColor,
+        form_bg_opacity: toNumberValue(payload.form_bg_opacity, LANDING_TEXT_STYLE_DEFAULTS.formBgOpacity),
+        form_field_border_color: payload.form_field_border_color || LANDING_TEXT_STYLE_DEFAULTS.formFieldBorderColor,
+        font_titulo: payload.font_titulo || payload.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontTitulo,
+        font_subtitulo: payload.font_subtitulo || payload.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontSubtitulo,
+        font_keyword: payload.font_keyword || payload.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontKeyword,
+        font_bono: payload.font_bono || payload.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontBono,
+        font_info: payload.font_info || payload.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontInfo,
+        font_boton: payload.font_boton || payload.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontBoton,
+        font_form: payload.font_form || payload.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontForm,
+        size_titulo: toNumberValue(payload.size_titulo, LANDING_TEXT_STYLE_DEFAULTS.sizeTitulo),
+        size_subtitulo: toNumberValue(payload.size_subtitulo, LANDING_TEXT_STYLE_DEFAULTS.sizeSubtitulo),
+        size_keyword: toNumberValue(payload.size_keyword, LANDING_TEXT_STYLE_DEFAULTS.sizeKeyword),
+        size_bono: toNumberValue(payload.size_bono, LANDING_TEXT_STYLE_DEFAULTS.sizeBono),
+        size_info: toNumberValue(payload.size_info, LANDING_TEXT_STYLE_DEFAULTS.sizeInfo),
+        size_boton: toNumberValue(payload.size_boton, LANDING_TEXT_STYLE_DEFAULTS.sizeBoton),
+        size_form: toNumberValue(payload.size_form, LANDING_TEXT_STYLE_DEFAULTS.sizeForm),
+        weight_titulo: toNumberValue(payload.weight_titulo, LANDING_TEXT_STYLE_DEFAULTS.weightTitulo),
+        weight_subtitulo: toNumberValue(payload.weight_subtitulo, LANDING_TEXT_STYLE_DEFAULTS.weightSubtitulo),
+        weight_keyword: toNumberValue(payload.weight_keyword, LANDING_TEXT_STYLE_DEFAULTS.weightKeyword),
+        weight_bono: toNumberValue(payload.weight_bono, LANDING_TEXT_STYLE_DEFAULTS.weightBono),
+        weight_info: toNumberValue(payload.weight_info, LANDING_TEXT_STYLE_DEFAULTS.weightInfo),
+        weight_boton: toNumberValue(payload.weight_boton, LANDING_TEXT_STYLE_DEFAULTS.weightBoton),
+        weight_form: toNumberValue(payload.weight_form, LANDING_TEXT_STYLE_DEFAULTS.weightForm),
         bg_type: payload.bg_type || "gradient",
         bg_color: payload.bg_color || "#0f172a",
         bg_gradient: payload.bg_gradient || "linear-gradient(135deg, #0b1f3a 0%, #0f172a 40%, #111827 100%)",
@@ -87,6 +117,30 @@ export default function Landing() {
         colorKeyword: "#ffe600",
         colorBono: "#ffe600",
         colorInfo: "#ffffff",
+        formBgColor: LANDING_TEXT_STYLE_DEFAULTS.formBgColor,
+        formBgOpacity: LANDING_TEXT_STYLE_DEFAULTS.formBgOpacity,
+        formFieldBorderColor: LANDING_TEXT_STYLE_DEFAULTS.formFieldBorderColor,
+        fontTitulo: LANDING_TEXT_STYLE_DEFAULTS.fontTitulo,
+        fontSubtitulo: LANDING_TEXT_STYLE_DEFAULTS.fontSubtitulo,
+        fontKeyword: LANDING_TEXT_STYLE_DEFAULTS.fontKeyword,
+        fontBono: LANDING_TEXT_STYLE_DEFAULTS.fontBono,
+        fontInfo: LANDING_TEXT_STYLE_DEFAULTS.fontInfo,
+        fontBoton: LANDING_TEXT_STYLE_DEFAULTS.fontBoton,
+        fontForm: LANDING_TEXT_STYLE_DEFAULTS.fontForm,
+        sizeTitulo: LANDING_TEXT_STYLE_DEFAULTS.sizeTitulo,
+        sizeSubtitulo: LANDING_TEXT_STYLE_DEFAULTS.sizeSubtitulo,
+        sizeKeyword: LANDING_TEXT_STYLE_DEFAULTS.sizeKeyword,
+        sizeBono: LANDING_TEXT_STYLE_DEFAULTS.sizeBono,
+        sizeInfo: LANDING_TEXT_STYLE_DEFAULTS.sizeInfo,
+        sizeBoton: LANDING_TEXT_STYLE_DEFAULTS.sizeBoton,
+        sizeForm: LANDING_TEXT_STYLE_DEFAULTS.sizeForm,
+        weightTitulo: LANDING_TEXT_STYLE_DEFAULTS.weightTitulo,
+        weightSubtitulo: LANDING_TEXT_STYLE_DEFAULTS.weightSubtitulo,
+        weightKeyword: LANDING_TEXT_STYLE_DEFAULTS.weightKeyword,
+        weightBono: LANDING_TEXT_STYLE_DEFAULTS.weightBono,
+        weightInfo: LANDING_TEXT_STYLE_DEFAULTS.weightInfo,
+        weightBoton: LANDING_TEXT_STYLE_DEFAULTS.weightBoton,
+        weightForm: LANDING_TEXT_STYLE_DEFAULTS.weightForm,
     });
     const pixelLoadedRef = useRef(null);
     const rotatingWhatsappRef = useRef(false);
@@ -210,6 +264,30 @@ export default function Landing() {
             colorKeyword: landing.color_keyword || "#ffe600",
             colorBono: landing.color_bono || "#ffe600",
             colorInfo: landing.color_info || "#ffffff",
+            formBgColor: landing.form_bg_color || LANDING_TEXT_STYLE_DEFAULTS.formBgColor,
+            formBgOpacity: toNumberValue(landing.form_bg_opacity, LANDING_TEXT_STYLE_DEFAULTS.formBgOpacity),
+            formFieldBorderColor: landing.form_field_border_color || LANDING_TEXT_STYLE_DEFAULTS.formFieldBorderColor,
+            fontTitulo: landing.font_titulo || landing.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontTitulo,
+            fontSubtitulo: landing.font_subtitulo || landing.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontSubtitulo,
+            fontKeyword: landing.font_keyword || landing.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontKeyword,
+            fontBono: landing.font_bono || landing.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontBono,
+            fontInfo: landing.font_info || landing.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontInfo,
+            fontBoton: landing.font_boton || landing.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontBoton,
+            fontForm: landing.font_form || landing.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontForm,
+            sizeTitulo: toNumberValue(landing.size_titulo, LANDING_TEXT_STYLE_DEFAULTS.sizeTitulo),
+            sizeSubtitulo: toNumberValue(landing.size_subtitulo, LANDING_TEXT_STYLE_DEFAULTS.sizeSubtitulo),
+            sizeKeyword: toNumberValue(landing.size_keyword, LANDING_TEXT_STYLE_DEFAULTS.sizeKeyword),
+            sizeBono: toNumberValue(landing.size_bono, LANDING_TEXT_STYLE_DEFAULTS.sizeBono),
+            sizeInfo: toNumberValue(landing.size_info, LANDING_TEXT_STYLE_DEFAULTS.sizeInfo),
+            sizeBoton: toNumberValue(landing.size_boton, LANDING_TEXT_STYLE_DEFAULTS.sizeBoton),
+            sizeForm: toNumberValue(landing.size_form, LANDING_TEXT_STYLE_DEFAULTS.sizeForm),
+            weightTitulo: toNumberValue(landing.weight_titulo, LANDING_TEXT_STYLE_DEFAULTS.weightTitulo),
+            weightSubtitulo: toNumberValue(landing.weight_subtitulo, LANDING_TEXT_STYLE_DEFAULTS.weightSubtitulo),
+            weightKeyword: toNumberValue(landing.weight_keyword, LANDING_TEXT_STYLE_DEFAULTS.weightKeyword),
+            weightBono: toNumberValue(landing.weight_bono, LANDING_TEXT_STYLE_DEFAULTS.weightBono),
+            weightInfo: toNumberValue(landing.weight_info, LANDING_TEXT_STYLE_DEFAULTS.weightInfo),
+            weightBoton: toNumberValue(landing.weight_boton, LANDING_TEXT_STYLE_DEFAULTS.weightBoton),
+            weightForm: toNumberValue(landing.weight_form, LANDING_TEXT_STYLE_DEFAULTS.weightForm),
         });
     }, [isPreviewMode, landing]);
 
@@ -228,6 +306,30 @@ export default function Landing() {
                     color_keyword: nextUi.colorKeyword,
                     color_bono: nextUi.colorBono,
                     color_info: nextUi.colorInfo,
+                    form_bg_color: nextUi.formBgColor,
+                    form_bg_opacity: toNumberValue(nextUi.formBgOpacity, LANDING_TEXT_STYLE_DEFAULTS.formBgOpacity),
+                    form_field_border_color: nextUi.formFieldBorderColor,
+                    font_titulo: nextUi.fontTitulo,
+                    font_subtitulo: nextUi.fontSubtitulo,
+                    font_keyword: nextUi.fontKeyword,
+                    font_bono: nextUi.fontBono,
+                    font_info: nextUi.fontInfo,
+                    font_boton: nextUi.fontBoton,
+                    font_form: nextUi.fontForm,
+                    size_titulo: toNumberValue(nextUi.sizeTitulo, LANDING_TEXT_STYLE_DEFAULTS.sizeTitulo),
+                    size_subtitulo: toNumberValue(nextUi.sizeSubtitulo, LANDING_TEXT_STYLE_DEFAULTS.sizeSubtitulo),
+                    size_keyword: toNumberValue(nextUi.sizeKeyword, LANDING_TEXT_STYLE_DEFAULTS.sizeKeyword),
+                    size_bono: toNumberValue(nextUi.sizeBono, LANDING_TEXT_STYLE_DEFAULTS.sizeBono),
+                    size_info: toNumberValue(nextUi.sizeInfo, LANDING_TEXT_STYLE_DEFAULTS.sizeInfo),
+                    size_boton: toNumberValue(nextUi.sizeBoton, LANDING_TEXT_STYLE_DEFAULTS.sizeBoton),
+                    size_form: toNumberValue(nextUi.sizeForm, LANDING_TEXT_STYLE_DEFAULTS.sizeForm),
+                    weight_titulo: toNumberValue(nextUi.weightTitulo, LANDING_TEXT_STYLE_DEFAULTS.weightTitulo),
+                    weight_subtitulo: toNumberValue(nextUi.weightSubtitulo, LANDING_TEXT_STYLE_DEFAULTS.weightSubtitulo),
+                    weight_keyword: toNumberValue(nextUi.weightKeyword, LANDING_TEXT_STYLE_DEFAULTS.weightKeyword),
+                    weight_bono: toNumberValue(nextUi.weightBono, LANDING_TEXT_STYLE_DEFAULTS.weightBono),
+                    weight_info: toNumberValue(nextUi.weightInfo, LANDING_TEXT_STYLE_DEFAULTS.weightInfo),
+                    weight_boton: toNumberValue(nextUi.weightBoton, LANDING_TEXT_STYLE_DEFAULTS.weightBoton),
+                    weight_form: toNumberValue(nextUi.weightForm, LANDING_TEXT_STYLE_DEFAULTS.weightForm),
                     bg_gradient: buildGradient(nextUi.bgGradientAngle, nextUi.bgGradientFrom, nextUi.bgGradientTo),
                 };
                 try {
@@ -363,6 +465,35 @@ export default function Landing() {
     const colorKeyword = landing?.color_keyword || "#ffe600";
     const colorBono = landing?.color_bono || "#ffe600";
     const colorInfo = landing?.color_info || "#ffffff";
+    const formBgColor = landing?.form_bg_color || LANDING_TEXT_STYLE_DEFAULTS.formBgColor;
+    const formBgOpacity = toNumberValue(landing?.form_bg_opacity, LANDING_TEXT_STYLE_DEFAULTS.formBgOpacity);
+    const formFieldBorderColor = landing?.form_field_border_color || LANDING_TEXT_STYLE_DEFAULTS.formFieldBorderColor;
+    const fontTitulo = landing?.font_titulo || landing?.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontTitulo;
+    const fontSubtitulo = landing?.font_subtitulo || landing?.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontSubtitulo;
+    const fontKeyword = landing?.font_keyword || landing?.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontKeyword;
+    const fontBono = landing?.font_bono || landing?.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontBono;
+    const fontInfo = landing?.font_info || landing?.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontInfo;
+    const fontBoton = landing?.font_boton || landing?.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontBoton;
+    const fontForm = landing?.font_form || landing?.font_family || LANDING_TEXT_STYLE_DEFAULTS.fontForm;
+    const sizeTitulo = toNumberValue(landing?.size_titulo, LANDING_TEXT_STYLE_DEFAULTS.sizeTitulo);
+    const sizeSubtitulo = toNumberValue(landing?.size_subtitulo, LANDING_TEXT_STYLE_DEFAULTS.sizeSubtitulo);
+    const sizeKeyword = toNumberValue(landing?.size_keyword, LANDING_TEXT_STYLE_DEFAULTS.sizeKeyword);
+    const sizeBono = toNumberValue(landing?.size_bono, LANDING_TEXT_STYLE_DEFAULTS.sizeBono);
+    const sizeInfo = toNumberValue(landing?.size_info, LANDING_TEXT_STYLE_DEFAULTS.sizeInfo);
+    const sizeBoton = toNumberValue(landing?.size_boton, LANDING_TEXT_STYLE_DEFAULTS.sizeBoton);
+    const sizeForm = toNumberValue(landing?.size_form, LANDING_TEXT_STYLE_DEFAULTS.sizeForm);
+    const weightTitulo = toNumberValue(landing?.weight_titulo, LANDING_TEXT_STYLE_DEFAULTS.weightTitulo);
+    const weightSubtitulo = toNumberValue(landing?.weight_subtitulo, LANDING_TEXT_STYLE_DEFAULTS.weightSubtitulo);
+    const weightKeyword = toNumberValue(landing?.weight_keyword, LANDING_TEXT_STYLE_DEFAULTS.weightKeyword);
+    const weightBono = toNumberValue(landing?.weight_bono, LANDING_TEXT_STYLE_DEFAULTS.weightBono);
+    const weightInfo = toNumberValue(landing?.weight_info, LANDING_TEXT_STYLE_DEFAULTS.weightInfo);
+    const weightBoton = toNumberValue(landing?.weight_boton, LANDING_TEXT_STYLE_DEFAULTS.weightBoton);
+    const weightForm = toNumberValue(landing?.weight_form, LANDING_TEXT_STYLE_DEFAULTS.weightForm);
+    const fontTituloStack = getLandingFontStack(fontTitulo);
+    const fontSubtituloStack = getLandingFontStack(fontSubtitulo);
+    const fontKeywordStack = getLandingFontStack(fontKeyword);
+    const fontBonoStack = getLandingFontStack(fontBono);
+    const fontInfoStack = getLandingFontStack(fontInfo);
     const showTicker = hasLandingData && landing?.mostrar_ticker !== false;
     const keyword = "DUPLICAMOS";
 
@@ -377,7 +508,7 @@ export default function Landing() {
         return (
             <>
                 {before}
-                <span className="keyword" style={{ color: colorKeyword }}>{keyword}</span>
+                <span className="keyword" style={{ color: colorKeyword, fontFamily: fontKeywordStack, fontSize: `${sizeKeyword}rem`, fontWeight: weightKeyword }}>{keyword}</span>
                 {after}
             </>
         );
@@ -428,7 +559,11 @@ export default function Landing() {
     return (
         <div
             className="landing-layout"
-            style={{ "--landing-bg-gradient": layoutBackground }}
+            style={{
+                "--landing-bg-gradient": layoutBackground,
+                "--landing-font-family": fontInfoStack,
+                "--landing-font-scale": "1",
+            }}
         >
             {showTicker ? (
                 <div className="landing-ticker">
@@ -462,14 +597,14 @@ export default function Landing() {
                         <div className="landing-title-container">
                             <h1
                                 className="mt-2 mb-4 text-center font-bold landing-fade-in"
-                                style={{ color: colorTitulo }}
+                                style={{ color: colorTitulo, fontFamily: fontTituloStack, fontSize: `${sizeTitulo}rem`, fontWeight: weightTitulo }}
                             >
                                 {titleText}
                             </h1>
                             <div className="landing-bono-pulse">
-                                <span className="landing-bono" style={{ color: colorBono }}> {bonusText} </span>
+                                <span className="landing-bono" style={{ color: colorBono, fontFamily: fontBonoStack, fontSize: `${sizeBono}rem`, fontWeight: weightBono }}> {bonusText} </span>
                             </div>
-                            <h2 className="font-bold" style={{ color: colorSubtitulo }}>{renderSubtitle()}</h2>
+                            <h2 className="font-bold" style={{ color: colorSubtitulo, fontFamily: fontSubtituloStack, fontSize: `${sizeSubtitulo}rem`, fontWeight: weightSubtitulo }}>{renderSubtitle()}</h2>
                         </div>
                     ) : (
                         <div className="landing-title-skeleton" aria-hidden="true">
@@ -490,6 +625,18 @@ export default function Landing() {
                                 infoText={infoText}
                                 whatsappTemplate={whatsappTemplate}
                                 infoColor={colorInfo}
+                                formBgColor={formBgColor}
+                                formBgOpacity={formBgOpacity}
+                                formFieldBorderColor={formFieldBorderColor}
+                                formTextFontFamily={fontForm}
+                                formTextFontSize={sizeForm}
+                                formTextFontWeight={weightForm}
+                                buttonFontFamily={fontBoton}
+                                buttonFontSize={sizeBoton}
+                                buttonFontWeight={weightBoton}
+                                infoFontFamily={fontInfo}
+                                infoFontSize={sizeInfo}
+                                infoFontWeight={weightInfo}
                                 isPreview={isPreviewMode}
                             />
                         </Suspense>
@@ -507,13 +654,26 @@ export default function Landing() {
                 </div>
             </section>
             <div className="w-full py-1 flex justify-center">
-                <span className="text-sm" style={{ color: colorInfo }}>
+                <span className="text-sm" style={{ color: colorInfo, fontFamily: fontInfoStack, fontSize: `${sizeInfo}rem`, fontWeight: weightInfo }}>
                     {hasLandingData ? (landing?.footer_text || "© 2026 ControlAR. Todos los derechos reservados.") : ""}
                 </span>
             </div>
             {isPreviewMode ? (
-                <div className="fixed top-4 right-4 z-[90] flex items-start gap-2">
-                    {previewPanelOpen ? (
+                <div className="fixed top-3 right-3 z-[90] flex flex-col items-end gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setPreviewPanelOpen((prev) => !prev)}
+                        className="rounded-full border border-white/30 bg-black/75 px-3 py-2 text-xs font-semibold text-white hover:bg-black/90 backdrop-blur-sm"
+                    >
+                        {previewPanelOpen ? "Ocultar panel" : "Editar"}
+                    </button>
+                    <div
+                        className={`transition-all duration-300 ease-out origin-top-right ${
+                            previewPanelOpen
+                                ? "opacity-100 translate-x-0 pointer-events-auto"
+                                : "opacity-0 translate-x-8 pointer-events-none"
+                        }`}
+                    >
                         <PreviewControls
                             bgType={previewUi.bgType}
                             bgGradientAngle={previewUi.bgGradientAngle}
@@ -525,16 +685,33 @@ export default function Landing() {
                             colorKeyword={previewUi.colorKeyword}
                             colorBono={previewUi.colorBono}
                             colorInfo={previewUi.colorInfo}
+                            formBgColor={previewUi.formBgColor}
+                            formBgOpacity={previewUi.formBgOpacity}
+                            formFieldBorderColor={previewUi.formFieldBorderColor}
+                            fontTitulo={previewUi.fontTitulo}
+                            fontSubtitulo={previewUi.fontSubtitulo}
+                            fontKeyword={previewUi.fontKeyword}
+                            fontBono={previewUi.fontBono}
+                            fontInfo={previewUi.fontInfo}
+                            fontBoton={previewUi.fontBoton}
+                            fontForm={previewUi.fontForm}
+                            sizeTitulo={previewUi.sizeTitulo}
+                            sizeSubtitulo={previewUi.sizeSubtitulo}
+                            sizeKeyword={previewUi.sizeKeyword}
+                            sizeBono={previewUi.sizeBono}
+                            sizeInfo={previewUi.sizeInfo}
+                            sizeBoton={previewUi.sizeBoton}
+                            sizeForm={previewUi.sizeForm}
+                            weightTitulo={previewUi.weightTitulo}
+                            weightSubtitulo={previewUi.weightSubtitulo}
+                            weightKeyword={previewUi.weightKeyword}
+                            weightBono={previewUi.weightBono}
+                            weightInfo={previewUi.weightInfo}
+                            weightBoton={previewUi.weightBoton}
+                            weightForm={previewUi.weightForm}
                             onFormChange={handlePreviewUiChange}
                         />
-                    ) : null}
-                    <button
-                        type="button"
-                        onClick={() => setPreviewPanelOpen((prev) => !prev)}
-                        className="rounded-full border border-white/30 bg-black/70 px-3 py-2 text-xs font-semibold text-white hover:bg-black/80"
-                    >
-                        {previewPanelOpen ? "Ocultar panel" : "Mostrar panel"}
-                    </button>
+                    </div>
                 </div>
             ) : null}
         </div>

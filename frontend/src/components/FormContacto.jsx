@@ -128,8 +128,8 @@ export default function FormContacto() {
   }, [empresaId]);
 
   const canSubmit = useMemo(
-    () => Boolean(selectedCliente?.id) && Boolean(empresaId) && !kommoEnabled,
-    [selectedCliente, empresaId, kommoEnabled]
+    () => Boolean(selectedCliente?.id) && Boolean(empresaId),
+    [selectedCliente, empresaId]
   );
 
   const handleSubmit = async () => {
@@ -161,7 +161,7 @@ export default function FormContacto() {
     <Stack spacing={2} className="form-stack">
       {kommoEnabled ? (
         <Alert severity="info" variant="outlined">
-          Esta empresa usa integracion Kommo. Los contactos se registran automaticamente por webhook.
+          Integracion Kommo activa. Este guardado manual queda como fallback si no llegara el webhook.
         </Alert>
       ) : null}
         <Autocomplete

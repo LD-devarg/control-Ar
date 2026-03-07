@@ -31,6 +31,11 @@ const EMPTY_FORM = {
     mostrarDisclaimer: true,
     mostrarTicker: true,
     mostrarFormulario: true,
+    mostrarMediosPago: false,
+    mostrarComunidad: false,
+    textoComunidad: "",
+    mostrarPasos: false,
+    textoPasos: "",
     colorTitulo: "#ffffff",
     colorSubtitulo: "#ffffff",
     colorKeyword: "#ffe600",
@@ -98,6 +103,23 @@ const FIELD_MAP = [
         apiKey: "mostrar_formulario",
         normalize: (value) => String(Boolean(value)),
     },
+    {
+        formKey: "mostrarMediosPago",
+        apiKey: "mostrar_medios_pago",
+        normalize: (value) => String(Boolean(value)),
+    },
+    {
+        formKey: "mostrarComunidad",
+        apiKey: "mostrar_comunidad",
+        normalize: (value) => String(Boolean(value)),
+    },
+    { formKey: "textoComunidad", apiKey: "texto_comunidad" },
+    {
+        formKey: "mostrarPasos",
+        apiKey: "mostrar_pasos",
+        normalize: (value) => String(Boolean(value)),
+    },
+    { formKey: "textoPasos", apiKey: "texto_pasos" },
     { formKey: "colorTitulo", apiKey: "color_titulo" },
     { formKey: "colorSubtitulo", apiKey: "color_subtitulo" },
     { formKey: "colorKeyword", apiKey: "color_keyword" },
@@ -207,6 +229,11 @@ const buildPreviewPayload = (form, previewUrls, currentGradient) => ({
     mostrar_disclaimer: form?.mostrarDisclaimer !== false,
     mostrar_ticker: form?.mostrarTicker !== false,
     mostrar_formulario: form?.mostrarFormulario !== false,
+    mostrar_medios_pago: form?.mostrarMediosPago === true,
+    mostrar_comunidad: form?.mostrarComunidad === true,
+    texto_comunidad: form?.textoComunidad || "",
+    mostrar_pasos: form?.mostrarPasos === true,
+    texto_pasos: form?.textoPasos || "",
     color_titulo: form?.colorTitulo || "#ffffff",
     color_subtitulo: form?.colorSubtitulo || "#ffffff",
     color_keyword: form?.colorKeyword || "#ffe600",
@@ -331,6 +358,11 @@ function LandingConfig() {
             mostrarDisclaimer: value.mostrar_disclaimer ?? EMPTY_FORM.mostrarDisclaimer,
             mostrarTicker: value.mostrar_ticker ?? EMPTY_FORM.mostrarTicker,
             mostrarFormulario: value.mostrar_formulario ?? EMPTY_FORM.mostrarFormulario,
+            mostrarMediosPago: value.mostrar_medios_pago ?? EMPTY_FORM.mostrarMediosPago,
+            mostrarComunidad: value.mostrar_comunidad ?? EMPTY_FORM.mostrarComunidad,
+            textoComunidad: value.texto_comunidad || "",
+            mostrarPasos: value.mostrar_pasos ?? EMPTY_FORM.mostrarPasos,
+            textoPasos: value.texto_pasos || "",
             colorTitulo: value.color_titulo || EMPTY_FORM.colorTitulo,
             colorSubtitulo: value.color_subtitulo || EMPTY_FORM.colorSubtitulo,
             colorKeyword: value.color_keyword || EMPTY_FORM.colorKeyword,
@@ -647,6 +679,11 @@ function LandingConfig() {
                 colorKeyword: payload.color_keyword || prev.colorKeyword,
                 colorBono: payload.color_bono || prev.colorBono,
                 colorInfo: payload.color_info || prev.colorInfo,
+                mostrarMediosPago: payload.mostrar_medios_pago ?? prev.mostrarMediosPago,
+                mostrarComunidad: payload.mostrar_comunidad ?? prev.mostrarComunidad,
+                textoComunidad: payload.texto_comunidad ?? prev.textoComunidad,
+                mostrarPasos: payload.mostrar_pasos ?? prev.mostrarPasos,
+                textoPasos: payload.texto_pasos ?? prev.textoPasos,
                 formBgColor: toColorInputValue(payload.form_bg_color, prev.formBgColor),
                 formBgOpacity: toNumberValue(payload.form_bg_opacity, prev.formBgOpacity),
                 formFieldBorderColor: toColorInputValue(
@@ -691,27 +728,27 @@ function LandingConfig() {
     }, [sendPreviewUpdate]);
 
     return (
-        <Page title="Configuración de Landing Page">
-            <div className="flex flex-row w-full p-2 sm:p-4 justify-center ">
-                <div className="flex flex-col items-center w-full xl:w-9/10 mb-3 rounded-xl pt-1 pb-1 px-3 sm:px-5 bg-black shadow-lg shadow-zinc-900 dark:shadow-black/70">
+        <Page title="Configuración de Landing Page"
+            actions={
+                <div className="flex flex-row items-center justify-between w-full max-w-[98%] 2xl:max-w-[1600px] rounded-xl py-2 px-2 sm:px-4 bg-black shadow-lg shadow-zinc-900 dark:shadow-black/70">
+                    <div className="flex w-full text-black dark:text-white">
+                        {publicLandingUrl ? (
+                            <div className="w-full flex  justify-start">
+                                <span className="text-black dark:text-white text-xs ">
+                                    URL pública:{" "}
+                                    <a
+                                        href={publicLandingUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sky-700 underline"
+                                    >
+                                        {publicLandingUrl}
+                                    </a>
+                                </span>
+                            </div>
+                        ) : null}
+                    </div>
                     <div className="flex flex-row font-bold text-lg items-center justify-start gap-2 ml-0 mt-1 mb-1">
-                        <div className="flex w-full text-black dark:text-white">
-                            {publicLandingUrl ? (
-                                <div className="w-full flex  justify-start">
-                                    <span className="text-black dark:text-white text-xs ">
-                                        URL pública:{" "}
-                                        <a
-                                            href={publicLandingUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-sky-700 underline"
-                                        >
-                                            {publicLandingUrl}
-                                        </a>
-                                    </span>
-                                </div>
-                            ) : null}
-                        </div>
                         <Autocomplete
                             options={landingOptions}
                             value={selectedLanding}
@@ -754,228 +791,210 @@ function LandingConfig() {
                             )}
                         />
                     </div>
-                    <div className="flex flex-row font-bold text-lg items-center gap-2 ml-0 mt-1 mb-1">
-                        <h2 className="text-white font-bold text-lg underline">Datos Generales</h2>
-                    </div>
-                    <div className="w-full xl:w-9/10 px-2 sm:px-5 pb-1 pt-1">
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
-                            sx={{
-                                mb: 1,
-                            }}>
-                            <TextField
-                                label="Nombre"
-                                variant="outlined"
-                                size="small"
-                                value={form.nombre}
-                                onChange={handleChange("nombre")}
-                                sx={{
-                                    ...commonTextFieldSx,
-                                    width: { xs: "100%", md: "40%" },
-                                    fontSize: "small",
-                                }}
-                            />
-                            <TextField
-                                label="Titulo"
-                                variant="outlined"
-                                size="small"
-                                value={form.titulo}
-                                onChange={handleChange("titulo")}
-                                sx={{
-                                    ...commonTextFieldSx,
-                                    fontSize: "small",
-                                    width: { xs: "100%", md: "45%" },
-                                }}
-                            />
-                            <TextField
-                                label="Bono Activo"
-                                variant="outlined"
-                                size="small"
-                                value={form.bonoActivo}
-                                onChange={handleChange("bonoActivo")}
-                                sx={{
-                                    ...commonTextFieldSx,
-                                    width: { xs: "100%", md: "15%" },
-                                    fontSize: "small",
-                                }}
-                            />
-                        </Stack>
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
-                            sx={{
-                                mb: 1,
-                            }}
-                        >
-                            <TextField
-                                label="Subtitulo"
-                                variant="outlined"
-                                fullWidth
-                                size="small"
-                                value={form.subtitulo}
-                                onChange={handleChange("subtitulo")}
-                                sx={commonTextFieldSx}
-                            />
-                            <TextField
-                                label="Texto Boton"
-                                variant="outlined"
-                                size="small"
-                                value={form.textoBoton}
-                                onChange={handleChange("textoBoton")}
-                                sx={{
-                                    ...commonTextFieldSx,
-                                    width: { xs: "100%", md: "25%" },
-                                    fontSize: "small",
-                                }}
-                            />
-                            <TextField
-                                label="Texto Info"
-                                variant="outlined"
-                                size="small"
-                                value={form.textoInfo}
-                                onChange={handleChange("textoInfo")}
-                                sx={{
-                                    ...commonTextFieldSx,
-                                    width: { xs: "100%", md: "40%" },
-                                    fontSize: "small",
-                                }}
-                            />
-                        </Stack>
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
-                            sx={{
-                                mb: 1,
-                            }}
-                        >
-                            <TextField
-                                label="Texto WhatsApp"
-                                variant="outlined"
-                                size="small"
-                                fullWidth
-                                value={form.textoWhatsapp}
-                                onChange={handleChange("textoWhatsapp")}
-                                helperText="Variables permitidas: {{bono}}, {{username}}, {{nombre}}, {{contacto}}"
-                                sx={{
-                                    ...commonTextFieldSx,
-                                    "& .MuiFormHelperText-root": { color: "rgba(255,255,255,0.65)" },
-                                }}
-                            />
-                        </Stack>
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
-                            sx={{
-                                mb: 1,
-                            }}
-                        >
-                            <TextField
-                                label="URL"
-                                variant="outlined"
-                                size="small"
-                                value={form.url}
-                                onChange={handleChange("url")}
-                                sx={{
-                                    ...commonTextFieldSx,
-                                    width: { xs: "100%", md: "60%" },
-                                    fontSize: "",
-                                }}
-                            />
-                            <Autocomplete
-                                options={credencialesMetaOptions}
-                                value={selectedCredencialMeta}
-                                onChange={(_, value) =>
-                                    setForm((prev) => ({ ...prev, credencialMetaId: value?.id || "" }))
-                                }
-                                getOptionLabel={(option) => option?.label || ""}
-                                isOptionEqualToValue={(option, value) => Number(option.id) === Number(value.id)}
-                                renderInput={(params) => (
-                                    <TextField
-                                        {...params}
-                                        label="Pixel vinculado"
-                                        variant="outlined"
-                                        size="small"
-                                        sx={{ ...commonTextFieldSx, width: { xs: "100%", md: "300%", lg: "400%" } }}
-                                    />
-                                )}
-                            />
-                        </Stack>
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1}
-                        >
-                            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start sm:items-center justify-end w-full mt-1">
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            checked={activo}
-                                            onChange={(event) => setActivo(event.target.checked)}
-                                            inputProps={{ id: "landing-activo", name: "landing-activo" }}
-                                            sx={{
-                                                color: "rgba(255,255,255,0.85)",
-                                                "&.Mui-checked": {
-                                                    color: "rgba(255,255,255,0.85)",
-                                                },
-                                            }}
-                                        />
-                                    }
-                                    label="Activo"
-                                    sx={{ color: "#fff", m: 0 }}
-                                />
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            checked={Boolean(form.mostrarDisclaimer)}
-                                            onChange={(event) =>
-                                                setForm((prev) => ({ ...prev, mostrarDisclaimer: event.target.checked }))
-                                            }
-                                            inputProps={{ id: "landing-disclaimer", name: "landing-disclaimer" }}
-                                            sx={{
-                                                color: "rgba(255,255,255,0.85)",
-                                                "&.Mui-checked": {
-                                                    color: "rgba(255,255,255,0.85)",
-                                                },
-                                            }}
-                                        />
-                                    }
-                                    label="Disclaimer"
-                                    sx={{ color: "#fff", m: 0 }}
-                                />
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            checked={Boolean(form.mostrarTicker)}
-                                            onChange={(event) =>
-                                                setForm((prev) => ({ ...prev, mostrarTicker: event.target.checked }))
-                                            }
-                                            inputProps={{ id: "landing-ticker", name: "landing-ticker" }}
-                                            sx={{
-                                                color: "rgba(255,255,255,0.85)",
-                                                "&.Mui-checked": {
-                                                    color: "rgba(255,255,255,0.85)",
-                                                },
-                                            }}
-                                        />
-                                    }
-                                    label="Barra ganadores"
-                                    sx={{ color: "#fff", m: 0 }}
-                                />
-                                <FormControlLabel
-                                    control={
-                                        <Checkbox
-                                            checked={Boolean(form.mostrarFormulario)}
-                                            onChange={(event) =>
-                                                setForm((prev) => ({ ...prev, mostrarFormulario: event.target.checked }))
-                                            }
-                                            inputProps={{ id: "landing-formulario", name: "landing-formulario" }}
-                                            sx={{
-                                                color: "rgba(255,255,255,0.85)",
-                                                "&.Mui-checked": {
-                                                    color: "rgba(255,255,255,0.85)",
-                                                },
-                                            }}
-                                        />
-                                    }
-                                    label="Formulario"
-                                    sx={{ color: "#fff", m: 0 }}
-                                />
-                            </div>
-                        </Stack>
-                        <div className="flex w-full text-center justify-center mb-1">
-                            <h2 className="text-white font-bold text-lg underline">Recursos Visuales</h2>
+                </div>
+            }>
+            <div className="flex flex-col w-full px-1 sm:px-2 py-2 justify-center">
+                <div className="flex flex-row flex-wrap gap-2 sm:gap-4 items-center justify-center w-full mt-1 mb-1 border-b border-white/10">
+                    <FormControlLabel control={<Checkbox checked={activo} onChange={(e) => setActivo(e.target.checked)} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Activo" sx={{ color: "#fff", m: 0 }} />
+                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarDisclaimer)} onChange={(e) => setForm(p => ({ ...p, mostrarDisclaimer: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Disclaimer" sx={{ color: "#fff", m: 0 }} />
+                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarTicker)} onChange={(e) => setForm(p => ({ ...p, mostrarTicker: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Barra ganadores" sx={{ color: "#fff", m: 0 }} />
+                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarFormulario)} onChange={(e) => setForm(p => ({ ...p, mostrarFormulario: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Formulario" sx={{ color: "#fff", m: 0 }} />
+                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarMediosPago)} onChange={(e) => setForm(p => ({ ...p, mostrarMediosPago: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Medios de Pago" sx={{ color: "#fff", m: 0 }} />
+                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarComunidad)} onChange={(e) => setForm(p => ({ ...p, mostrarComunidad: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Testimonio Comunidad" sx={{ color: "#fff", m: 0 }} />
+                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarPasos)} onChange={(e) => setForm(p => ({ ...p, mostrarPasos: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Paso a Paso" sx={{ color: "#fff", m: 0 }} />
+                </div>
+                <div className="grid grid-cols-[50%_50%] gap-4 lg:gap-8 items-start">
+                    {/* Columna Izquierda: Datos */}
+                    <div className="flex flex-col w-full overflow-y-auto max-h-[60vh] lg:max-h-[55vh] pr-2 xl:pr-4 lg:border-r lg:border-white/10" style={{ scrollbarWidth: 'thin', scrollbarColor: '#444 transparent' }}>
+                        <div className="flex flex-row font-bold items-center gap-2 mb-2">
+                            <h2 className="text-white font-bold text-base underline">Datos Generales</h2>
                         </div>
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={2} className="mt-1 justify-center">
+                        <div className="w-full pb-1 pt-1">
+                            <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1 }}>
+                                <TextField
+                                    label="Nombre"
+                                    variant="outlined"
+                                    size="small"
+                                    value={form.nombre}
+                                    onChange={handleChange("nombre")}
+                                    sx={{
+                                        ...commonTextFieldSx,
+                                        width: { xs: "100%", md: "40%" },
+                                        fontSize: "small",
+                                    }}
+                                />
+                                <TextField
+                                    label="Titulo"
+                                    variant="outlined"
+                                    size="small"
+                                    value={form.titulo}
+                                    onChange={handleChange("titulo")}
+                                    sx={{
+                                        ...commonTextFieldSx,
+                                        fontSize: "small",
+                                        width: { xs: "100%", md: "60%" },
+                                    }}
+                                />
+                            </Stack>
+                            <Stack direction={{ xs: "column", md: "row" }} spacing={1}
+                                sx={{
+                                    mb: 1,
+                                }}
+                            >
+                                <TextField
+                                    label="Texto Boton"
+                                    variant="outlined"
+                                    size="small"
+                                    value={form.textoBoton}
+                                    onChange={handleChange("textoBoton")}
+                                    sx={{
+                                        ...commonTextFieldSx,
+                                        width: { xs: "100%", md: "30%" },
+                                        fontSize: "small",
+                                    }}
+                                />
+                                <TextField
+                                    label="Bono Activo"
+                                    variant="outlined"
+                                    size="small"
+                                    value={form.bonoActivo}
+                                    onChange={handleChange("bonoActivo")}
+                                    sx={{
+                                        ...commonTextFieldSx,
+                                        width: { xs: "100%", md: "20%" },
+                                        fontSize: "small",
+                                    }}
+                                />
+                                <TextField
+                                    label="Texto Info"
+                                    variant="outlined"
+                                    size="small"
+                                    value={form.textoInfo}
+                                    onChange={handleChange("textoInfo")}
+                                    sx={{
+                                        ...commonTextFieldSx,
+                                        width: { xs: "100%", md: "50%" },
+                                        fontSize: "small",
+                                    }}
+                                />
+                            </Stack>
+                            <Stack direction={{ xs: "column", md: "row" }} spacing={1}
+                                sx={{
+                                    mb: 1,
+                                }}
+                            >
+                                <TextField
+                                    label="Subtitulo"
+                                    variant="outlined"
+                                    fullWidth
+                                    multiline
+                                    rows={2}
+                                    size="small"
+                                    value={form.subtitulo}
+                                    onChange={handleChange("subtitulo")}
+                                    sx={commonTextFieldSx}
+                                />
+                            </Stack>
+                            <Stack direction={{ xs: "column", md: "row" }} spacing={1}
+                                sx={{
+                                    mb: 1,
+                                }}
+                            >
+                                <TextField
+                                    label="Texto WhatsApp"
+                                    variant="outlined"
+                                    size="small"
+                                    fullWidth
+                                    multiline
+                                    rows={2}
+                                    value={form.textoWhatsapp}
+                                    onChange={handleChange("textoWhatsapp")}
+                                    helperText="Variables permitidas: {{bono}}, {{username}}, {{nombre}}, {{contacto}}"
+                                    sx={{
+                                        ...commonTextFieldSx,
+                                        "& .MuiFormHelperText-root": { color: "rgba(255,255,255,0.65)" },
+                                    }}
+                                />
+                            </Stack>
+                            <Stack direction={{ xs: "column", md: "row" }} spacing={1}
+                                sx={{
+                                    mb: 1,
+                                    width: "100%",
+                                }}
+                            >
+                                <TextField
+                                    label="URL"
+                                    variant="outlined"
+                                    size="small"
+                                    value={form.url}
+                                    onChange={handleChange("url")}
+                                    sx={{
+                                        ...commonTextFieldSx,
+                                        width: { xs: "100%", md: "100%" },
+                                        fontSize: "",
+                                    }}
+                                />
+                            </Stack>
+
+                            <Stack direction={{ xs: "column", md: "row" }} spacing={1}
+                                sx={{
+                                    mb: 1,
+                                    width: "full",
+                                }}
+                            >
+                                <Autocomplete
+                                    options={credencialesMetaOptions}
+                                    value={selectedCredencialMeta}
+                                    onChange={(_, value) =>
+                                        setForm((prev) => ({ ...prev, credencialMetaId: value?.id || "" }))
+                                    }
+                                    getOptionLabel={(option) => option?.label || ""}
+                                    isOptionEqualToValue={(option, value) => Number(option.id) === Number(value.id)}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            label="Pixel vinculado"
+                                            variant="outlined"
+                                            size="small"
+                                            sx={{ ...commonTextFieldSx, width: "500%" }}
+                                        />
+                                    )}
+                                />
+                            </Stack>
+
+                            {(form.mostrarComunidad || form.mostrarPasos) && (
+                                <Stack direction={{ xs: "column", md: "column" }} spacing={1} sx={{ mb: 1, mt: 1 }}>
+                                    {form.mostrarComunidad && (
+                                        <TextField
+                                            label="Texto Testimonio Comunidad"
+                                            variant="outlined"
+                                            size="small"
+                                            rows={2}
+                                            value={form.textoComunidad}
+                                            onChange={handleChange("textoComunidad")}
+                                            sx={{ ...commonTextFieldSx, width: { xs: "100%", md: "100%" } }}
+                                        />
+                                    )}
+                                    {form.mostrarPasos && (
+                                        <TextField
+                                            label="Texto Paso a Paso (ej: 1.Clic 2.Msj 3.Carga)"
+                                            variant="outlined"
+                                            size="small"
+                                            value={form.textoPasos}
+                                            onChange={handleChange("textoPasos")}
+                                            sx={{ ...commonTextFieldSx, width: { xs: "100%", md: "100%" } }}
+                                        />
+                                    )}
+                                </Stack>
+                            )}
+                        </div>
+                    </div>
+                    {/* Right column */}
+                    <div className="flex flex-col w-full border-t lg:border-t-0 border-white/10 pt-4 lg:pt-0 lg:pr-6">
+                        <div className="flex w-full justify-center lg:justify-start mb-3">
+                            <h2 className="text-white font-bold text-base underline">Recursos Visuales</h2>
+                        </div>
+                        <Stack direction="row" spacing={3} className="w-full items-center">
                             <div className="flex flex-col items-center gap-2">
                                 <UploadButton
                                     key={`upload-vertical-${uploadKey}`}
@@ -1030,86 +1049,86 @@ function LandingConfig() {
                                     Ver Fondo Horizontal
                                 </Button>
                             </div>
-                            <div className="flex flex-col items-center gap-2">
-                                <UploadButton
-                                    key={`upload-reemplazoForm-${uploadKey}`}
-                                    label="Imagen Formulario (Opcional)"
-                                    onUpload={(file) => {
-                                        setForm((prev) => ({ ...prev, imagenReemplazoForm: file }));
-                                        setPreviewUrlFromFile("reemplazoForm", file);
-                                    }}
-                                    sx={{
-                                        gridColumn: "span 2",
-                                        width: "100%",
-                                        borderRadius: "50px",
-                                        backgroundColor: "rgba(217, 221, 88, 0.12)",
-                                        color: "rgba(255,255,255,0.85)",
-                                        "&:hover": { backgroundColor: "rgba(217, 221, 88, 0.2)" },
-                                        "& .MuiButton-startIcon": { marginRight: "8px" },
-                                    }}
-                                />
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    disabled={!previewUrls.reemplazoForm}
-                                    onClick={() => previewUrls.reemplazoForm && window.open(previewUrls.reemplazoForm, "_blank", "noopener,noreferrer")}
-                                >
-                                    Ver Imagen Formulario
-                                </Button>
-                            </div>
                         </Stack>
-                        <div className="w-full gap-2 mb-2 mt-2 items-end flex justify-end">
+                        <div className="flex flex-col w-full mt-2 pt-2 items-center gap-2">
+                            <UploadButton
+                                key={`upload-reemplazoForm-${uploadKey}`}
+                                label="Imagen Formulario (Opcional)"
+                                onUpload={(file) => {
+                                    setForm((prev) => ({ ...prev, imagenReemplazoForm: file }));
+                                    setPreviewUrlFromFile("reemplazoForm", file);
+                                }}
+                                sx={{
+                                    gridColumn: "span 2",
+                                    width: "100%",
+                                    borderRadius: "50px",
+                                    backgroundColor: "rgba(217, 221, 88, 0.12)",
+                                    color: "rgba(255,255,255,0.85)",
+                                    "&:hover": { backgroundColor: "rgba(217, 221, 88, 0.2)" },
+                                    "& .MuiButton-startIcon": { marginRight: "8px" },
+                                }}
+                            />
                             <Button
                                 variant="outlined"
-                                startIcon={<SaveIcon />}
-                                disabled={primaryDisabled || submitting}
-                                onClick={handleSubmit}
-                                sx={{
-                                    borderColor: "#fff",
-                                    color: "#fff",
-                                    "&:hover": {
-                                        borderColor: "#fff",
-                                    },
-                                    "&.Mui-disabled": {
-                                        borderColor: "rgba(255,255,255,0.4)",
-                                        color: "rgba(255,255,255,0.4)",
-                                    },
-                                }}
+                                size="small"
+                                disabled={!previewUrls.reemplazoForm}
+                                onClick={() => previewUrls.reemplazoForm && window.open(previewUrls.reemplazoForm, "_blank", "noopener,noreferrer")}
                             >
-                                {submitting ? "Guardando..." : primaryLabel}
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                onClick={handleCancel}
-                                sx={{
-                                    borderColor: "#ef4444",
-                                    color: "#ef4444",
-                                    "&:hover": {
-                                        borderColor: "#dc2626",
-                                        color: "#dc2626",
-                                        backgroundColor: "rgba(239, 68, 68, 0.08)",
-                                    },
-                                    "&.Mui-disabled": {
-                                        borderColor: "rgba(239, 68, 68, 0.4)",
-                                        color: "rgba(239, 68, 68, 0.4)",
-                                    },
-                                }}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                className="mr-2"
-                                sx={{
-                                    height: "100%",
-                                }}
-                                disabled={previewDisabled}
-                                onClick={openPreviewWindow}
-                            >
-                                Vista Previa
+                                Ver Imagen Formulario
                             </Button>
                         </div>
                     </div>
+                </div>
+                <div className="w-full gap-2 mb-2 mt-2 items-center flex justify-center lg:justify-end border-t border-white/10 pt-3">
+                    <Button
+                        variant="outlined"
+                        startIcon={<SaveIcon />}
+                        disabled={primaryDisabled || submitting}
+                        onClick={handleSubmit}
+                        sx={{
+                            borderColor: "#fff",
+                            color: "#fff",
+                            "&:hover": {
+                                borderColor: "#fff",
+                            },
+                            "&.Mui-disabled": {
+                                borderColor: "rgba(255,255,255,0.4)",
+                                color: "rgba(255,255,255,0.4)",
+                            },
+                        }}
+                    >
+                        {submitting ? "Guardando..." : primaryLabel}
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        onClick={handleCancel}
+                        sx={{
+                            borderColor: "#ef4444",
+                            color: "#ef4444",
+                            "&:hover": {
+                                borderColor: "#dc2626",
+                                color: "#dc2626",
+                                backgroundColor: "rgba(239, 68, 68, 0.08)",
+                            },
+                            "&.Mui-disabled": {
+                                borderColor: "rgba(239, 68, 68, 0.4)",
+                                color: "rgba(239, 68, 68, 0.4)",
+                            },
+                        }}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        className="mr-2"
+                        sx={{
+                            height: "100%",
+                        }}
+                        disabled={previewDisabled}
+                        onClick={openPreviewWindow}
+                    >
+                        Vista Previa
+                    </Button>
                 </div>
             </div>
             <Snackbar

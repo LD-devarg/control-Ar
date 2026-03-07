@@ -45,6 +45,7 @@
     from {
         transform: translateX(0);
     }
+
     to {
         transform: translateX(-50%);
     }
@@ -56,7 +57,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 90%;
+    width: 95%;
     max-width: 1200px;
     border-radius: 50px;
     box-shadow: 20px 20px 30px rgba(0, 0, 0, 0.5);
@@ -74,15 +75,6 @@
     z-index: 0;
 }
 
-.landing-content {
-    position: relative;
-    z-index: 1;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
 .landing-fade-in {
     animation: landingFadeIn 420ms ease-out both;
 }
@@ -97,10 +89,6 @@
     border-radius: 12px;
     background: rgba(0, 0, 0, 0.35);
     margin: 1rem 0;
-}
-
-.landing-title-container {
-    text-align: center;
 }
 
 .landing-title-skeleton {
@@ -135,30 +123,7 @@
     height: 1.5rem;
 }
 
-.landing-container h1 {
-    font-size: 2.5rem;
-    margin-bottom: 0;
-    color: rgb(255, 255, 0);
-}
-.landing-container .landing-bono {
-    font-size: 3rem;
-    margin-bottom: 0;
-    color: rgb(255, 255, 0);
-}
 
-.landing-container h2 {
-    font-size: 1.5rem;
-    color: rgb(255, 255, 255);
-}
-
-.landing-container h2 .keyword {
-    color: #ffcb0d;
-    font-weight: bold;
-    font-size: 2rem;
-    text-decoration: underline;
-    text-decoration-color: #ffcb0d;
-    text-underline-offset: 6px;
-}
 
 @media (max-width: 768px) {
     .landing-container {
@@ -176,7 +141,7 @@
     .landing-container h2 {
         font-size: 1.2rem;
     }
-    
+
 }
 
 @media (max-width: 403px) {
@@ -202,6 +167,7 @@
         opacity: 0;
         transform: translateY(12px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -212,9 +178,11 @@
     0% {
         transform: scale(1);
     }
+
     50% {
         transform: scale(1.05);
     }
+
     100% {
         transform: scale(1);
     }
@@ -224,6 +192,7 @@
     from {
         background-position: 200% 0;
     }
+
     to {
         background-position: -200% 0;
     }

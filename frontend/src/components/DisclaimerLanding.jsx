@@ -2,7 +2,7 @@
 
 function DisclaimerLanding() {
     return (
-        <div className="flex flex-row w-full rounded-full px-4 py-1 bg-black/20 justify-between items-center text-xs text-slate-600 dark:text-zinc-400">
+        <div className="flex flex-row w-full rounded-full px-4 py-1 bg-black/50 justify-between items-center text-xs text-slate-600 dark:text-zinc-400">
             <div className="p-0 lg:p-2 flex justify-center items-center w-2/10">
                 <img src="/18-.png" className="w-6 h-6 mr-4" alt="Imagen de advertencia 18+" />
             </div>

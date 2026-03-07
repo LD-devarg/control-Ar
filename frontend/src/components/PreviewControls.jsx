@@ -18,6 +18,51 @@ const TEXT_STYLE_FIELDS = [
     { label: "Formulario", fontKey: "fontForm", sizeKey: "sizeForm", weightKey: "weightForm" },
 ];
 
+const hexToRgb = (hex) => {
+    let r = 0, g = 0, b = 0;
+    if (hex.length === 4) {
+        r = parseInt(hex[1] + hex[1], 16);
+        g = parseInt(hex[2] + hex[2], 16);
+        b = parseInt(hex[3] + hex[3], 16);
+    } else if (hex.length === 7) {
+        r = parseInt(hex.substring(1, 3), 16);
+        g = parseInt(hex.substring(3, 5), 16);
+        b = parseInt(hex.substring(5, 7), 16);
+    }
+    return [r, g, b];
+};
+
+const rgbToHex = (r, g, b) => {
+    return "#" + (1 << 24 | (r << 16) | (g << 8) | b).toString(16).slice(1).padStart(6, '0');
+};
+
+const generateMetallicGradient = (baseHex) => {
+    if (!baseHex || !baseHex.startsWith('#')) return baseHex;
+    const [r, g, b] = hexToRgb(baseHex);
+    const light = rgbToHex(
+        Math.min(255, Math.round(r + (255 - r) * 0.7)),
+        Math.min(255, Math.round(g + (255 - g) * 0.7)),
+        Math.min(255, Math.round(b + (255 - b) * 0.7))
+    );
+    const midLight = rgbToHex(
+        Math.min(255, Math.round(r + (255 - r) * 0.3)),
+        Math.min(255, Math.round(g + (255 - g) * 0.3)),
+        Math.min(255, Math.round(b + (255 - b) * 0.3))
+    );
+    const dark = rgbToHex(Math.round(r * 0.6), Math.round(g * 0.6), Math.round(b * 0.6));
+    const darker = rgbToHex(Math.round(r * 0.4), Math.round(g * 0.4), Math.round(b * 0.4));
+    
+    return `linear-gradient(90deg, ${darker} 0%, ${light} 25%, ${baseHex} 50%, ${midLight} 75%, ${dark} 100%) /*metallic:${baseHex}*/`;
+};
+
+const extractBaseColor = (colorStr, defaultColor) => {
+    if (!colorStr) return defaultColor;
+    const match = colorStr.match(/\/\*metallic:(#[0-9a-fA-F]{6})\*\//);
+    if (match) return match[1];
+    if (colorStr.includes('gradient')) return '#ffe600';
+    return colorStr;
+};
+
 function PreviewControlsComponent({
     bgType,
     bgGradientAngle,
@@ -165,25 +210,57 @@ function PreviewControlsComponent({
             <div className="border-t border-white/10 my-4" />
             <div className="text-sm font-semibold mb-3">Texto (Colores)</div>
             <div className="grid grid-cols-2 gap-3 text-xs">
-                <label className="flex items-center gap-2 text-white/80">
-                    <input type="color" value={colorTitulo} onChange={(event) => onFormChange({ colorTitulo: event.target.value })} className="w-8 h-7 rounded border border-white/40 bg-transparent" />
-                    Titulo
+                <label className="flex items-center gap-2 text-white/80 col-span-2">
+                    <input type="color" value={extractBaseColor(colorTitulo, '#ffffff')} onChange={(event) => {
+                        const val = event.target.value;
+                        onFormChange({ colorTitulo: colorTitulo?.includes?.('gradient') ? generateMetallicGradient(val) : val });
+                    }} className="w-8 h-7 rounded border border-white/40 bg-transparent" />
+                    <span className="flex-1">Titulo</span>
+                    <input type="checkbox" checked={colorTitulo?.includes?.('gradient')} onChange={(e) => {
+                        const baseColor = extractBaseColor(colorTitulo, '#ffffff');
+                        onFormChange({ colorTitulo: e.target.checked ? generateMetallicGradient(baseColor) : baseColor });
+                    }} />
+                    <span className="text-[10px]">✨ Metal</span>
                 </label>
-                <label className="flex items-center gap-2 text-white/80">
-                    <input type="color" value={colorSubtitulo} onChange={(event) => onFormChange({ colorSubtitulo: event.target.value })} className="w-8 h-7 rounded border border-white/40 bg-transparent" />
-                    Subtitulo
+                <label className="flex items-center gap-2 text-white/80 col-span-2">
+                    <input type="color" value={extractBaseColor(colorSubtitulo, '#ffffff')} onChange={(event) => {
+                        const val = event.target.value;
+                        onFormChange({ colorSubtitulo: colorSubtitulo?.includes?.('gradient') ? generateMetallicGradient(val) : val });
+                    }} className="w-8 h-7 rounded border border-white/40 bg-transparent" />
+                    <span className="flex-1">Subtitulo</span>
+                    <input type="checkbox" checked={colorSubtitulo?.includes?.('gradient')} onChange={(e) => {
+                        const baseColor = extractBaseColor(colorSubtitulo, '#ffffff');
+                        onFormChange({ colorSubtitulo: e.target.checked ? generateMetallicGradient(baseColor) : baseColor });
+                    }} />
+                    <span className="text-[10px]">✨ Metal</span>
                 </label>
-                <label className="flex items-center gap-2 text-white/80">
-                    <input type="color" value={colorKeyword} onChange={(event) => onFormChange({ colorKeyword: event.target.value })} className="w-8 h-7 rounded border border-white/40 bg-transparent" />
-                    Keyword
+                <label className="flex items-center gap-2 text-white/80 col-span-2">
+                    <input type="color" value={extractBaseColor(colorKeyword, '#ffe600')} onChange={(event) => {
+                        const val = event.target.value;
+                        onFormChange({ colorKeyword: colorKeyword?.includes?.('gradient') ? generateMetallicGradient(val) : val });
+                    }} className="w-8 h-7 rounded border border-white/40 bg-transparent" />
+                    <span className="flex-1">Keyword</span>
+                    <input type="checkbox" checked={colorKeyword?.includes?.('gradient')} onChange={(e) => {
+                        const baseColor = extractBaseColor(colorKeyword, '#ffe600');
+                        onFormChange({ colorKeyword: e.target.checked ? generateMetallicGradient(baseColor) : baseColor });
+                    }} />
+                    <span className="text-[10px]">✨ Metal</span>
                 </label>
-                <label className="flex items-center gap-2 text-white/80">
-                    <input type="color" value={colorBono} onChange={(event) => onFormChange({ colorBono: event.target.value })} className="w-8 h-7 rounded border border-white/40 bg-transparent" />
-                    Bono
+                <label className="flex items-center gap-2 text-white/80 col-span-2">
+                    <input type="color" value={extractBaseColor(colorBono, '#ffe600')} onChange={(event) => {
+                        const val = event.target.value;
+                        onFormChange({ colorBono: colorBono?.includes?.('gradient') ? generateMetallicGradient(val) : val });
+                    }} className="w-8 h-7 rounded border border-white/40 bg-transparent" />
+                    <span className="flex-1">Bono</span>
+                    <input type="checkbox" checked={colorBono?.includes?.('gradient')} onChange={(e) => {
+                        const baseColor = extractBaseColor(colorBono, '#ffe600');
+                        onFormChange({ colorBono: e.target.checked ? generateMetallicGradient(baseColor) : baseColor });
+                    }} />
+                    <span className="text-[10px]">✨ Metal</span>
                 </label>
-                <label className="flex items-center gap-2 text-white/80">
+                <label className="flex items-center gap-2 text-white/80 col-span-2">
                     <input type="color" value={colorInfo} onChange={(event) => onFormChange({ colorInfo: event.target.value })} className="w-8 h-7 rounded border border-white/40 bg-transparent" />
-                    Info
+                    <span className="flex-1">Info</span>
                 </label>
             </div>
             <div className="border-t border-white/10 my-4" />

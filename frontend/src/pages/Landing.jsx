@@ -1,4 +1,4 @@
-﻿import "../assets/css/Landing.css";
+import "../assets/css/Landing.css";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import PreviewControls from "../components/PreviewControls";
@@ -45,6 +45,11 @@ function normalizePreviewLanding(payload = {}) {
         mostrar_formulario: payload.mostrar_formulario !== false,
         mostrar_disclaimer: payload.mostrar_disclaimer !== false,
         mostrar_ticker: payload.mostrar_ticker !== false,
+        mostrar_medios_pago: payload.mostrar_medios_pago === true,
+        mostrar_comunidad: payload.mostrar_comunidad === true,
+        texto_comunidad: payload.texto_comunidad || "",
+        mostrar_pasos: payload.mostrar_pasos === true,
+        texto_pasos: payload.texto_pasos || "",
         color_titulo: payload.color_titulo || "#ffffff",
         color_subtitulo: payload.color_subtitulo || "#ffffff",
         color_keyword: payload.color_keyword || "#ffe600",
@@ -99,6 +104,19 @@ function parseGradient(gradient) {
 
 function buildGradient(angle, from, to) {
     return `linear-gradient(${angle}deg, ${from} 0%, ${to} 100%)`;
+}
+
+function getTextStyle(colorValue, baseStyle = {}) {
+    if (colorValue && colorValue.includes("gradient")) {
+        return {
+            ...baseStyle,
+            backgroundImage: colorValue,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            color: "transparent"
+        };
+    }
+    return { ...baseStyle, color: colorValue };
 }
 
 export default function Landing() {
@@ -456,6 +474,11 @@ export default function Landing() {
     const buttonText = hasLandingData ? (landing?.texto_boton || "JUGÁ AHORA") : "";
     const infoText = hasLandingData ? (landing?.texto_info || "💬 Atención personalizada las 24hs.") : "";
     const whatsappTemplate = hasLandingData ? (landing?.texto_whatsapp || "") : "";
+    const mostrarMediosPago = hasLandingData ? (landing?.mostrar_medios_pago === true) : false;
+    const mostrarComunidad = hasLandingData ? (landing?.mostrar_comunidad === true) : false;
+    const textoComunidad = hasLandingData ? (landing?.texto_comunidad || "") : "";
+    const mostrarPasos = hasLandingData ? (landing?.mostrar_pasos === true) : false;
+    const textoPasos = hasLandingData ? (landing?.texto_pasos || "") : "";
     const bgDesktop = landing?.background_horizontal || null;
     const bgMobile = landing?.background_vertical || null;
     const bgType = landing?.bg_type || "gradient";
@@ -510,7 +533,7 @@ export default function Landing() {
         return (
             <>
                 {before}
-                <span className="keyword" style={{ color: colorKeyword, fontFamily: fontKeywordStack, fontSize: `${sizeKeyword}rem`, fontWeight: weightKeyword }}>{keyword}</span>
+                <span className="keyword" style={getTextStyle(colorKeyword, { fontFamily: fontKeywordStack, fontSize: `${sizeKeyword}rem`, fontWeight: weightKeyword })}>{keyword}</span>
                 {after}
             </>
         );
@@ -594,19 +617,26 @@ export default function Landing() {
                         decoding="async"
                     />
                 ) : null}
-                <div className="landing-content">
+                <div className="relative z-index-1 w-full flex flex-col items-center justify-center h-full">
                     {hasLandingData ? (
-                        <div className="landing-title-container">
+                        <div className="text-center">
                             <h1
-                                className="mt-2 mb-4 text-center font-bold landing-fade-in"
-                                style={{ color: colorTitulo, fontFamily: fontTituloStack, fontSize: `${sizeTitulo}rem`, fontWeight: weightTitulo }}
+                                className="mt-10 text-center font-bold landing-fade-in"
+                                style={getTextStyle(colorTitulo, { fontFamily: fontTituloStack, fontSize: `${sizeTitulo}rem`, fontWeight: weightTitulo })}
                             >
                                 {titleText}
                             </h1>
                             <div className="landing-bono-pulse">
-                                <span className="landing-bono" style={{ color: colorBono, fontFamily: fontBonoStack, fontSize: `${sizeBono}rem`, fontWeight: weightBono }}> {bonusText} </span>
+                                <span className="landing-bono" style={getTextStyle(colorBono, { fontFamily: fontBonoStack, fontSize: `${sizeBono}rem`, fontWeight: weightBono })}> {bonusText} </span>
                             </div>
-                            <h2 className="font-bold" style={{ color: colorSubtitulo, fontFamily: fontSubtituloStack, fontSize: `${sizeSubtitulo}rem`, fontWeight: weightSubtitulo }}>{renderSubtitle()}</h2>
+                            <h2 className="" style={getTextStyle(colorSubtitulo, { fontFamily: fontSubtituloStack, fontSize: `${sizeSubtitulo}rem`, fontWeight: weightSubtitulo })}>{renderSubtitle()}</h2>
+                            {hasLandingData && mostrarComunidad && textoComunidad && (
+                                <div className="mt-1 mb-1 px-2 lg:p-0 landing-fade-in flex justify-center w-full ">
+                                    <span className="px-4 py-1 rounded-full bg-white/10 border border-white/20 text-white font-semibold backdrop-blur-sm text-sm" style={{ fontFamily: fontSubtituloStack, color: colorSubtitulo }}>
+                                        {textoComunidad}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="landing-title-skeleton" aria-hidden="true">
@@ -648,8 +678,25 @@ export default function Landing() {
                         <div className="landing-form-fallback" />
                     )}
 
+                    {hasLandingData && mostrarPasos && textoPasos && (
+                        <div className="flex justify-center w-full mt-2 landing-fade-in">
+                            <span className="text-center text-sm/relaxed font-medium bg-black/40 px-5 py-2 rounded border border-white/10 backdrop-blur-md" style={{ color: colorInfo, fontFamily: fontInfoStack }}>
+                                {textoPasos}
+                            </span>
+                        </div>
+                    )}
+
+                    {hasLandingData && mostrarMediosPago && (
+                        <div className="flex flex-wrap items-center justify-center gap-3 w-full mt-6 mb-2 landing-fade-in opacity-80">
+                            <span className="px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded text-blue-100 text-xs font-bold tracking-wider backdrop-blur-sm">MercadoPago</span>
+                            <span className="px-3 py-1 bg-indigo-500/20 border border-indigo-400/30 rounded text-indigo-100 text-xs font-bold tracking-wider backdrop-blur-sm">Transferencia</span>
+                            <span className="px-3 py-1 bg-teal-500/20 border border-teal-400/30 rounded text-teal-100 text-xs font-bold tracking-wider backdrop-blur-sm">Ualá</span>
+                            <span className="px-3 py-1 bg-yellow-500/20 border border-yellow-400/30 rounded text-yellow-100 text-xs font-bold tracking-wider backdrop-blur-sm">Cripto</span>
+                        </div>
+                    )}
+
                     {hasLandingData && landing?.mostrar_disclaimer !== false ? (
-                        <div className="flex justify-center w-full lg:w-2/3 mt-8 lg:mt-10 landing-fade-in">
+                        <div className="flex justify-center w-full mt-6 mb-2 lg:mt-8 landing-fade-in sticky bottom-4 z-10 px-2">
                             <Suspense fallback={null}>
                                 <DisclaimerLanding />
                             </Suspense>
@@ -657,8 +704,8 @@ export default function Landing() {
                     ) : null}
                 </div>
             </section>
-            <div className="w-full py-1 flex justify-center">
-                <span className="text-sm" style={{ color: colorInfo, fontFamily: fontInfoStack, fontSize: `${sizeInfo}rem`, fontWeight: weightInfo }}>
+            <div className="w-full py-2 flex justify-center bg-black/80 relative z-20">
+                <span className="text-xs text-gray">
                     {hasLandingData ? (landing?.footer_text || "© 2026 ControlAR. Todos los derechos reservados.") : ""}
                 </span>
             </div>
@@ -673,8 +720,8 @@ export default function Landing() {
                     </button>
                     <div
                         className={`transition-all duration-300 ease-out origin-top-right ${previewPanelOpen
-                                ? "opacity-100 translate-x-0 pointer-events-auto"
-                                : "opacity-0 translate-x-8 pointer-events-none"
+                            ? "opacity-100 translate-x-0 pointer-events-auto"
+                            : "opacity-0 translate-x-8 pointer-events-none"
                             }`}
                     >
                         <PreviewControls

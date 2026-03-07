@@ -491,7 +491,7 @@ export default function NuevoLead({
 
     return (
         <div
-            className="flex flex-col items-center rounded-xl shadow-xl w-8/10 lg:w-3/10 h-6/10 lg:h-7/10 p-2 m-4"
+            className={`flex flex-col items-center rounded-xl shadow-xl w-8/10 lg:w-3/10 p-4 lg:p-2 mb-8 transition-all duration-300 ${mostrarFormulario ? "h-6/10 lg:h-7/10" : "h-auto py-8 lg:py-12 justify-center"}`}
             style={{ backgroundColor: resolvedFormBg, fontFamily: formTextFontStack }}
         >
             <h3
@@ -565,8 +565,8 @@ export default function NuevoLead({
                 </>
             ) : (
                 imagenReemplazoForm ? (
-                    <div className="w-full flex justify-center mb-4 px-2">
-                        <img src={imagenReemplazoForm} alt="Placeholder" className="w-full max-h-48 object-contain rounded-xl shadow-md" />
+                    <div className="w-full flex justify-center mb-2 px-2">
+                        <img src={imagenReemplazoForm} alt="Placeholder" className="w-full max-h-48 object-contain rounded-full" />
                     </div>
                 ) : null
             )}

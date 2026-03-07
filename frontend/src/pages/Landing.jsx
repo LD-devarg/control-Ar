@@ -3,6 +3,10 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import axios from "axios";
 import PreviewControls from "../components/PreviewControls";
 import { getLandingFontStack, LANDING_TEXT_STYLE_DEFAULTS } from "../constants/landingTypography";
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import WalletIcon from '@mui/icons-material/Wallet';
+import PaymentIcon from '@mui/icons-material/Payment';
+import CurrencyBitcoinIcon from '@mui/icons-material/CurrencyBitcoin';
 
 const NuevoLead = lazy(() => import("../components/FormLeads"));
 const DisclaimerLanding = lazy(() => import("../components/DisclaimerLanding"));
@@ -539,6 +543,62 @@ export default function Landing() {
         );
     };
 
+    const renderPasos = (texto) => {
+        if (!texto) return null;
+        const parts = texto.split(/(?=\d+[.-]\s*)/).filter(Boolean);
+        
+        if (parts.length > 1) {
+            return (
+                <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 w-full">
+                    {parts.map((p, i) => {
+                        const cleanText = p.replace(/^\d+[.-]\s*/, '').trim();
+                        if (!cleanText) return null;
+                        return (
+                            <div key={i} className="flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 shadow-lg">
+                                <span className="flex items-center justify-center min-w-[22px] min-h-[22px] rounded-full bg-white/20 text-white text-[11px] font-bold">
+                                    {i + 1}
+                                </span>
+                                <span className="text-sm font-semibold whitespace-nowrap" style={{ color: colorInfo, fontFamily: fontInfoStack }}>
+                                    {cleanText}
+                                </span>
+                                {i < parts.length - 1 && (
+                                    <span className="text-white/40 ml-1 md:ml-2 hidden md:inline text-xs">➔</span>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )
+        }
+        
+        return (
+            <span className="text-center text-sm/relaxed font-semibold bg-black/60 px-6 py-3 rounded-2xl border border-white/20 shadow-xl backdrop-blur-md" style={{ color: colorInfo, fontFamily: fontInfoStack }}>
+                {texto}
+            </span>
+        );
+    };
+
+    const renderMediosPago = () => (
+        <div className="flex flex-wrap items-center justify-center gap-3 lg:gap-4 w-full mt-2 lg:mt-3 opacity-95">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#009EE3]/20 border border-[#009EE3]/40 rounded-xl text-blue-100 text-xs font-bold tracking-wide backdrop-blur-sm">
+                <WalletIcon fontSize="small" sx={{ color: '#009EE3', fontSize: 18 }}/>
+                <span>MercadoPago</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/20 border border-indigo-400/40 rounded-xl text-indigo-100 text-xs font-bold tracking-wide backdrop-blur-sm">
+                <AccountBalanceIcon fontSize="small" sx={{ color: '#818cf8', fontSize: 18 }}/>
+                <span>Transferencia</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-500/20 border border-teal-400/40 rounded-xl text-teal-100 text-xs font-bold tracking-wide backdrop-blur-sm">
+                <PaymentIcon fontSize="small" sx={{ color: '#2dd4bf', fontSize: 18 }}/>
+                <span>Ualá</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 border border-yellow-400/40 rounded-xl text-yellow-100 text-xs font-bold tracking-wide backdrop-blur-sm">
+                <CurrencyBitcoinIcon fontSize="small" sx={{ color: '#facc15', fontSize: 18 }}/>
+                <span>Cripto</span>
+            </div>
+        </div>
+    );
+
     useEffect(() => {
         if (!hasBgImage) {
             setBgUrl("");
@@ -672,27 +732,12 @@ export default function Landing() {
                                 mostrarFormulario={hasLandingData ? landing?.mostrar_formulario !== false : true}
                                 imagenReemplazoForm={hasLandingData ? landing?.imagen_reemplazo_form : ""}
                                 isPreview={isPreviewMode}
+                                pasosNode={hasLandingData && mostrarPasos && textoPasos ? renderPasos(textoPasos) : null}
+                                mediosPagoNode={hasLandingData && mostrarMediosPago ? renderMediosPago() : null}
                             />
                         </Suspense>
                     ) : (
                         <div className="landing-form-fallback" />
-                    )}
-
-                    {hasLandingData && mostrarPasos && textoPasos && (
-                        <div className="flex justify-center w-full mt-2 landing-fade-in">
-                            <span className="text-center text-sm/relaxed font-medium bg-black/40 px-5 py-2 rounded border border-white/10 backdrop-blur-md" style={{ color: colorInfo, fontFamily: fontInfoStack }}>
-                                {textoPasos}
-                            </span>
-                        </div>
-                    )}
-
-                    {hasLandingData && mostrarMediosPago && (
-                        <div className="flex flex-wrap items-center justify-center gap-3 w-full mt-6 mb-2 landing-fade-in opacity-80">
-                            <span className="px-3 py-1 bg-blue-500/20 border border-blue-400/30 rounded text-blue-100 text-xs font-bold tracking-wider backdrop-blur-sm">MercadoPago</span>
-                            <span className="px-3 py-1 bg-indigo-500/20 border border-indigo-400/30 rounded text-indigo-100 text-xs font-bold tracking-wider backdrop-blur-sm">Transferencia</span>
-                            <span className="px-3 py-1 bg-teal-500/20 border border-teal-400/30 rounded text-teal-100 text-xs font-bold tracking-wider backdrop-blur-sm">Ualá</span>
-                            <span className="px-3 py-1 bg-yellow-500/20 border border-yellow-400/30 rounded text-yellow-100 text-xs font-bold tracking-wider backdrop-blur-sm">Cripto</span>
-                        </div>
                     )}
 
                     {hasLandingData && landing?.mostrar_disclaimer !== false ? (

@@ -119,6 +119,8 @@ export default function NuevoLead({
     mostrarFormulario = true,
     imagenReemplazoForm = "",
     isPreview = false,
+    pasosNode = null,
+    mediosPagoNode = null,
 }) {
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
@@ -491,15 +493,17 @@ export default function NuevoLead({
 
     return (
         <div
-            className={`flex flex-col items-center rounded-xl shadow-xl w-8/10 lg:w-3/10 p-4 lg:p-2 mb-8 transition-all duration-300 ${mostrarFormulario ? "h-6/10 lg:h-7/10" : "h-auto py-8 lg:py-12 justify-center"}`}
+            className={`flex flex-col items-center rounded-xl backdrop-blur-[2px] shadow-xl w-8/10 lg:w-6/10 p-4 lg:p-1 my-2 transition-all duration-300 ${mostrarFormulario ? "h-6/10 lg:h-7/10" : "h-auto py-8 lg:py-12 justify-center"}`}
             style={{ backgroundColor: resolvedFormBg, fontFamily: formTextFontStack }}
         >
-            <h3
-                className='text-white text-xl lg:text-2xl my-1'
-                style={{ fontFamily: formTextFontStack, fontSize: `${1.5 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}
-            >
-                Contactanos
-            </h3>
+            {mostrarFormulario && (
+                <h3
+                    className='text-white text-xl lg:text-2xl my-1'
+                    style={{ fontFamily: formTextFontStack, fontSize: `${1.5 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}
+                >
+                    Contactanos
+                </h3>
+            )}
 
             {mostrarFormulario ? (
                 <>
@@ -599,6 +603,16 @@ export default function NuevoLead({
                     {finalButtonText}
                 </Button>
             </div>
-            <span className='font-bold text-md mt-4 lg:mt-5' style={{ color: infoColor || "#ffffff", fontFamily: infoFontStack, fontSize: `${resolvedInfoSize}rem`, fontWeight: resolvedInfoWeight }}>{finalInfoText}</span>
+            <span className='font-bold text-md mt-4 lg:mt-2' style={{ color: infoColor || "#ffffff", fontFamily: infoFontStack, fontSize: `${resolvedInfoSize}rem`, fontWeight: resolvedInfoWeight }}>{finalInfoText}</span>
+            {pasosNode && (
+                <div className="w-full mt-2 flex justify-center">
+                    {pasosNode}
+                </div>
+            )}
+            {mediosPagoNode && (
+                <div className="w-full mt-2 flex justify-center">
+                    {mediosPagoNode}
+                </div>
+            )}
         </div >);
 }

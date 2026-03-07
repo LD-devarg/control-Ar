@@ -16,13 +16,17 @@ BONO_CHOICES = [
     ("30%", "30%"),
 ]
 
+def generar_codigo_corto():
+    import string, random
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
 
 class Cliente(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    codigo = models.CharField(max_length=6, default=generar_codigo_corto, unique=True)
     idempotency_key = models.UUIDField(null=True, blank=True, unique=True)
-    nombre = models.CharField(max_length=100)
-    contacto = models.CharField(max_length=15)
-    username = models.CharField(max_length=50, unique=True)
+    nombre = models.CharField(max_length=100, null=True, blank=True)
+    contacto = models.CharField(max_length=15, null=True, blank=True)
+    username = models.CharField(max_length=50, unique=True, null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     cant_compras = models.IntegerField(default=0)
     total_compras_ars = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -47,7 +51,7 @@ class Cliente(models.Model):
         db_table = "operativo_cliente"
 
     def __str__(self):
-        return self.nombre
+        return self.nombre or f"Cliente #{self.pk}"
 
 
 class Landing(models.Model):
@@ -74,6 +78,7 @@ class Landing(models.Model):
     texto_boton = models.CharField(max_length=100, null=True, blank=True)
     texto_info = models.CharField(max_length=255, null=True, blank=True)
     texto_whatsapp = models.TextField(blank=True, default="")
+    mostrar_formulario = models.BooleanField(default=True)
     mostrar_disclaimer = models.BooleanField(default=True)
     mostrar_ticker = models.BooleanField(default=True)
     color_titulo = models.CharField(max_length=20, default="#ffffff")
@@ -124,6 +129,12 @@ class Landing(models.Model):
         blank=True,
     )
     background_horizontal = models.ImageField(
+        upload_to=_landing_upload_to,
+        storage=PublicMediaStorage(),
+        null=True,
+        blank=True,
+    )
+    imagen_reemplazo_form = models.ImageField(
         upload_to=_landing_upload_to,
         storage=PublicMediaStorage(),
         null=True,

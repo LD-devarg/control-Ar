@@ -42,6 +42,7 @@ function normalizePreviewLanding(payload = {}) {
         texto_boton: payload.texto_boton || "JUGÁ AHORA",
         texto_info: payload.texto_info || "💬 Atención personalizada las 24hs.",
         texto_whatsapp: payload.texto_whatsapp || "",
+        mostrar_formulario: payload.mostrar_formulario !== false,
         mostrar_disclaimer: payload.mostrar_disclaimer !== false,
         mostrar_ticker: payload.mostrar_ticker !== false,
         color_titulo: payload.color_titulo || "#ffffff",
@@ -78,6 +79,7 @@ function normalizePreviewLanding(payload = {}) {
         bg_gradient: payload.bg_gradient || "linear-gradient(135deg, #0b1f3a 0%, #0f172a 40%, #111827 100%)",
         background_vertical: payload.background_vertical || "",
         background_horizontal: payload.background_horizontal || "",
+        imagen_reemplazo_form: payload.imagen_reemplazo_form || "",
         footer_text: payload.footer_text || "© 2026 ControlAR. Todos los derechos reservados.",
     };
 }
@@ -637,6 +639,8 @@ export default function Landing() {
                                 infoFontFamily={fontInfo}
                                 infoFontSize={sizeInfo}
                                 infoFontWeight={weightInfo}
+                                mostrarFormulario={hasLandingData ? landing?.mostrar_formulario !== false : true}
+                                imagenReemplazoForm={hasLandingData ? landing?.imagen_reemplazo_form : ""}
                                 isPreview={isPreviewMode}
                             />
                         </Suspense>
@@ -668,11 +672,10 @@ export default function Landing() {
                         {previewPanelOpen ? "Ocultar panel" : "Editar"}
                     </button>
                     <div
-                        className={`transition-all duration-300 ease-out origin-top-right ${
-                            previewPanelOpen
+                        className={`transition-all duration-300 ease-out origin-top-right ${previewPanelOpen
                                 ? "opacity-100 translate-x-0 pointer-events-auto"
                                 : "opacity-0 translate-x-8 pointer-events-none"
-                        }`}
+                            }`}
                     >
                         <PreviewControls
                             bgType={previewUi.bgType}

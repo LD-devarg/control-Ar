@@ -116,6 +116,8 @@ export default function NuevoLead({
     infoFontFamily,
     infoFontSize,
     infoFontWeight,
+    mostrarFormulario = true,
+    imagenReemplazoForm = "",
     isPreview = false,
 }) {
     const [name, setName] = useState("");
@@ -129,9 +131,10 @@ export default function NuevoLead({
     const phoneDigits = useMemo(() => phone.replace(/\D/g, ""), [phone]);
     const trimmedName = useMemo(() => name.trim(), [name]);
     const username = useMemo(() => {
+        if (!mostrarFormulario) return "";
         if (!trimmedName || !phoneDigits) return "";
         return buildUsername(trimmedName, phoneDigits);
-    }, [trimmedName, phoneDigits]);
+    }, [mostrarFormulario, trimmedName, phoneDigits]);
 
     const finalButtonText = buttonText || "JUGÁ AHORA";
     const finalInfoText = infoText || "Atencion personalizada las 24hs.";
@@ -199,9 +202,7 @@ export default function NuevoLead({
     const isPhoneValid = phoneDigits.length === 10;
     const canSubmit =
         Boolean(landingToken) &&
-        Boolean(username) &&
-        isNameValid &&
-        isPhoneValid;
+        (mostrarFormulario ? (Boolean(username) && isNameValid && isPhoneValid) : true);
 
     const scheduleRetry = () => {
         if (retryTimerRef.current) return;
@@ -436,6 +437,17 @@ export default function NuevoLead({
                 ? `${window.location.origin}${window.location.pathname}`
                 : undefined;
 
+        const generatedCodigo = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+        const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
+            bono: bonusText || "100%",
+            username,
+            nombre: trimmedName,
+            contacto: phoneDigits,
+            codigo: generatedCodigo,
+        });
+        const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
+
         const payload = {
             idempotency_key: generateIdempotencyKey(),
             queued_at: new Date().toISOString(),
@@ -443,6 +455,7 @@ export default function NuevoLead({
             nombre: trimmedName,
             contacto: phoneDigits,
             username,
+            codigo: generatedCodigo,
             ...(fbp ? { fbp } : {}),
             ...(fbc ? { fbc } : {}),
             ...Object.fromEntries(Object.entries(tracking).filter(([, value]) => Boolean(value))),
@@ -457,7 +470,7 @@ export default function NuevoLead({
         tryFlushQueue();
         checkQueueHealth();
 
-        window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+        window.open(currentWhatsappUrl, "_blank", "noopener,noreferrer");
         if (typeof onWhatsappOpened === "function") {
             onWhatsappOpened();
         }
@@ -487,94 +500,105 @@ export default function NuevoLead({
             >
                 Contactanos
             </h3>
-            <Stack spacing={0.5} direction="column" className="form-leads-stack">
-                <TextField
-                className='textfield'
-                required
-                id="nombre"
-                label="Nombre"
-                variant="outlined"
-                fullWidth
-                value={name}
-                onChange={handleNameChange}
-                InputProps={{ readOnly: isPreview }}
-                sx={{
-                    "& .MuiOutlinedInput-root": {
-                        marginBottom: "10px",
-                    borderRadius: "20px",
-                    backgroundColor: "rgba(49, 36, 146, 0.12)",
-                    "& fieldset": { borderColor: resolvedFieldBorder },
-                    "&:hover fieldset": { borderColor: "#fff" },
-                    "&.Mui-focused fieldset": { borderColor: "#fff" },
-                    },
-                    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
-                    "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
-                }}
-                />
-                <TextField
-                    required
-                    id="celular"
-                    label="Celular"
-                    fullWidth
-                    value={phone}
-                    onChange={handlePhoneChange}
-                    InputProps={{
-                        readOnly: isPreview,
-                        endAdornment: (
-                            <InputAdornment position="end">
-                                <Tooltip title="10 dígitos, sin 0, sin 15." arrow>
-                                    <InfoOutlinedIcon sx={{ color: "rgba(255,255,255,0.75)", fontSize: 18 }} />
-                                </Tooltip>
-                            </InputAdornment>
-                        ),
-                    }}
-                    inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
-                    sx={{
-                        "& .MuiOutlinedInput-root": {
-                        marginBottom: "0",
-                            borderRadius: "20px",
-                            backgroundColor: "rgba(49, 36, 146, 0.12)",
-                            "& fieldset": { borderColor: resolvedFieldBorder },
-                        "&:hover fieldset": { borderColor: "#fff" },
-                        "&.Mui-focused fieldset": { borderColor: "#fff" },
-                        },
-                        "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
-                        "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
-                        "& .MuiFormHelperText-root": { color: "rgba(255,255,255,0.6)" },
-                    }}
-                    />
-            </Stack>
-            <span className='text-xs mt-1 text-white/70' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>No compartiremos tu número con nadie.</span>
-            {error ? <span className='text-red-400 text-xs mt-2' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>{error}</span> : null}
+
+            {mostrarFormulario ? (
+                <>
+                    <Stack spacing={0.5} direction="column" className="form-leads-stack">
+                        <TextField
+                            className='textfield'
+                            required
+                            id="nombre"
+                            label="Nombre"
+                            variant="outlined"
+                            fullWidth
+                            value={name}
+                            onChange={handleNameChange}
+                            InputProps={{ readOnly: isPreview }}
+                            sx={{
+                                "& .MuiOutlinedInput-root": {
+                                    marginBottom: "10px",
+                                    borderRadius: "20px",
+                                    backgroundColor: "rgba(49, 36, 146, 0.12)",
+                                    "& fieldset": { borderColor: resolvedFieldBorder },
+                                    "&:hover fieldset": { borderColor: "#fff" },
+                                    "&.Mui-focused fieldset": { borderColor: "#fff" },
+                                },
+                                "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
+                                "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
+                            }}
+                        />
+                        <TextField
+                            required
+                            id="celular"
+                            label="Celular"
+                            fullWidth
+                            value={phone}
+                            onChange={handlePhoneChange}
+                            InputProps={{
+                                readOnly: isPreview,
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <Tooltip title="10 dígitos, sin 0, sin 15." arrow>
+                                            <InfoOutlinedIcon sx={{ color: "rgba(255,255,255,0.75)", fontSize: 18 }} />
+                                        </Tooltip>
+                                    </InputAdornment>
+                                ),
+                            }}
+                            inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
+                            sx={{
+                                "& .MuiOutlinedInput-root": {
+                                    marginBottom: "0",
+                                    borderRadius: "20px",
+                                    backgroundColor: "rgba(49, 36, 146, 0.12)",
+                                    "& fieldset": { borderColor: resolvedFieldBorder },
+                                    "&:hover fieldset": { borderColor: "#fff" },
+                                    "&.Mui-focused fieldset": { borderColor: "#fff" },
+                                },
+                                "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
+                                "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
+                                "& .MuiFormHelperText-root": { color: "rgba(255,255,255,0.6)" },
+                            }}
+                        />
+                    </Stack>
+                    <span className='text-xs mt-1 text-white/70' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>No compartiremos tu número con nadie.</span>
+                    {error ? <span className='text-red-400 text-xs mt-2' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>{error}</span> : null}
+                </>
+            ) : (
+                imagenReemplazoForm ? (
+                    <div className="w-full flex justify-center mb-4 px-2">
+                        <img src={imagenReemplazoForm} alt="Placeholder" className="w-full max-h-48 object-contain rounded-xl shadow-md" />
+                    </div>
+                ) : null
+            )}
             <div className={`landing-submit-wrap ${canSubmit ? "is-active" : ""}`}>
                 <Button variant="contained" startIcon={<WhatsAppIcon />}
-                onClick={handleWhatsappClick}
-                disabled={isPreview || !canSubmit}
-                sx={{
-                    backgroundColor: "transparent",
-                    marginTop: "10px",
-                    color: "#ffffff",
-                    border: "none",
-                    borderRadius: "20px",
-                    padding: "10px 20px",
-                    fontWeight: resolvedButtonWeight,
-                    fontSize: `${resolvedButtonSize}rem`,
-                    fontFamily: buttonFontStack,
-                    background: "linear-gradient(135deg, #2bd528 0%, #038f0c 100%)",
-                    boxShadow: "0 4px 15px rgba(255, 203, 13, 0.4), 0 2px 5px rgba(0, 0, 0, 0.2)",
-                    "&:hover": {
+                    onClick={handleWhatsappClick}
+                    disabled={isPreview || !canSubmit}
+                    sx={{
                         backgroundColor: "transparent",
-                    },
-                    "&.Mui-disabled": {
-                        background: "linear-gradient(135deg, rgba(43, 213, 40, 0.35) 0%, rgba(3, 143, 12, 0.35) 100%)",
-                        color: "rgba(255,255,255,0.7)",
-                        boxShadow: "none",
-                    },
-                }}
+                        marginTop: "10px",
+                        color: "#ffffff",
+                        border: "none",
+                        borderRadius: "20px",
+                        padding: "10px 20px",
+                        fontWeight: resolvedButtonWeight,
+                        fontSize: `${resolvedButtonSize}rem`,
+                        fontFamily: buttonFontStack,
+                        background: "linear-gradient(135deg, #2bd528 0%, #038f0c 100%)",
+                        boxShadow: "0 4px 15px rgba(255, 203, 13, 0.4), 0 2px 5px rgba(0, 0, 0, 0.2)",
+                        "&:hover": {
+                            backgroundColor: "transparent",
+                        },
+                        "&.Mui-disabled": {
+                            background: "linear-gradient(135deg, rgba(43, 213, 40, 0.35) 0%, rgba(3, 143, 12, 0.35) 100%)",
+                            color: "rgba(255,255,255,0.7)",
+                            boxShadow: "none",
+                        },
+                    }}
                 >
                     {finalButtonText}
                 </Button>
             </div>
             <span className='font-bold text-md mt-4 lg:mt-5' style={{ color: infoColor || "#ffffff", fontFamily: infoFontStack, fontSize: `${resolvedInfoSize}rem`, fontWeight: resolvedInfoWeight }}>{finalInfoText}</span>
-        </div>);
+        </div >);
 }

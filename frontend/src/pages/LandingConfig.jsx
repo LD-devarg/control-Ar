@@ -30,6 +30,7 @@ const EMPTY_FORM = {
     textoWhatsapp: "",
     mostrarDisclaimer: true,
     mostrarTicker: true,
+    mostrarFormulario: true,
     colorTitulo: "#ffffff",
     colorSubtitulo: "#ffffff",
     colorKeyword: "#ffe600",
@@ -68,6 +69,7 @@ const EMPTY_FORM = {
     credencialMetaId: "",
     backgroundVertical: null,
     backgroundHorizontal: null,
+    imagenReemplazoForm: null,
 };
 
 const cloneEmptyForm = () => ({ ...EMPTY_FORM });
@@ -89,6 +91,11 @@ const FIELD_MAP = [
     {
         formKey: "mostrarTicker",
         apiKey: "mostrar_ticker",
+        normalize: (value) => String(Boolean(value)),
+    },
+    {
+        formKey: "mostrarFormulario",
+        apiKey: "mostrar_formulario",
         normalize: (value) => String(Boolean(value)),
     },
     { formKey: "colorTitulo", apiKey: "color_titulo" },
@@ -199,6 +206,7 @@ const buildPreviewPayload = (form, previewUrls, currentGradient) => ({
     texto_whatsapp: form?.textoWhatsapp || "",
     mostrar_disclaimer: form?.mostrarDisclaimer !== false,
     mostrar_ticker: form?.mostrarTicker !== false,
+    mostrar_formulario: form?.mostrarFormulario !== false,
     color_titulo: form?.colorTitulo || "#ffffff",
     color_subtitulo: form?.colorSubtitulo || "#ffffff",
     color_keyword: form?.colorKeyword || "#ffe600",
@@ -236,6 +244,7 @@ const buildPreviewPayload = (form, previewUrls, currentGradient) => ({
         "linear-gradient(135deg, #0b1f3a 0%, #111827 100%)",
     background_vertical: previewUrls?.vertical || "",
     background_horizontal: previewUrls?.horizontal || "",
+    imagen_reemplazo_form: previewUrls?.reemplazoForm || "",
     footer_text: "© 2026 ControlAR. Todos los derechos reservados.",
 });
 
@@ -250,12 +259,12 @@ function LandingConfig() {
     const [initialActivo, setInitialActivo] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
-    const [previewUrls, setPreviewUrls] = useState({ vertical: "", horizontal: "" });
+    const [previewUrls, setPreviewUrls] = useState({ vertical: "", horizontal: "", reemplazoForm: "" });
     const [uploadKey, setUploadKey] = useState(0);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const previewWindowRef = useRef(null);
 
-    const clearPreviewObjectUrls = useCallback(() => {}, []);
+    const clearPreviewObjectUrls = useCallback(() => { }, []);
 
     const setPreviewUrlFromFile = useCallback(async (key, file) => {
         if (!file) return;
@@ -306,7 +315,7 @@ function LandingConfig() {
             setInitialForm(empty);
             setActivo(false);
             setInitialActivo(false);
-            setPreviewUrls({ vertical: "", horizontal: "" });
+            setPreviewUrls({ vertical: "", horizontal: "", reemplazoForm: "" });
             return;
         }
         const nextForm = {
@@ -321,6 +330,7 @@ function LandingConfig() {
             textoWhatsapp: value.texto_whatsapp || "",
             mostrarDisclaimer: value.mostrar_disclaimer ?? EMPTY_FORM.mostrarDisclaimer,
             mostrarTicker: value.mostrar_ticker ?? EMPTY_FORM.mostrarTicker,
+            mostrarFormulario: value.mostrar_formulario ?? EMPTY_FORM.mostrarFormulario,
             colorTitulo: value.color_titulo || EMPTY_FORM.colorTitulo,
             colorSubtitulo: value.color_subtitulo || EMPTY_FORM.colorSubtitulo,
             colorKeyword: value.color_keyword || EMPTY_FORM.colorKeyword,
@@ -359,6 +369,7 @@ function LandingConfig() {
             credencialMetaId: value.credencial_meta || "",
             backgroundVertical: null,
             backgroundHorizontal: null,
+            imagenReemplazoForm: null,
         };
         const parsed = parseGradient(nextForm.bgGradient);
         if (parsed) {
@@ -373,6 +384,7 @@ function LandingConfig() {
         setPreviewUrls({
             vertical: value.background_vertical || "",
             horizontal: value.background_horizontal || "",
+            reemplazoForm: value.imagen_reemplazo_form || "",
         });
     }, []);
 
@@ -449,7 +461,7 @@ function LandingConfig() {
         Boolean(form.backgroundVertical) &&
         Boolean(form.backgroundHorizontal);
     const isDirty = useMemo(() => {
-        const hasNewFiles = Boolean(form.backgroundVertical) || Boolean(form.backgroundHorizontal);
+        const hasNewFiles = Boolean(form.backgroundVertical) || Boolean(form.backgroundHorizontal) || Boolean(form.imagenReemplazoForm);
         if (hasNewFiles) return true;
         if (activo !== initialActivo) return true;
         if (currentGradient !== initialForm.bgGradient) return true;
@@ -480,7 +492,7 @@ function LandingConfig() {
         setInitialForm(empty);
         setActivo(false);
         setInitialActivo(false);
-        setPreviewUrls({ vertical: "", horizontal: "" });
+        setPreviewUrls({ vertical: "", horizontal: "", reemplazoForm: "" });
         setUploadKey((prev) => prev + 1);
     };
 
@@ -512,6 +524,9 @@ function LandingConfig() {
             }
             if (form.backgroundHorizontal) {
                 formData.append("background_horizontal", form.backgroundHorizontal);
+            }
+            if (form.imagenReemplazoForm) {
+                formData.append("imagen_reemplazo_form", form.imagenReemplazoForm);
             }
         };
 
@@ -679,8 +694,8 @@ function LandingConfig() {
         <Page title="Configuración de Landing Page">
             <div className="flex flex-row w-full p-2 sm:p-4 justify-center ">
                 <div className="flex flex-col items-center w-full xl:w-9/10 mb-3 rounded-xl pt-1 pb-1 px-3 sm:px-5 bg-black shadow-lg shadow-zinc-900 dark:shadow-black/70">
-                        <div className="flex flex-row font-bold text-lg items-center justify-start gap-2 ml-0 mt-1 mb-1">
-                            <div className="flex w-full text-black dark:text-white">
+                    <div className="flex flex-row font-bold text-lg items-center justify-start gap-2 ml-0 mt-1 mb-1">
+                        <div className="flex w-full text-black dark:text-white">
                             {publicLandingUrl ? (
                                 <div className="w-full flex  justify-start">
                                     <span className="text-black dark:text-white text-xs ">
@@ -696,64 +711,65 @@ function LandingConfig() {
                                     </span>
                                 </div>
                             ) : null}
-                            </div>    
-                                <Autocomplete
-                                    options={landingOptions}
-                                    value={selectedLanding}
-                                    onChange={(event, value) => handleSelectLanding(value)}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            label="Selecciona una landing page"
-                                            size="small"
-                                            sx={{
-                                                height: 32,
-                                                width: 300,
-                                                "& .MuiFormControl-root": { height: "100%" },
-                                                "& .MuiInputBase-root": {
-                                                    height: 32,
-                                                    minHeight: 32,
-                                                    fontSize: "0.8rem",
-                                                    color: "rgba(255,255,255,0.85)",
-                                                },
-                                                "& .MuiInputBase-input": {
-                                                    padding: "4px 10px",
-                                                },
-                                                "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontSize: "0.8rem" },
-                                                "& .MuiOutlinedInput-root": {
-                                                    "& fieldset": {
-                                                        borderColor: "rgba(255,255,255,0.85)",
-                                                    },
-                                                    "&:hover fieldset": {
-                                                        borderColor: "rgba(255,255,255,0.85)",
-                                                    },
-                                                    "&.Mui-focused fieldset": {
-                                                        borderColor: "rgba(255,255,255,0.85)",
-                                                    },
-                                                },
-                                                "& .MuiSvgIcon-root": {
-                                                    color: "rgba(255,255,255,0.85)",
-                                                },
-                                            }}
-                                        />
-                                    )}
+                        </div>
+                        <Autocomplete
+                            options={landingOptions}
+                            value={selectedLanding}
+                            onChange={(event, value) => handleSelectLanding(value)}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label="Selecciona una landing page"
+                                    size="small"
+                                    sx={{
+                                        height: 32,
+                                        width: 300,
+                                        "& .MuiFormControl-root": { height: "100%" },
+                                        "& .MuiInputBase-root": {
+                                            height: 32,
+                                            minHeight: 32,
+                                            fontSize: "0.8rem",
+                                            color: "rgba(255,255,255,0.85)",
+                                        },
+                                        "& .MuiInputBase-input": {
+                                            padding: "4px 10px",
+                                        },
+                                        "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontSize: "0.8rem" },
+                                        "& .MuiOutlinedInput-root": {
+                                            "& fieldset": {
+                                                borderColor: "rgba(255,255,255,0.85)",
+                                            },
+                                            "&:hover fieldset": {
+                                                borderColor: "rgba(255,255,255,0.85)",
+                                            },
+                                            "&.Mui-focused fieldset": {
+                                                borderColor: "rgba(255,255,255,0.85)",
+                                            },
+                                        },
+                                        "& .MuiSvgIcon-root": {
+                                            color: "rgba(255,255,255,0.85)",
+                                        },
+                                    }}
                                 />
-                            </div>
+                            )}
+                        />
+                    </div>
                     <div className="flex flex-row font-bold text-lg items-center gap-2 ml-0 mt-1 mb-1">
                         <h2 className="text-white font-bold text-lg underline">Datos Generales</h2>
                     </div>
                     <div className="w-full xl:w-9/10 px-2 sm:px-5 pb-1 pt-1">
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1}
-                        sx={{
-                            mb: 1,
-                        }}>
+                            sx={{
+                                mb: 1,
+                            }}>
                             <TextField
                                 label="Nombre"
                                 variant="outlined"
                                 size="small"
                                 value={form.nombre}
                                 onChange={handleChange("nombre")}
-                                sx={{...commonTextFieldSx,
+                                sx={{
+                                    ...commonTextFieldSx,
                                     width: { xs: "100%", md: "40%" },
                                     fontSize: "small",
                                 }}
@@ -764,7 +780,8 @@ function LandingConfig() {
                                 size="small"
                                 value={form.titulo}
                                 onChange={handleChange("titulo")}
-                                sx={{...commonTextFieldSx,
+                                sx={{
+                                    ...commonTextFieldSx,
                                     fontSize: "small",
                                     width: { xs: "100%", md: "45%" },
                                 }}
@@ -775,16 +792,17 @@ function LandingConfig() {
                                 size="small"
                                 value={form.bonoActivo}
                                 onChange={handleChange("bonoActivo")}
-                                sx={{...commonTextFieldSx,
+                                sx={{
+                                    ...commonTextFieldSx,
                                     width: { xs: "100%", md: "15%" },
                                     fontSize: "small",
                                 }}
                             />
                         </Stack>
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1}
-                        sx={{
-                            mb: 1,
-                        }}
+                            sx={{
+                                mb: 1,
+                            }}
                         >
                             <TextField
                                 label="Subtitulo"
@@ -801,7 +819,8 @@ function LandingConfig() {
                                 size="small"
                                 value={form.textoBoton}
                                 onChange={handleChange("textoBoton")}
-                                sx={{...commonTextFieldSx,
+                                sx={{
+                                    ...commonTextFieldSx,
                                     width: { xs: "100%", md: "25%" },
                                     fontSize: "small",
                                 }}
@@ -812,16 +831,17 @@ function LandingConfig() {
                                 size="small"
                                 value={form.textoInfo}
                                 onChange={handleChange("textoInfo")}
-                                sx={{...commonTextFieldSx,
+                                sx={{
+                                    ...commonTextFieldSx,
                                     width: { xs: "100%", md: "40%" },
                                     fontSize: "small",
                                 }}
                             />
                         </Stack>
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1}
-                        sx={{
-                            mb: 1,
-                        }}
+                            sx={{
+                                mb: 1,
+                            }}
                         >
                             <TextField
                                 label="Texto WhatsApp"
@@ -838,9 +858,9 @@ function LandingConfig() {
                             />
                         </Stack>
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1}
-                        sx={{
-                            mb: 1,
-                        }}
+                            sx={{
+                                mb: 1,
+                            }}
                         >
                             <TextField
                                 label="URL"
@@ -848,7 +868,8 @@ function LandingConfig() {
                                 size="small"
                                 value={form.url}
                                 onChange={handleChange("url")}
-                                sx={{...commonTextFieldSx,
+                                sx={{
+                                    ...commonTextFieldSx,
                                     width: { xs: "100%", md: "60%" },
                                     fontSize: "",
                                 }}
@@ -930,6 +951,25 @@ function LandingConfig() {
                                     label="Barra ganadores"
                                     sx={{ color: "#fff", m: 0 }}
                                 />
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={Boolean(form.mostrarFormulario)}
+                                            onChange={(event) =>
+                                                setForm((prev) => ({ ...prev, mostrarFormulario: event.target.checked }))
+                                            }
+                                            inputProps={{ id: "landing-formulario", name: "landing-formulario" }}
+                                            sx={{
+                                                color: "rgba(255,255,255,0.85)",
+                                                "&.Mui-checked": {
+                                                    color: "rgba(255,255,255,0.85)",
+                                                },
+                                            }}
+                                        />
+                                    }
+                                    label="Formulario"
+                                    sx={{ color: "#fff", m: 0 }}
+                                />
                             </div>
                         </Stack>
                         <div className="flex w-full text-center justify-center mb-1">
@@ -964,31 +1004,58 @@ function LandingConfig() {
                                 </Button>
                             </div>
                             <div className="flex flex-col items-center gap-2">
-                            <UploadButton
-                                key={`upload-horizontal-${uploadKey}`}
-                                label="Fondo Horizontal (Desktop)"
-                                onUpload={(file) => {
-                                    setForm((prev) => ({ ...prev, backgroundHorizontal: file }));
-                                    setPreviewUrlFromFile("horizontal", file);
-                                }}
-                                sx={{
-                                    gridColumn: "span 2",
-                                    width: "100%",
-                                    borderRadius: "50px",
-                                    backgroundColor: "rgba(217, 221, 88, 0.12)",
-                                    color: "rgba(255,255,255,0.85)",
-                                    "&:hover": { backgroundColor: "rgba(217, 221, 88, 0.2)" },
-                                    "& .MuiButton-startIcon": { marginRight: "8px" },
-                                }}
-                            />
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                disabled={!previewUrls.horizontal}
-                                onClick={() => previewUrls.horizontal && window.open(previewUrls.horizontal, "_blank", "noopener,noreferrer")}
-                            >
-                                Ver Fondo Horizontal
-                            </Button>
+                                <UploadButton
+                                    key={`upload-horizontal-${uploadKey}`}
+                                    label="Fondo Horizontal (Desktop)"
+                                    onUpload={(file) => {
+                                        setForm((prev) => ({ ...prev, backgroundHorizontal: file }));
+                                        setPreviewUrlFromFile("horizontal", file);
+                                    }}
+                                    sx={{
+                                        gridColumn: "span 2",
+                                        width: "100%",
+                                        borderRadius: "50px",
+                                        backgroundColor: "rgba(217, 221, 88, 0.12)",
+                                        color: "rgba(255,255,255,0.85)",
+                                        "&:hover": { backgroundColor: "rgba(217, 221, 88, 0.2)" },
+                                        "& .MuiButton-startIcon": { marginRight: "8px" },
+                                    }}
+                                />
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    disabled={!previewUrls.horizontal}
+                                    onClick={() => previewUrls.horizontal && window.open(previewUrls.horizontal, "_blank", "noopener,noreferrer")}
+                                >
+                                    Ver Fondo Horizontal
+                                </Button>
+                            </div>
+                            <div className="flex flex-col items-center gap-2">
+                                <UploadButton
+                                    key={`upload-reemplazoForm-${uploadKey}`}
+                                    label="Imagen Formulario (Opcional)"
+                                    onUpload={(file) => {
+                                        setForm((prev) => ({ ...prev, imagenReemplazoForm: file }));
+                                        setPreviewUrlFromFile("reemplazoForm", file);
+                                    }}
+                                    sx={{
+                                        gridColumn: "span 2",
+                                        width: "100%",
+                                        borderRadius: "50px",
+                                        backgroundColor: "rgba(217, 221, 88, 0.12)",
+                                        color: "rgba(255,255,255,0.85)",
+                                        "&:hover": { backgroundColor: "rgba(217, 221, 88, 0.2)" },
+                                        "& .MuiButton-startIcon": { marginRight: "8px" },
+                                    }}
+                                />
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    disabled={!previewUrls.reemplazoForm}
+                                    onClick={() => previewUrls.reemplazoForm && window.open(previewUrls.reemplazoForm, "_blank", "noopener,noreferrer")}
+                                >
+                                    Ver Imagen Formulario
+                                </Button>
                             </div>
                         </Stack>
                         <div className="w-full gap-2 mb-2 mt-2 items-end flex justify-end">
@@ -1031,13 +1098,13 @@ function LandingConfig() {
                                 Cancelar
                             </Button>
                             <Button
-                            variant="outlined"
-                            className="mr-2"
-                            sx={{
-                                height: "100%",
-                            }}
-                            disabled={previewDisabled}
-                            onClick={openPreviewWindow}
+                                variant="outlined"
+                                className="mr-2"
+                                sx={{
+                                    height: "100%",
+                                }}
+                                disabled={previewDisabled}
+                                onClick={openPreviewWindow}
                             >
                                 Vista Previa
                             </Button>

@@ -1,7 +1,8 @@
 from rest_framework import serializers
 import re
+from django.db import IntegrityError, transaction
 
-from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit, Retiro
+from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit, Retiro, generar_codigo_corto
 from apps.pauta.models import CredencialesMeta
 from apps.empresas.scope import get_user_empresa_ids
 
@@ -18,6 +19,7 @@ class ClienteSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "uuid",
+            "codigo",
             "nombre",
             "contacto",
             "username",
@@ -45,6 +47,7 @@ class ClienteSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "uuid",
+            "codigo",
             "creado_en",
             "cant_compras",
             "total_compras_ars",
@@ -60,9 +63,10 @@ class ClienteSerializer(serializers.ModelSerializer):
 class ClienteCreateSerializer(serializers.Serializer):
     landing_token = serializers.UUIDField(write_only=True)
     idempotency_key = serializers.UUIDField(required=False, write_only=True)
-    nombre = serializers.CharField(max_length=100)
-    contacto = serializers.CharField(max_length=15)
-    username = serializers.CharField(max_length=50)
+    nombre = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    contacto = serializers.CharField(max_length=15, required=False, allow_blank=True)
+    username = serializers.CharField(max_length=50, required=False, allow_blank=True)
+    codigo = serializers.CharField(max_length=6, required=False, allow_blank=True)
     fbp = serializers.CharField(max_length=255, required=False, allow_blank=True)
     fbc = serializers.CharField(max_length=255, required=False, allow_blank=True)
     fbclid = serializers.CharField(max_length=255, required=False, allow_blank=True)
@@ -94,6 +98,16 @@ class ClienteCreateSerializer(serializers.Serializer):
                 return candidate
             suffix += 1
 
+    def _resolve_unique_codigo(self, requested_codigo=None):
+        candidate = (requested_codigo or "").strip().upper()
+        if candidate and not Cliente.objects.filter(codigo=candidate).exists():
+            return candidate
+        for _ in range(20):
+            generated = generar_codigo_corto().upper()
+            if not Cliente.objects.filter(codigo=generated).exists():
+                return generated
+        raise serializers.ValidationError("No se pudo generar un codigo unico. Reintenta.")
+
     def create(self, validated_data):
         landing = validated_data.pop("landing")
         validated_data.pop("landing_token", None)
@@ -102,12 +116,36 @@ class ClienteCreateSerializer(serializers.Serializer):
             existing = Cliente.objects.filter(idempotency_key=idempotency_key).first()
             if existing:
                 return existing
-        validated_data["username"] = self._unique_username(validated_data["username"])
-        return Cliente.objects.create(
-            empresa=landing.empresa,
-            idempotency_key=idempotency_key,
-            **validated_data,
-        )
+
+        requested_codigo = validated_data.pop("codigo", "")
+        nombre = (validated_data.get("nombre") or "").strip()
+        contacto = (validated_data.get("contacto") or "").strip()
+        username = (validated_data.get("username") or "").strip()
+
+        if landing.mostrar_formulario:
+            if not nombre or not contacto:
+                raise serializers.ValidationError(
+                    "Nombre y contacto son obligatorios cuando el formulario esta activo."
+                )
+
+        validated_data["nombre"] = nombre or None
+        validated_data["contacto"] = contacto or None
+        validated_data["username"] = self._unique_username(username) if username else None
+        validated_data["codigo"] = self._resolve_unique_codigo(requested_codigo)
+
+        for _ in range(3):
+            try:
+                with transaction.atomic():
+                    return Cliente.objects.create(
+                        empresa=landing.empresa,
+                        idempotency_key=idempotency_key,
+                        **validated_data,
+                    )
+            except IntegrityError:
+                validated_data["codigo"] = self._resolve_unique_codigo("")
+                if validated_data["username"]:
+                    validated_data["username"] = self._unique_username(validated_data["username"])
+        raise serializers.ValidationError("No se pudo crear el cliente por conflicto de datos. Reintenta.")
 
 
 class LandingSerializer(serializers.ModelSerializer):
@@ -185,7 +223,7 @@ class LandingSerializer(serializers.ModelSerializer):
     def validate_texto_whatsapp(self, value):
         if not value:
             return value
-        allowed = {"bono", "username", "nombre", "contacto"}
+        allowed = {"bono", "username", "nombre", "contacto", "codigo"}
         found = set(re.findall(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}", value))
         invalid = sorted(item for item in found if item not in allowed)
         if invalid:
@@ -220,6 +258,7 @@ class LandingSerializer(serializers.ModelSerializer):
             "texto_boton",
             "texto_info",
             "texto_whatsapp",
+            "mostrar_formulario",
             "mostrar_disclaimer",
             "mostrar_ticker",
             "color_titulo",
@@ -258,6 +297,7 @@ class LandingSerializer(serializers.ModelSerializer):
             "bg_gradient",
             "background_vertical",
             "background_horizontal",
+            "imagen_reemplazo_form",
             "activo",
             "creado_en",
             "pixel_id",

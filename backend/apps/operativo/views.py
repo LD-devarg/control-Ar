@@ -831,11 +831,29 @@ class LandingViewSet(viewsets.ModelViewSet):
         return filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
 
     def perform_create(self, serializer):
-        empresa = getattr(self.request.user, "empresa", None)
-        if not empresa:
-            empresa_id = self.request.data.get("empresa")
-            if empresa_id:
+        user = self.request.user
+        empresa = None
+        empresa_id = self.request.data.get("empresa") or self.request.query_params.get("empresa")
+
+        if user.is_superuser:
+            if not empresa_id:
+                raise ValidationError("Empresa requerida.")
+            empresa = Empresa.objects.filter(id=empresa_id).first()
+        else:
+            allowed_ids = get_user_empresa_ids(user)
+            if empresa_id not in (None, ""):
+                try:
+                    empresa_id = int(empresa_id)
+                except (TypeError, ValueError):
+                    raise ValidationError("Empresa invalida.")
+                if empresa_id not in allowed_ids:
+                    raise ValidationError("No tenes acceso a la empresa seleccionada.")
                 empresa = Empresa.objects.filter(id=empresa_id).first()
+            elif getattr(user, "empresa_id", None):
+                empresa = Empresa.objects.filter(id=user.empresa_id).first()
+            elif len(allowed_ids) == 1:
+                empresa = Empresa.objects.filter(id=allowed_ids[0]).first()
+
         if not empresa:
             raise ValidationError("Empresa requerida.")
         credencial_meta = serializer.validated_data.get("credencial_meta")

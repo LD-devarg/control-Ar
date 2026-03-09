@@ -17,8 +17,8 @@ BONO_CHOICES = [
 ]
 
 def generar_codigo_corto():
-    import string, random
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    import random
+    return f"{random.randint(0, 999999):06d}"
 
 class Cliente(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)

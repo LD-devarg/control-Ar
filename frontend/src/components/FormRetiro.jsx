@@ -15,6 +15,7 @@ import "../assets/css/Form.css";
 import { fetchClientes } from "../services/operativo/clientes";
 import { apiClient } from "../services/auth";
 import { useTenant } from "../context/TenantContext";
+import { buildClienteDisplayLabel } from "../utils/clientDisplay";
 
 export default function FormRetiro() {
   const theme = useTheme();
@@ -48,7 +49,7 @@ export default function FormRetiro() {
         if (mounted) {
           const options = (data || []).map((cliente) => ({
             ...cliente,
-            label: `${cliente.contacto} - ${cliente.username}`,
+            label: buildClienteDisplayLabel(cliente),
           }));
           setUsuarios(options);
         }

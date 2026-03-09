@@ -15,6 +15,11 @@ import { useTenant } from '../context/TenantContext';
 
 const baseColumns = [
   {
+    width: 120,
+    label: 'Codigo',
+    dataKey: 'codigo',
+  },
+  {
     width: 180,
     label: 'Nombre',
     dataKey: 'nombre',
@@ -128,7 +133,8 @@ export default function TablaContactos() {
     return rows.filter((row) => {
       if (!normalizedSearch) return true;
 
-      return (
+        return (
+        row.codigo?.toLowerCase().includes(normalizedSearch) ||
         row.nombre?.toLowerCase().includes(normalizedSearch) ||
         row.username?.toLowerCase().includes(normalizedSearch) ||
         row.contacto?.toLowerCase().includes(normalizedSearch)
@@ -225,7 +231,7 @@ export default function TablaContactos() {
             type="text"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por nombre, username o contacto..."
+            placeholder="Buscar por codigo, nombre, username o contacto..."
           />
           <button
             type="button"

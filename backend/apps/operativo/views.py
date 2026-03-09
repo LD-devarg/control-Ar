@@ -289,6 +289,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
             payload={
                 "id": evento.id,
                 "cliente": cliente.id,
+                "cliente_codigo": cliente.codigo,
                 "cliente_nombre": cliente.nombre,
                 "cliente_username": cliente.username,
                 "cliente_contacto": cliente.contacto,

@@ -909,7 +909,7 @@ function LandingConfig() {
                                     rows={2}
                                     value={form.textoWhatsapp}
                                     onChange={handleChange("textoWhatsapp")}
-                                    helperText="Variables permitidas: {{bono}}, {{username}}, {{nombre}}, {{contacto}}"
+                                    helperText="Variables permitidas: {{bono}}, {{username}}, {{nombre}}, {{contacto}}, {{codigo}}"
                                     sx={{
                                         ...commonTextFieldSx,
                                         "& .MuiFormHelperText-root": { color: "rgba(255,255,255,0.65)" },

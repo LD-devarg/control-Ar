@@ -99,11 +99,16 @@ class ClienteCreateSerializer(serializers.Serializer):
             suffix += 1
 
     def _resolve_unique_codigo(self, requested_codigo=None):
-        candidate = (requested_codigo or "").strip().upper()
-        if candidate and not Cliente.objects.filter(codigo=candidate).exists():
-            return candidate
+        candidate = (requested_codigo or "").strip()
+        if candidate:
+            if not re.fullmatch(r"\d{6}", candidate):
+                raise serializers.ValidationError("El codigo debe tener exactamente 6 digitos.")
+            if not Cliente.objects.filter(codigo=candidate).exists():
+                return candidate
+        if candidate:
+            candidate = ""
         for _ in range(20):
-            generated = generar_codigo_corto().upper()
+            generated = generar_codigo_corto()
             if not Cliente.objects.filter(codigo=generated).exists():
                 return generated
         raise serializers.ValidationError("No se pudo generar un codigo unico. Reintenta.")
@@ -340,6 +345,7 @@ class EventosMetaReadSerializer(serializers.ModelSerializer):
     cliente_nombre = serializers.CharField(source="cliente.nombre", read_only=True)
     cliente_username = serializers.CharField(source="cliente.username", read_only=True)
     cliente_contacto = serializers.CharField(source="cliente.contacto", read_only=True)
+    cliente_codigo = serializers.CharField(source="cliente.codigo", read_only=True)
     contactado = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -351,6 +357,7 @@ class EventosMetaReadSerializer(serializers.ModelSerializer):
             "cliente_nombre",
             "cliente_username",
             "cliente_contacto",
+            "cliente_codigo",
             "contactado",
             "empresa",
             "landing",

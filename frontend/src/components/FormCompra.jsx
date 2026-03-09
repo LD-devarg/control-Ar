@@ -17,6 +17,7 @@ import { useTheme } from '@mui/material/styles';
 import { fetchClientes } from '../services/operativo/clientes';
 import { apiClient } from '../services/auth';
 import { useTenant } from '../context/TenantContext';
+import { buildClienteDisplayLabel } from "../utils/clientDisplay";
 
 export default function FormCompra() {
   const theme = useTheme();
@@ -52,7 +53,7 @@ export default function FormCompra() {
         if (mounted) {
           const options = (data || []).map((cliente) => ({
             ...cliente,
-            label: `${cliente.contacto} - ${cliente.username}`,
+            label: buildClienteDisplayLabel(cliente),
           }));
           setUsuarios(options);
         }

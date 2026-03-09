@@ -98,7 +98,7 @@ function NuevosLeads() {
 
     const leadRows = useMemo(() => leads.map((lead) => ({
         ...lead,
-        username: lead.cliente_username || "Sin username",
+        username: lead.cliente_username || lead.cliente_nombre || `Codigo ${lead.cliente_codigo || "-"}`,
         fecha: formatDateTime(lead.creado_en),
     })), [leads]);
 
@@ -137,7 +137,7 @@ function NuevosLeads() {
                                 {lead.username}
                             </span>
                             <span className="shrink-0 text-base font-semibold text-cyan-300">
-                                {lead.cliente_contacto || "-"}
+                                {lead.cliente_codigo ? `#${lead.cliente_codigo}` : (lead.cliente_contacto || "-")}
                             </span>
                         </div>
                     </button>
@@ -155,6 +155,7 @@ function NuevosLeads() {
                 ) : (
                     <>
                         <p><strong>Nombre:</strong> {clienteDetalle?.nombre || selectedLead?.cliente_nombre || "-"}</p>
+                        <p><strong>Codigo:</strong> {clienteDetalle?.codigo || selectedLead?.cliente_codigo || "-"}</p>
                         <p><strong>Contacto:</strong> {clienteDetalle?.contacto || "-"}</p>
                         <p><strong>Username:</strong> {clienteDetalle?.username || selectedLead?.cliente_username || "-"}</p>
                         <p><strong>Fecha de Lead:</strong> {formatDateTime(selectedLead?.creado_en)}</p>

@@ -40,6 +40,10 @@ function buildWhatsappUrl(number, text) {
     return `https://wa.me/${number}?text=${encoded}`;
 }
 
+function generateLeadCode() {
+    return String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
+}
+
 function renderWhatsappMessage(template, variables) {
     const fallback = "Hola vengo por el bono del {{bono}} mi username es {{username}}";
     const source = (template || fallback).trim() || fallback;
@@ -439,7 +443,7 @@ export default function NuevoLead({
                 ? `${window.location.origin}${window.location.pathname}`
                 : undefined;
 
-        const generatedCodigo = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const generatedCodigo = generateLeadCode();
 
         const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
             bono: bonusText || "100%",

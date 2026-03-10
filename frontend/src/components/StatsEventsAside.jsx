@@ -36,6 +36,19 @@ function getEventBadgeTheme(rawType) {
   };
 }
 
+function buildEventDisplayName(item) {
+  const username = String(item?.username || "").trim();
+  const nombre = String(item?.nombre || "").trim();
+  const codigo = String(item?.cliente_codigo || "").trim();
+  const clienteId = String(item?.cliente || "").trim();
+
+  if (username) return username;
+  if (nombre) return nombre;
+  if (codigo) return `ID ${codigo}`;
+  if (clienteId) return `Cliente #${clienteId}`;
+  return "Evento";
+}
+
 function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight = false }) {
   const { tenantId } = useTenant();
   const [loading, setLoading] = useState(false);
@@ -229,7 +242,7 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-sm xl:text-lg font-semibold text-white">
-                  {item.username || "Sin username"}
+                  {buildEventDisplayName(item)}
                 </span>
                 {isCompra ? (
                   <span className="shrink-0 text-base font-semibold text-cyan-300">
@@ -251,7 +264,7 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
         {selectedEvent ? (
           <div className="space-y-2 text-sm">
             <p>
-              <strong>Username:</strong> {selectedEvent.username || "-"}
+              <strong>Usuario:</strong> {buildEventDisplayName(selectedEvent)}
             </p>
             <p>
               <strong>Fecha y hora:</strong> {formatDateTime(selectedEvent.fecha_hora)}
@@ -286,9 +299,9 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
                       href={selectedEvent.comprobante_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-block text-blue-500 underline"
+                      className="inline-flex items-center rounded-md border border-cyan-400/60 bg-cyan-500/10 px-3 py-1.5 text-sm font-semibold text-cyan-300 transition-colors hover:bg-cyan-500/20"
                     >
-                      Abrir comprobante
+                      Ver comprobante
                     </a>
                     {selectedEvent.comprobante_url.match(/\.(jpg|jpeg|png|webp|gif)$/i) ? (
                       <img

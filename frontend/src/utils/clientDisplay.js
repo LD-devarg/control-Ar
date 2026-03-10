@@ -5,13 +5,14 @@ export function buildClienteDisplayLabel(cliente) {
   const nombre = String(cliente.nombre || "").trim();
   const username = String(cliente.username || "").trim();
   const contacto = String(cliente.contacto || "").trim();
+  const clienteId = String(cliente.id || "").trim();
 
-  const primaryParts = [codigo ? `#${codigo}` : "", nombre, username]
+  const primaryParts = [codigo ? `#${codigo}` : clienteId ? `Cliente #${clienteId}` : "", nombre, username]
     .filter(Boolean);
-  const secondary = contacto || "Sin contacto";
+  const secondary = contacto || "Sin datos";
 
   if (!primaryParts.length) {
-    return codigo ? `#${codigo} - ${secondary}` : secondary;
+    return clienteId ? `Cliente #${clienteId} - ${secondary}` : secondary;
   }
 
   return `${primaryParts.join(" - ")} - ${secondary}`;

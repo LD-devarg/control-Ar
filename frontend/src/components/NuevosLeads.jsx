@@ -16,6 +16,19 @@ function formatDateTime(value) {
     }).format(date);
 }
 
+function buildLeadTitle(lead) {
+    const nombre = String(lead?.cliente_nombre || "").trim();
+    const username = String(lead?.cliente_username || "").trim();
+    const codigo = String(lead?.cliente_codigo || "").trim();
+    const clienteId = String(lead?.cliente || "").trim();
+
+    if (nombre) return nombre;
+    if (username) return username;
+    if (codigo) return `ID ${codigo}`;
+    if (clienteId) return `Cliente #${clienteId}`;
+    return "Lead";
+}
+
 function NuevosLeads() {
     const { tenantId } = useTenant();
     const [leads, setLeads] = useState([]);
@@ -98,7 +111,7 @@ function NuevosLeads() {
 
     const leadRows = useMemo(() => leads.map((lead) => ({
         ...lead,
-        username: lead.cliente_username || lead.cliente_nombre || `Codigo ${lead.cliente_codigo || "-"}`,
+        title: buildLeadTitle(lead),
         fecha: formatDateTime(lead.creado_en),
     })), [leads]);
 
@@ -134,10 +147,10 @@ function NuevosLeads() {
                         </div>
                         <div className="flex items-center justify-between gap-2">
                             <span className="truncate text-sm xl:text-lg font-semibold text-white">
-                                {lead.username}
+                                {lead.title}
                             </span>
                             <span className="shrink-0 text-base font-semibold text-cyan-300">
-                                {lead.cliente_codigo ? `#${lead.cliente_codigo}` : (lead.cliente_contacto || "-")}
+                                {lead.cliente_codigo ? `ID ${lead.cliente_codigo}` : (lead.cliente_contacto || "-")}
                             </span>
                         </div>
                     </button>
@@ -155,7 +168,7 @@ function NuevosLeads() {
                 ) : (
                     <>
                         <p><strong>Nombre:</strong> {clienteDetalle?.nombre || selectedLead?.cliente_nombre || "-"}</p>
-                        <p><strong>Codigo:</strong> {clienteDetalle?.codigo || selectedLead?.cliente_codigo || "-"}</p>
+                        <p><strong>ID:</strong> {clienteDetalle?.codigo || selectedLead?.cliente_codigo || "-"}</p>
                         <p><strong>Contacto:</strong> {clienteDetalle?.contacto || "-"}</p>
                         <p><strong>Username:</strong> {clienteDetalle?.username || selectedLead?.cliente_username || "-"}</p>
                         <p><strong>Fecha de Lead:</strong> {formatDateTime(selectedLead?.creado_en)}</p>

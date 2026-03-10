@@ -282,8 +282,8 @@ function LandingConfig() {
     const [credencialesMetaOptions, setCredencialesMetaOptions] = useState([]);
     const [form, setForm] = useState(() => cloneEmptyForm());
     const [initialForm, setInitialForm] = useState(() => cloneEmptyForm());
-    const [activo, setActivo] = useState(false);
-    const [initialActivo, setInitialActivo] = useState(false);
+    const [activo, setActivo] = useState(true);
+    const [initialActivo, setInitialActivo] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
     const [previewUrls, setPreviewUrls] = useState({ vertical: "", horizontal: "", reemplazoForm: "" });
@@ -340,8 +340,8 @@ function LandingConfig() {
             const empty = cloneEmptyForm();
             setForm(empty);
             setInitialForm(empty);
-            setActivo(false);
-            setInitialActivo(false);
+            setActivo(true);
+            setInitialActivo(true);
             setPreviewUrls({ vertical: "", horizontal: "", reemplazoForm: "" });
             return;
         }
@@ -522,8 +522,8 @@ function LandingConfig() {
         const empty = cloneEmptyForm();
         setForm(empty);
         setInitialForm(empty);
-        setActivo(false);
-        setInitialActivo(false);
+        setActivo(true);
+        setInitialActivo(true);
         setPreviewUrls({ vertical: "", horizontal: "", reemplazoForm: "" });
         setUploadKey((prev) => prev + 1);
     };

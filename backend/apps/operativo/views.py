@@ -39,6 +39,7 @@ from .serializers import (
     RetiroSerializer,
     LandingVisitSerializer,
     LandingVisitCreateSerializer,
+    normalize_contacto,
 )
 from .servicios.calculos import calcular_compra
 from .servicios.enviador import enviar_evento_meta
@@ -192,6 +193,7 @@ def _is_wallet_enabled_for_empresa(empresa_id: int) -> bool:
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     filterset_fields = ["empresa__id"]
+    EDITABLE_FIELDS = {"nombre", "contacto", "username"}
 
     def get_permissions(self):
         if self.action == "create":
@@ -204,7 +206,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
         if is_admin(request.user):
             return True
         if is_operador(request.user):
-            return self.action in {"list", "retrieve"}
+            return self.action in {"list", "retrieve", "partial_update"}
         return False
 
     def get_queryset(self):
@@ -299,6 +301,26 @@ class ClienteViewSet(viewsets.ModelViewSet):
 
         output = ClienteSerializer(cliente)
         return Response(output.data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        payload = {}
+        for field_name in self.EDITABLE_FIELDS:
+            if field_name not in request.data:
+                continue
+            raw_value = request.data.get(field_name)
+            value = raw_value.strip() if isinstance(raw_value, str) else raw_value
+            if field_name == "contacto":
+                value = normalize_contacto(value)
+            payload[field_name] = value or None
+
+        if not payload:
+            raise ValidationError("No hay campos editables para actualizar.")
+
+        serializer = self.get_serializer(instance, data=payload, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
 
 
 class KommoWebhookViewSet(viewsets.ViewSet):

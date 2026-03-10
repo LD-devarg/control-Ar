@@ -11,6 +11,18 @@ import { apiClient } from '../services/auth';
 import { useTenant } from '../context/TenantContext';
 import { subscribeRealtimeEvents } from '../services/realtime';
 
+function buildLeadClienteLabel(cliente) {
+  if (!cliente) return "";
+  const clienteId = cliente.id ? `Cliente #${cliente.id}` : "Cliente";
+  const nombre = String(cliente.nombre || "").trim();
+  const username = String(cliente.username || "").trim();
+  const contacto = String(cliente.contacto || "").trim();
+
+  const main = nombre || username || clienteId;
+  const meta = [username && username !== main ? `@${username}` : "", contacto].filter(Boolean).join(" - ");
+  return meta ? `${main} - ${meta}` : main;
+}
+
 export default function FormContacto() {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
@@ -66,14 +78,15 @@ export default function FormContacto() {
       (data || []).forEach((evento) => {
         if (!evento?.cliente) return;
         if (unique.has(evento.cliente)) return;
-        const contacto = evento.cliente_contacto || "";
-        const username = evento.cliente_username || "Sin username";
-        unique.set(evento.cliente, {
+        const cliente = {
           id: evento.cliente,
-          username,
-          contacto,
-          nombre: evento.cliente_nombre,
-          label: `${contacto || "-"} - ${username}`,
+          username: evento.cliente_username || "",
+          contacto: evento.cliente_contacto || "",
+          nombre: evento.cliente_nombre || "",
+        };
+        unique.set(evento.cliente, {
+          ...cliente,
+          label: buildLeadClienteLabel(cliente),
         });
       });
       return Array.from(unique.values());
@@ -175,7 +188,7 @@ export default function FormContacto() {
         onChange={(event, value) => setSelectedCliente(value)}
         renderOption={(props, option) => (
           <li {...props}>
-            {option.contacto || "-"} - {option.username || "Sin username"}
+            {option.label || buildLeadClienteLabel(option)}
           </li>
         )}
         renderInput={(params) => <TextField {...params} label="Seleccione el cliente" sx={fieldSx} />}

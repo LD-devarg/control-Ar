@@ -76,6 +76,35 @@
   padding-bottom: 12px !important;
 }
 
+.tabla-contactos-inline-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: inherit;
+  padding: 6px 0;
+  cursor: text;
+}
+
+.tabla-contactos-inline-input {
+  width: 100%;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #4b5160;
+  background: rgba(10, 14, 24, 0.85);
+  color: #eef0f5;
+  padding: 0 10px;
+  outline: none;
+}
+
+.tabla-contactos-inline-input:focus {
+  border-color: #7fc3ff;
+}
+
+.tabla-contactos-empty {
+  color: #8b93a7;
+}
+
 .tabla-contactos::-webkit-scrollbar {
   width: 10px;
   height: 10px;

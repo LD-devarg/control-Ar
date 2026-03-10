@@ -11,7 +11,10 @@ import '../assets/css/TablaContactos.css';
 import { clearClientesCache, fetchClientes } from '../services/operativo/clientes';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import Pagination from '@mui/material/Pagination';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 import { useTenant } from '../context/TenantContext';
+import { apiClient } from '../services/auth';
 
 const baseColumns = [
   {
@@ -94,13 +97,18 @@ const VirtuosoTableComponents = {
 export default function TablaContactos() {
   const { features } = useTenant();
   const showWalletColumns = Boolean(features?.net_metrics);
+  const editableKeys = React.useMemo(() => new Set(['nombre', 'contacto', 'username']), []);
   const [search, setSearch] = React.useState('');
   const [rows, setRows] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
   const [page, setPage] = React.useState(1);
   const pageSize = 20;
   const [sortKey, setSortKey] = React.useState('');
   const [sortDir, setSortDir] = React.useState('desc');
+  const [editingCell, setEditingCell] = React.useState(null);
+  const [editingValue, setEditingValue] = React.useState('');
+  const [toast, setToast] = React.useState({ open: false, severity: 'success', message: '' });
 
   const columns = React.useMemo(() => {
     if (showWalletColumns) return baseColumns;
@@ -219,6 +227,100 @@ export default function TablaContactos() {
     }
   };
 
+  const showToast = (severity, message) => {
+    setToast({ open: true, severity, message });
+  };
+
+  const startEdit = (row, key) => {
+    if (!editableKeys.has(key)) return;
+    setEditingCell({ rowId: row.id, key });
+    setEditingValue(String(row?.[key] ?? ''));
+  };
+
+  const cancelEdit = React.useCallback(() => {
+    setEditingCell(null);
+    setEditingValue('');
+  }, []);
+
+  const saveEdit = React.useCallback(async () => {
+    if (!editingCell) return;
+    const row = rows.find((item) => item.id === editingCell.rowId);
+    if (!row) {
+      cancelEdit();
+      return;
+    }
+
+    const nextValue = editingValue.trim();
+    const currentValue = String(row?.[editingCell.key] ?? '').trim();
+    if (nextValue === currentValue) {
+      cancelEdit();
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { data } = await apiClient.patch(`/clientes/${row.id}/`, {
+        [editingCell.key]: nextValue,
+      });
+      setRows((prev) => prev.map((item) => (item.id === row.id ? { ...item, ...data } : item)));
+      clearClientesCache();
+      showToast('success', 'Cliente actualizado.');
+      cancelEdit();
+    } catch (error) {
+      const detail =
+        error?.response?.data?.detail ||
+        Object.values(error?.response?.data || {}).flat().find((value) => typeof value === 'string') ||
+        'No se pudo actualizar el cliente.';
+      showToast('error', detail);
+    } finally {
+      setSaving(false);
+    }
+  }, [cancelEdit, editingCell, editingValue, rows]);
+
+  const renderCellContent = (row, column) => {
+    const isEditable = editableKeys.has(column.dataKey);
+    const isEditing = editingCell?.rowId === row.id && editingCell?.key === column.dataKey;
+    const value = formatValue(column, row[column.dataKey]);
+
+    if (!isEditable) {
+      return value;
+    }
+
+    if (isEditing) {
+      return (
+        <input
+          autoFocus
+          className="tabla-contactos-inline-input"
+          value={editingValue}
+          onChange={(event) => setEditingValue(event.target.value)}
+          onBlur={saveEdit}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              saveEdit();
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              cancelEdit();
+            }
+          }}
+          disabled={saving}
+        />
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        className="tabla-contactos-inline-button"
+        onClick={() => startEdit(row, column.dataKey)}
+        title="Click para editar"
+      >
+        {value || <span className="tabla-contactos-empty">Completar</span>}
+      </button>
+    );
+  };
+
   return (
     <Paper elevation={0} style={{ height: 550, width: '100%', padding: '16px', color: '#e7e9ef', backgroundColor: 'transparent' }}>
       <div className="tabla-contactos-layout">
@@ -286,7 +388,7 @@ export default function TablaContactos() {
                     align={column.numeric || false ? 'right' : 'left'}
                     className="tabla-contactos-cell"
                   >
-                    {formatValue(column, row[column.dataKey])}
+                    {renderCellContent(row, column)}
                   </TableCell>
                 ))}
               </React.Fragment>
@@ -308,6 +410,21 @@ export default function TablaContactos() {
         </div>
         {loading ? <div className="tabla-contactos-loading">Cargando...</div> : null}
       </div>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={4000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 }

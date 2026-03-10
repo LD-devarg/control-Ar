@@ -7,6 +7,12 @@ from apps.pauta.models import CredencialesMeta
 from apps.empresas.scope import get_user_empresa_ids
 
 
+def normalize_contacto(value):
+    if value in (None, ""):
+        return ""
+    return "".join(ch for ch in str(value) if ch.isdigit())[:15]
+
+
 class ClienteSerializer(serializers.ModelSerializer):
     total_bonos_ars = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total_bonos_usd = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -124,7 +130,7 @@ class ClienteCreateSerializer(serializers.Serializer):
 
         requested_codigo = validated_data.pop("codigo", "")
         nombre = (validated_data.get("nombre") or "").strip()
-        contacto = (validated_data.get("contacto") or "").strip()
+        contacto = normalize_contacto(validated_data.get("contacto"))
         username = (validated_data.get("username") or "").strip()
 
         if landing.mostrar_formulario:

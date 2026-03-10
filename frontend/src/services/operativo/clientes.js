@@ -68,3 +68,9 @@ export async function fetchClientes() {
   }
   return rows;
 }
+
+export async function updateCliente(clienteId, payload) {
+  const { data } = await apiClient.patch(`/clientes/${clienteId}/`, payload);
+  markClientesDirty();
+  return data;
+}

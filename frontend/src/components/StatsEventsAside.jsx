@@ -37,15 +37,15 @@ function getEventBadgeTheme(rawType) {
 }
 
 function buildEventDisplayName(item) {
-  const username = String(item?.username || "").trim();
-  const nombre = String(item?.nombre || "").trim();
   const codigo = String(item?.cliente_codigo || "").trim();
   const clienteId = String(item?.cliente || "").trim();
+  const username = String(item?.username || "").trim();
+  const nombre = String(item?.nombre || "").trim();
 
-  if (username) return username;
-  if (nombre) return nombre;
   if (codigo) return `ID ${codigo}`;
   if (clienteId) return `Cliente #${clienteId}`;
+  if (username) return username;
+  if (nombre) return nombre;
   return "Evento";
 }
 

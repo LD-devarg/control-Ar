@@ -10,18 +10,7 @@ import { useTheme } from '@mui/material/styles';
 import { apiClient } from '../services/auth';
 import { useTenant } from '../context/TenantContext';
 import { subscribeRealtimeEvents } from '../services/realtime';
-
-function buildLeadClienteLabel(cliente) {
-  if (!cliente) return "";
-  const clienteId = cliente.id ? `Cliente #${cliente.id}` : "Cliente";
-  const nombre = String(cliente.nombre || "").trim();
-  const username = String(cliente.username || "").trim();
-  const contacto = String(cliente.contacto || "").trim();
-
-  const main = nombre || username || clienteId;
-  const meta = [username && username !== main ? `@${username}` : "", contacto].filter(Boolean).join(" - ");
-  return meta ? `${main} - ${meta}` : main;
-}
+import { buildClienteDisplayLabel } from '../utils/clientDisplay';
 
 export default function FormContacto() {
   const theme = useTheme();
@@ -80,13 +69,14 @@ export default function FormContacto() {
         if (unique.has(evento.cliente)) return;
         const cliente = {
           id: evento.cliente,
+          codigo: evento.cliente_codigo || "",
           username: evento.cliente_username || "",
           contacto: evento.cliente_contacto || "",
           nombre: evento.cliente_nombre || "",
         };
         unique.set(evento.cliente, {
           ...cliente,
-          label: buildLeadClienteLabel(cliente),
+          label: buildClienteDisplayLabel(cliente),
         });
       });
       return Array.from(unique.values());
@@ -188,7 +178,7 @@ export default function FormContacto() {
         onChange={(event, value) => setSelectedCliente(value)}
         renderOption={(props, option) => (
           <li {...props}>
-            {option.label || buildLeadClienteLabel(option)}
+            {option.label || buildClienteDisplayLabel(option)}
           </li>
         )}
         renderInput={(params) => <TextField {...params} label="Seleccione el cliente" sx={fieldSx} />}

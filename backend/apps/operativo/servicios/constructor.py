@@ -2,6 +2,7 @@ import uuid
 import time
 import hashlib
 import re
+import ipaddress
 
 
 EVENT_NAME_MAP = {
@@ -60,6 +61,29 @@ def _clean_dict(data: dict) -> dict:
     return {k: v for k, v in data.items() if v is not None}
 
 
+def _normalize_ip(value: str | None) -> str | None:
+    if not value:
+        return None
+    candidate = str(value).split(",")[0].strip()
+    if not candidate:
+        return None
+    try:
+        return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return None
+
+
+def _extract_request_ip(request) -> str | None:
+    if not request:
+        return None
+    return (
+        _normalize_ip(request.META.get("HTTP_X_FORWARDED_FOR"))
+        or _normalize_ip(request.META.get("HTTP_X_REAL_IP"))
+        or _normalize_ip(request.META.get("HTTP_CF_CONNECTING_IP"))
+        or _normalize_ip(request.META.get("REMOTE_ADDR"))
+    )
+
+
 class MetaEventBuilder:
     @staticmethod
     def build(*, tipo: str, payload: dict, request=None) -> tuple[dict, uuid.UUID]:
@@ -87,8 +111,8 @@ class MetaEventBuilder:
             "external_id": _sha256(payload.get("external_id").strip().lower() if payload.get("external_id") else None),
             "fbp": payload.get("fbp"),
             "fbc": payload.get("fbc"),
-            "client_ip_address": request.META.get("REMOTE_ADDR") if request else None,
-            "client_user_agent": request.META.get("HTTP_USER_AGENT") if request else None,
+            "client_ip_address": _normalize_ip(payload.get("ip_address")) or _extract_request_ip(request),
+            "client_user_agent": payload.get("user_agent") or (request.META.get("HTTP_USER_AGENT") if request else None),
         })
 
         # -------------------------

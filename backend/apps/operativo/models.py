@@ -41,6 +41,8 @@ class Cliente(models.Model):
     utm_content = models.CharField(max_length=255, null=True, blank=True)
     utm_term = models.CharField(max_length=255, null=True, blank=True)
     event_source_url = models.URLField(max_length=1024, null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
     empresa = models.ForeignKey(
         "empresas.Empresa",
         on_delete=models.CASCADE,
@@ -196,6 +198,8 @@ class EventosMeta(models.Model):
     respuesta_meta = models.JSONField(null=True, blank=True)
     fbc = models.CharField(max_length=255, null=True, blank=True)
     fbp = models.CharField(max_length=255, null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
     cliente = models.ForeignKey(
         "operativo.Cliente",
         on_delete=models.CASCADE,

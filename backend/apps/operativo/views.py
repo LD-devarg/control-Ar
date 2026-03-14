@@ -39,6 +39,8 @@ from .serializers import (
     RetiroSerializer,
     LandingVisitSerializer,
     LandingVisitCreateSerializer,
+    get_request_ip,
+    get_request_user_agent,
     normalize_contacto,
 )
 from .servicios.calculos import calcular_compra
@@ -296,6 +298,8 @@ class ClienteViewSet(viewsets.ModelViewSet):
             },
             fbp=request.data.get("fbp"),
             fbc=request.data.get("fbc"),
+            ip_address=get_request_ip(request) or cliente.ip_address,
+            user_agent=get_request_user_agent(request) or cliente.user_agent,
         )
         try:
             enviar_evento_meta(evento, request=request)
@@ -735,6 +739,8 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             data=self._event_payload(cliente, data),
             fbp=data.get("fbp") or cliente.fbp,
             fbc=data.get("fbc") or cliente.fbc,
+            ip_address=get_request_ip(request) or cliente.ip_address,
+            user_agent=get_request_user_agent(request) or cliente.user_agent,
         )
         try:
             enviar_evento_meta(evento, request=request)
@@ -830,6 +836,8 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             data=self._event_payload(cliente, data),
             fbp=data.get("fbp") or cliente.fbp,
             fbc=data.get("fbc") or cliente.fbc,
+            ip_address=get_request_ip(request) or cliente.ip_address,
+            user_agent=get_request_user_agent(request) or cliente.user_agent,
         )
         try:
             enviar_evento_meta(evento, request=request)
@@ -1131,6 +1139,8 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             data=payload,
             fbp=serializer.validated_data.get("fbp") or (cliente.fbp if cliente else None),
             fbc=serializer.validated_data.get("fbc") or (cliente.fbc if cliente else None),
+            ip_address=get_request_ip(request) or (cliente.ip_address if cliente else None),
+            user_agent=get_request_user_agent(request) or (cliente.user_agent if cliente else None),
         )
 
         try:
@@ -1202,6 +1212,8 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 landing=landing,
                 fbp=request.data.get("fbp"),
                 fbc=request.data.get("fbc"),
+                ip_address=get_request_ip(request) or cliente.ip_address,
+                user_agent=get_request_user_agent(request) or cliente.user_agent,
             )
         else:
             cliente_id = request.data.get("cliente_id")
@@ -1232,6 +1244,8 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 landing=None,
                 fbp=request.data.get("fbp"),
                 fbc=request.data.get("fbc"),
+                ip_address=get_request_ip(request) or cliente.ip_address,
+                user_agent=get_request_user_agent(request) or cliente.user_agent,
             )
         try:
             respuesta = enviar_evento_meta(evento, request=request, test_event_code=test_event_code)
@@ -1327,6 +1341,8 @@ class CompraViewSet(viewsets.ModelViewSet):
                 data=payload,
                 fbp=cliente.fbp,
                 fbc=cliente.fbc,
+                ip_address=get_request_ip(request) or cliente.ip_address,
+                user_agent=get_request_user_agent(request) or cliente.user_agent,
             )
             try:
                 enviar_evento_meta(evento, request=request)

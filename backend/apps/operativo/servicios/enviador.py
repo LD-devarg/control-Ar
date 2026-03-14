@@ -82,6 +82,14 @@ def _merge_payload(evento) -> dict[str, Any]:
         payload["fbp"] = evento.fbp
     if evento.fbc:
         payload["fbc"] = evento.fbc
+    if getattr(evento, "ip_address", None):
+        payload["ip_address"] = evento.ip_address
+    elif getattr(evento, "cliente", None) and getattr(evento.cliente, "ip_address", None):
+        payload["ip_address"] = evento.cliente.ip_address
+    if getattr(evento, "user_agent", None):
+        payload["user_agent"] = evento.user_agent
+    elif getattr(evento, "cliente", None) and getattr(evento.cliente, "user_agent", None):
+        payload["user_agent"] = evento.cliente.user_agent
     return payload
 
 

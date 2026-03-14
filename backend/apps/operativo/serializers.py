@@ -19,6 +19,30 @@ def normalize_contacto(value):
     return "".join(ch for ch in str(value) if ch.isdigit())[:15]
 
 
+def get_request_ip(request):
+    if not request:
+        return None
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded:
+        first = str(forwarded).split(",")[0].strip()
+        if first:
+            return first
+    for header in ("HTTP_X_REAL_IP", "HTTP_CF_CONNECTING_IP", "REMOTE_ADDR"):
+        value = request.META.get(header)
+        if value:
+            normalized = str(value).strip()
+            if normalized:
+                return normalized
+    return None
+
+
+def get_request_user_agent(request):
+    if not request:
+        return None
+    value = request.META.get("HTTP_USER_AGENT")
+    return str(value).strip() if value else None
+
+
 class ClienteSerializer(serializers.ModelSerializer):
     total_bonos_ars = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total_bonos_usd = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -54,6 +78,8 @@ class ClienteSerializer(serializers.ModelSerializer):
             "utm_content",
             "utm_term",
             "event_source_url",
+            "ip_address",
+            "user_agent",
             "empresa",
         ]
         read_only_fields = [
@@ -145,6 +171,16 @@ class ClienteCreateSerializer(serializers.Serializer):
                 setattr(cliente, field_name, next_value)
                 update_fields.append(field_name)
 
+        request = self.context.get("request")
+        request_ip = get_request_ip(request)
+        request_user_agent = get_request_user_agent(request)
+        if request_ip and cliente.ip_address != request_ip:
+            cliente.ip_address = request_ip
+            update_fields.append("ip_address")
+        if request_user_agent and cliente.user_agent != request_user_agent:
+            cliente.user_agent = request_user_agent
+            update_fields.append("user_agent")
+
         nombre = validated_data.get("nombre")
         contacto = validated_data.get("contacto")
         username = validated_data.get("username")
@@ -216,6 +252,9 @@ class ClienteCreateSerializer(serializers.Serializer):
         validated_data["contacto"] = contacto or None
         validated_data["username"] = self._unique_username(username) if username else None
         validated_data["codigo"] = self._resolve_unique_codigo(requested_codigo)
+        request = self.context.get("request")
+        validated_data["ip_address"] = get_request_ip(request)
+        validated_data["user_agent"] = get_request_user_agent(request)
 
         if existing_cliente:
             return self._update_existing_cliente(existing_cliente, validated_data)

@@ -218,6 +218,14 @@ def _resolve_latest_lead_landing(*, cliente_id: int):
     return Landing.objects.filter(id=landing_id).first()
 
 
+def _client_first_ip(request, cliente):
+    return (getattr(cliente, "ip_address", None) if cliente else None) or get_request_ip(request)
+
+
+def _client_first_user_agent(request, cliente):
+    return (getattr(cliente, "user_agent", None) if cliente else None) or get_request_user_agent(request)
+
+
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     filterset_fields = ["empresa__id"]
@@ -310,8 +318,8 @@ class ClienteViewSet(viewsets.ModelViewSet):
             },
             fbp=request.data.get("fbp"),
             fbc=request.data.get("fbc"),
-            ip_address=get_request_ip(request) or cliente.ip_address,
-            user_agent=get_request_user_agent(request) or cliente.user_agent,
+            ip_address=_client_first_ip(request, cliente),
+            user_agent=_client_first_user_agent(request, cliente),
         )
         try:
             enviar_evento_meta(evento, request=request)
@@ -751,8 +759,8 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             data=self._event_payload(cliente, data),
             fbp=data.get("fbp") or cliente.fbp,
             fbc=data.get("fbc") or cliente.fbc,
-            ip_address=get_request_ip(request) or cliente.ip_address,
-            user_agent=get_request_user_agent(request) or cliente.user_agent,
+            ip_address=_client_first_ip(request, cliente),
+            user_agent=_client_first_user_agent(request, cliente),
         )
         try:
             enviar_evento_meta(evento, request=request)
@@ -841,8 +849,8 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             data=self._event_payload(cliente, data),
             fbp=data.get("fbp") or cliente.fbp,
             fbc=data.get("fbc") or cliente.fbc,
-            ip_address=get_request_ip(request) or cliente.ip_address,
-            user_agent=get_request_user_agent(request) or cliente.user_agent,
+            ip_address=_client_first_ip(request, cliente),
+            user_agent=_client_first_user_agent(request, cliente),
         )
         try:
             enviar_evento_meta(evento, request=request)
@@ -1169,6 +1177,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         }
         if cliente:
             payload["external_id"] = str(cliente.uuid)
+            payload["event_source_url"] = cliente.event_source_url
 
         evento = EventosMeta.objects.create(
             id_evento=uuid.uuid4(),
@@ -1180,8 +1189,8 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             data=payload,
             fbp=serializer.validated_data.get("fbp") or (cliente.fbp if cliente else None),
             fbc=serializer.validated_data.get("fbc") or (cliente.fbc if cliente else None),
-            ip_address=get_request_ip(request) or (cliente.ip_address if cliente else None),
-            user_agent=get_request_user_agent(request) or (cliente.user_agent if cliente else None),
+            ip_address=_client_first_ip(request, cliente),
+            user_agent=_client_first_user_agent(request, cliente),
         )
 
         try:
@@ -1253,8 +1262,8 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 landing=landing,
                 fbp=request.data.get("fbp"),
                 fbc=request.data.get("fbc"),
-                ip_address=get_request_ip(request) or cliente.ip_address,
-                user_agent=get_request_user_agent(request) or cliente.user_agent,
+                ip_address=_client_first_ip(request, cliente),
+                user_agent=_client_first_user_agent(request, cliente),
             )
         else:
             cliente_id = request.data.get("cliente_id")
@@ -1275,6 +1284,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 "currency": request.data.get("currency"),
                 "fbp": request.data.get("fbp"),
                 "fbc": request.data.get("fbc"),
+                "event_source_url": cliente.event_source_url or request.data.get("event_source_url"),
             }
             evento = EventosMeta.objects.create(
                 tipo=tipo,
@@ -1285,8 +1295,8 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 landing=None,
                 fbp=request.data.get("fbp"),
                 fbc=request.data.get("fbc"),
-                ip_address=get_request_ip(request) or cliente.ip_address,
-                user_agent=get_request_user_agent(request) or cliente.user_agent,
+                ip_address=_client_first_ip(request, cliente),
+                user_agent=_client_first_user_agent(request, cliente),
             )
         try:
             respuesta = enviar_evento_meta(evento, request=request, test_event_code=test_event_code)
@@ -1371,6 +1381,7 @@ class CompraViewSet(viewsets.ModelViewSet):
                 "currency": "USD",
                 "phone": cliente.contacto,
                 "external_id": str(cliente.uuid),
+                "event_source_url": cliente.event_source_url,
             }
             evento = EventosMeta.objects.create(
                 id_evento=uuid.uuid4(),
@@ -1382,8 +1393,8 @@ class CompraViewSet(viewsets.ModelViewSet):
                 data=payload,
                 fbp=cliente.fbp,
                 fbc=cliente.fbc,
-                ip_address=get_request_ip(request) or cliente.ip_address,
-                user_agent=get_request_user_agent(request) or cliente.user_agent,
+                ip_address=_client_first_ip(request, cliente),
+                user_agent=_client_first_user_agent(request, cliente),
             )
             try:
                 enviar_evento_meta(evento, request=request)

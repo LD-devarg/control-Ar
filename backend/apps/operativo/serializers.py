@@ -1,10 +1,16 @@
 from rest_framework import serializers
 import re
 from django.db import IntegrityError, transaction
+from django.db.models import Q
+from django.utils import timezone
+from datetime import timedelta
 
 from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit, Retiro, generar_codigo_corto
 from apps.pauta.models import CredencialesMeta
 from apps.empresas.scope import get_user_empresa_ids
+
+
+LEAD_IDENTITY_DEDUPE_DAYS = 7
 
 
 def normalize_contacto(value):
@@ -89,7 +95,73 @@ class ClienteCreateSerializer(serializers.Serializer):
         except Landing.DoesNotExist:
             raise serializers.ValidationError("Landing invalida o inactiva.")
         data["landing"] = landing
+        data["existing_cliente"] = self._find_recent_cliente_by_identity(landing, data)
         return data
+
+    def _find_recent_cliente_by_identity(self, landing, data):
+        fbp = (data.get("fbp") or "").strip()
+        fbc = (data.get("fbc") or "").strip()
+        if not fbp and not fbc:
+            return None
+
+        window_start = timezone.now() - timedelta(days=LEAD_IDENTITY_DEDUPE_DAYS)
+        signal_filter = Q()
+        if fbp:
+            signal_filter |= Q(fbp=fbp) | Q(eventos_meta__fbp=fbp)
+        if fbc:
+            signal_filter |= Q(fbc=fbc) | Q(eventos_meta__fbc=fbc)
+        if not signal_filter:
+            return None
+
+        return (
+            Cliente.objects.filter(
+                empresa=landing.empresa,
+                creado_en__gte=window_start,
+                eventos_meta__tipo="lead",
+                eventos_meta__landing=landing,
+                eventos_meta__creado_en__gte=window_start,
+            )
+            .filter(signal_filter)
+            .order_by("-creado_en")
+            .distinct()
+            .first()
+        )
+
+    def _update_existing_cliente(self, cliente, validated_data):
+        update_fields = []
+        for field_name in (
+            "fbp",
+            "fbc",
+            "fbclid",
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_content",
+            "utm_term",
+            "event_source_url",
+        ):
+            next_value = validated_data.get(field_name)
+            if next_value and getattr(cliente, field_name) != next_value:
+                setattr(cliente, field_name, next_value)
+                update_fields.append(field_name)
+
+        nombre = validated_data.get("nombre")
+        contacto = validated_data.get("contacto")
+        username = validated_data.get("username")
+        if nombre and cliente.nombre != nombre:
+            cliente.nombre = nombre
+            update_fields.append("nombre")
+        if contacto and cliente.contacto != contacto:
+            cliente.contacto = contacto
+            update_fields.append("contacto")
+        if username and cliente.username != username:
+            cliente.username = self._unique_username(username)
+            update_fields.append("username")
+
+        if update_fields:
+            cliente.save(update_fields=sorted(set(update_fields)))
+        self.context["dedupe_reason"] = "identity_window"
+        return cliente
 
     def _unique_username(self, base_username):
         if not Cliente.objects.filter(username=base_username).exists():
@@ -122,6 +194,7 @@ class ClienteCreateSerializer(serializers.Serializer):
     def create(self, validated_data):
         landing = validated_data.pop("landing")
         validated_data.pop("landing_token", None)
+        existing_cliente = validated_data.pop("existing_cliente", None)
         idempotency_key = validated_data.pop("idempotency_key", None)
         if idempotency_key:
             existing = Cliente.objects.filter(idempotency_key=idempotency_key).first()
@@ -143,6 +216,9 @@ class ClienteCreateSerializer(serializers.Serializer):
         validated_data["contacto"] = contacto or None
         validated_data["username"] = self._unique_username(username) if username else None
         validated_data["codigo"] = self._resolve_unique_codigo(requested_codigo)
+
+        if existing_cliente:
+            return self._update_existing_cliente(existing_cliente, validated_data)
 
         for _ in range(3):
             try:
@@ -172,6 +248,7 @@ class LandingSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         credencial_meta = attrs.get("credencial_meta")
+        credencial_meta_extra = attrs.get("credencial_meta_extra")
         empresa = attrs.get("empresa") or getattr(self.instance, "empresa", None)
         if (
             credencial_meta
@@ -180,6 +257,28 @@ class LandingSerializer(serializers.ModelSerializer):
         ):
             raise serializers.ValidationError(
                 "La credencial Meta seleccionada no pertenece a la organizacion de la landing."
+            )
+        if (
+            credencial_meta_extra
+            and empresa
+            and credencial_meta_extra.bm.organizacion_id != empresa.organizacion_id
+        ):
+            raise serializers.ValidationError(
+                "La credencial Meta extra no pertenece a la organizacion de la landing."
+            )
+        effective_main = credencial_meta or getattr(self.instance, "credencial_meta", None)
+        effective_extra = credencial_meta_extra or getattr(self.instance, "credencial_meta_extra", None)
+        send_extra = attrs.get(
+            "enviar_capi_pixel_extra",
+            getattr(self.instance, "enviar_capi_pixel_extra", False),
+        )
+        if send_extra and not effective_extra:
+            raise serializers.ValidationError(
+                {"credencial_meta_extra": "Selecciona una credencial Meta extra para habilitar el envio adicional por CAPI."}
+            )
+        if send_extra and effective_main and effective_extra and effective_main.id == effective_extra.id:
+            raise serializers.ValidationError(
+                {"credencial_meta_extra": "La credencial Meta extra debe ser distinta del pixel principal de la landing."}
             )
         size_fields = (
             "size_titulo",
@@ -260,6 +359,8 @@ class LandingSerializer(serializers.ModelSerializer):
             "id",
             "empresa",
             "credencial_meta",
+            "enviar_capi_pixel_extra",
+            "credencial_meta_extra",
             "nombre",
             "token",
             "url",

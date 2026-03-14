@@ -5,6 +5,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from apps.recursos.models import WhatsApp
+from apps.recursos.serializers import normalizar_numero_whatsapp
 
 
 def seleccionar_numero_whatsapp(empresa_id, *, consume=True):
@@ -22,4 +23,4 @@ def seleccionar_numero_whatsapp(empresa_id, *, consume=True):
         if consume:
             numero.ultimo_uso = timezone.now()
             numero.save(update_fields=["ultimo_uso"])
-        return numero.numero
+        return normalizar_numero_whatsapp(numero.numero)

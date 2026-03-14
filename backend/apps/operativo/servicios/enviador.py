@@ -55,6 +55,27 @@ def obtener_credenciales_meta(empresa_id: int, landing=None) -> CredencialesMeta
     return CredencialesMeta.objects.filter(empresa_id=empresa_id).order_by("id").first()
 
 
+def _resolve_target_credentials(evento, credenciales: CredencialesMeta | None = None) -> tuple[CredencialesMeta, list[CredencialesMeta]]:
+    primary = credenciales or obtener_credenciales_meta(
+        evento.empresa_id,
+        landing=getattr(evento, "landing", None),
+    )
+    if not primary:
+        raise ValueError("No hay credenciales Meta configuradas para la empresa.")
+
+    targets = [primary]
+    landing = getattr(evento, "landing", None)
+    if (
+        landing
+        and getattr(landing, "enviar_capi_pixel_extra", False)
+        and getattr(landing, "credencial_meta_extra_id", None)
+    ):
+        extra = getattr(landing, "credencial_meta_extra", None)
+        if extra and extra.id != primary.id:
+            targets.append(extra)
+    return primary, targets
+
+
 def _merge_payload(evento) -> dict[str, Any]:
     payload = dict(evento.data or {})
     if evento.fbp:
@@ -69,32 +90,60 @@ def enviar_evento_meta(evento, request=None, credenciales: CredencialesMeta | No
     Envia un evento CAPI a Meta usando las CredencialesMeta de la empresa.
     Actualiza el estado del evento en la base de datos.
     """
-    credenciales = credenciales or obtener_credenciales_meta(evento.empresa_id, landing=getattr(evento, "landing", None))
-    if not credenciales:
-        raise ValueError("No hay credenciales Meta configuradas para la empresa.")
+    primary_credencial, target_credentials = _resolve_target_credentials(evento, credenciales=credenciales)
 
     payload = _merge_payload(evento)
     data, _ = MetaEventBuilder.build(tipo=evento.tipo, payload=payload, request=request)
     data["event_id"] = str(evento.id_evento)
 
-    token_acceso = decrypt_token(credenciales.token_acceso_encrypted)
     resolved_test_code = _resolve_test_event_code(evento, request=request, explicit_code=test_event_code)
-    url = _build_capi_url(credenciales.pixel_id, token_acceso, resolved_test_code)
+    target_results: list[dict[str, Any]] = []
+    primary_ok = False
+    extra_failures = 0
 
-    response = None
-    response_data: dict[str, Any]
-    try:
-        response = requests.post(url, json={"data": [data]}, timeout=META_TIMEOUT_SECONDS)
-        response_data = response.json()
-    except requests.RequestException as exc:
-        response_data = {"error": str(exc)}
-    except ValueError:
-        response_data = {"status_code": response.status_code, "text": response.text} if response else {"error": "invalid_json"}
+    for current_credencial in target_credentials:
+        token_acceso = decrypt_token(current_credencial.token_acceso_encrypted)
+        url = _build_capi_url(current_credencial.pixel_id, token_acceso, resolved_test_code)
+
+        response = None
+        target_response: dict[str, Any]
+        try:
+            response = requests.post(url, json={"data": [data]}, timeout=META_TIMEOUT_SECONDS)
+            target_response = response.json()
+        except requests.RequestException as exc:
+            target_response = {"error": str(exc)}
+        except ValueError:
+            target_response = (
+                {"status_code": response.status_code, "text": response.text}
+                if response else {"error": "invalid_json"}
+            )
+
+        ok = bool(response and response.ok)
+        target_results.append(
+            {
+                "credencial_id": current_credencial.id,
+                "nombre": current_credencial.nombre,
+                "pixel_id": current_credencial.pixel_id,
+                "is_primary": current_credencial.id == primary_credencial.id,
+                "ok": ok,
+                "response": target_response,
+            }
+        )
+        if current_credencial.id == primary_credencial.id:
+            primary_ok = ok
+        elif not ok:
+            extra_failures += 1
+
+    response_data = {
+        "targets": target_results,
+        "primary_ok": primary_ok,
+        "extra_failures": extra_failures,
+    }
 
     update_fields = ["respuesta_meta"]
     with transaction.atomic():
         evento.respuesta_meta = response_data
-        if response and response.ok:
+        if primary_ok:
             evento.estado_envio = "enviado"
             evento.enviado_en = timezone.now()
             update_fields += ["estado_envio", "enviado_en"]

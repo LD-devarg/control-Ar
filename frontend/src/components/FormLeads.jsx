@@ -36,8 +36,17 @@ function buildUsername(name, phoneDigits) {
 
 function buildWhatsappUrl(number, text) {
     if (!number) return "";
+    const digits = String(number).replace(/\D/g, "");
+    let normalizedNumber = digits;
+    if (digits.length === 10) {
+        normalizedNumber = `549${digits}`;
+    } else if (digits.startsWith("54") && digits.length === 12) {
+        normalizedNumber = `549${digits.slice(2)}`;
+    } else if (digits.startsWith("0") && digits.length === 11) {
+        normalizedNumber = `549${digits.slice(1)}`;
+    }
     const encoded = encodeURIComponent(text || "");
-    return `https://wa.me/${number}?text=${encoded}`;
+    return `https://wa.me/${normalizedNumber}?text=${encoded}`;
 }
 
 function generateLeadCode() {

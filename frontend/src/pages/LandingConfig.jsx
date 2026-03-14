@@ -72,6 +72,8 @@ const EMPTY_FORM = {
     bgGradientFrom: "#0b1f3a",
     bgGradientTo: "#111827",
     credencialMetaId: "",
+    enviarCapiPixelExtra: false,
+    credencialMetaExtraId: "",
     backgroundVertical: null,
     backgroundHorizontal: null,
     imagenReemplazoForm: null,
@@ -151,6 +153,11 @@ const FIELD_MAP = [
     { formKey: "weightForm", apiKey: "weight_form", normalize: (value) => String(Number(value || LANDING_TEXT_STYLE_DEFAULTS.weightForm)) },
     { formKey: "bgType", apiKey: "bg_type" },
     { formKey: "bgColor", apiKey: "bg_color" },
+    {
+        formKey: "enviarCapiPixelExtra",
+        apiKey: "enviar_capi_pixel_extra",
+        normalize: (value) => String(Boolean(value)),
+    },
 ];
 
 const parseGradient = (value) => {
@@ -399,6 +406,8 @@ function LandingConfig() {
             bgColor: value.bg_color || EMPTY_FORM.bgColor,
             bgGradient: value.bg_gradient || EMPTY_FORM.bgGradient,
             credencialMetaId: value.credencial_meta || "",
+            enviarCapiPixelExtra: value.enviar_capi_pixel_extra ?? EMPTY_FORM.enviarCapiPixelExtra,
+            credencialMetaExtraId: value.credencial_meta_extra || "",
             backgroundVertical: null,
             backgroundHorizontal: null,
             imagenReemplazoForm: null,
@@ -474,6 +483,13 @@ function LandingConfig() {
             || null
         );
     }, [credencialesMetaOptions, form.credencialMetaId]);
+    const selectedCredencialMetaExtra = useMemo(() => {
+        if (!form.credencialMetaExtraId) return null;
+        return (
+            credencialesMetaOptions.find((item) => Number(item.id) === Number(form.credencialMetaExtraId))
+            || null
+        );
+    }, [credencialesMetaOptions, form.credencialMetaExtraId]);
     const currentGradient = useMemo(
         () => buildGradient(form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo),
         [form.bgGradientAngle, form.bgGradientFrom, form.bgGradientTo]
@@ -498,6 +514,7 @@ function LandingConfig() {
         if (activo !== initialActivo) return true;
         if (currentGradient !== initialForm.bgGradient) return true;
         if (String(form.credencialMetaId || "") !== String(initialForm.credencialMetaId || "")) return true;
+        if (String(form.credencialMetaExtraId || "") !== String(initialForm.credencialMetaExtraId || "")) return true;
         return FIELD_MAP.some(({ formKey, normalize }) => {
             const toValue = normalize || ((value) => value);
             return toValue(form[formKey]) !== toValue(initialForm[formKey]);
@@ -577,6 +594,11 @@ function LandingConfig() {
             if (nextCredencial !== prevCredencial) {
                 formData.append("credencial_meta", nextCredencial);
             }
+            const nextCredencialExtra = String(form.credencialMetaExtraId || "");
+            const prevCredencialExtra = String(initialForm.credencialMetaExtraId || "");
+            if (nextCredencialExtra !== prevCredencialExtra) {
+                formData.append("credencial_meta_extra", nextCredencialExtra);
+            }
             appendFiles();
             if ([...formData.keys()].length === 0) {
                 showToast("info", "No hay cambios para guardar.");
@@ -589,6 +611,9 @@ function LandingConfig() {
             formData.append("bg_gradient", currentGradient);
             if (form.credencialMetaId) {
                 formData.append("credencial_meta", String(form.credencialMetaId));
+            }
+            if (form.credencialMetaExtraId) {
+                formData.append("credencial_meta_extra", String(form.credencialMetaExtraId));
             }
             appendFiles();
         }
@@ -961,6 +986,48 @@ function LandingConfig() {
                                     )}
                                 />
                             </Stack>
+
+                            <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1, width: "full" }}>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={Boolean(form.enviarCapiPixelExtra)}
+                                            onChange={(e) =>
+                                                setForm((prev) => ({ ...prev, enviarCapiPixelExtra: e.target.checked }))
+                                            }
+                                            sx={{
+                                                color: "rgba(255,255,255,0.85)",
+                                                "&.Mui-checked": { color: "rgba(255,255,255,0.85)" },
+                                            }}
+                                        />
+                                    }
+                                    label="Pixel extra por CAPI"
+                                    sx={{ color: "#fff", m: 0 }}
+                                />
+                            </Stack>
+
+                            {form.enviarCapiPixelExtra && (
+                                <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1, width: "full" }}>
+                                    <Autocomplete
+                                        options={credencialesMetaOptions}
+                                        value={selectedCredencialMetaExtra}
+                                        onChange={(_, value) =>
+                                            setForm((prev) => ({ ...prev, credencialMetaExtraId: value?.id || "" }))
+                                        }
+                                        getOptionLabel={(option) => option?.label || ""}
+                                        isOptionEqualToValue={(option, value) => Number(option.id) === Number(value.id)}
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Credencial Meta extra"
+                                                variant="outlined"
+                                                size="small"
+                                                sx={{ ...commonTextFieldSx, width: "500%" }}
+                                            />
+                                        )}
+                                    />
+                                </Stack>
+                            )}
 
                             {(form.mostrarComunidad || form.mostrarPasos) && (
                                 <Stack direction={{ xs: "column", md: "column" }} spacing={1} sx={{ mb: 1, mt: 1 }}>

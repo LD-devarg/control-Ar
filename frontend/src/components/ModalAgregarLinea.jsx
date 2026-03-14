@@ -29,7 +29,7 @@ function ModalAgregarLinea({ open, onClose, onSave, value, onChange }) {
                     label="Numero"
                     value={value}
                     onChange={onChange}
-                    helperText="Max. 10 digitos Ej: 2235123456"
+                    helperText="Celular argentino. Ej: 1168597657 o 5491168597657"
                     fullWidth
                     sx={{
                         fontSize: "10px",
@@ -57,7 +57,7 @@ function ModalAgregarLinea({ open, onClose, onSave, value, onChange }) {
                     }}
                 />
                 <Tooltip
-                    title="No agregar +54, 0 o 15"
+                    title="Se guarda en formato internacional para WhatsApp"
                     PopperProps={{ sx: { zIndex: 2101 } }}
                 >
                     <IconButton aria-label="Ayuda">

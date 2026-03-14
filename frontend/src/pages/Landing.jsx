@@ -22,7 +22,11 @@ function toNumberValue(value, fallback) {
 
 function normalizeWhatsappNumber(rawNumber) {
     if (!rawNumber) return "";
-    return String(rawNumber).replace(/\D/g, "");
+    const digits = String(rawNumber).replace(/\D/g, "");
+    if (digits.length === 10) return `549${digits}`;
+    if (digits.startsWith("54") && digits.length === 12) return `549${digits.slice(2)}`;
+    if (digits.startsWith("0") && digits.length === 11) return `549${digits.slice(1)}`;
+    return digits;
 }
 
 function buildFakeWinner() {

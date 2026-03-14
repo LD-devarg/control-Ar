@@ -93,7 +93,7 @@ function WhatsApp() {
     };
 
     const handleNewNumberChange = (event) => {
-        const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, 10);
+        const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, 13);
         setNewNumber(digitsOnly);
     };
 

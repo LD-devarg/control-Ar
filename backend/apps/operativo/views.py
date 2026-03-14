@@ -190,6 +190,20 @@ def _is_wallet_enabled_for_empresa(empresa_id: int) -> bool:
     return _get_empresa_operating_mode(empresa_id) == Empresa.OPERATING_MODE_FULL
 
 
+def _find_recent_lead_event(*, cliente_id: int, landing_id: int, seconds: int = 60):
+    window_start = timezone.now() - timedelta(seconds=seconds)
+    return (
+        EventosMeta.objects.filter(
+            cliente_id=cliente_id,
+            landing_id=landing_id,
+            tipo="lead",
+            creado_en__gte=window_start,
+        )
+        .order_by("-creado_en")
+        .first()
+    )
+
+
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     filterset_fields = ["empresa__id"]
@@ -262,6 +276,11 @@ class ClienteViewSet(viewsets.ModelViewSet):
 
         landing = serializer.validated_data["landing"]
         cliente = serializer.save()
+        dedupe_reason = serializer.context.get("dedupe_reason")
+        recent_event = _find_recent_lead_event(cliente_id=cliente.id, landing_id=landing.id)
+        if dedupe_reason == "identity_window" or recent_event:
+            output = ClienteSerializer(cliente)
+            return Response(output.data, status=status.HTTP_200_OK)
 
         evento = EventosMeta.objects.create(
             id_evento=uuid.uuid4(),

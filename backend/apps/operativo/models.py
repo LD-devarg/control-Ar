@@ -67,6 +67,14 @@ class Landing(models.Model):
         null=True,
         blank=True,
     )
+    enviar_capi_pixel_extra = models.BooleanField(default=False)
+    credencial_meta_extra = models.ForeignKey(
+        "pauta.CredencialesMeta",
+        on_delete=models.SET_NULL,
+        related_name="landings_capi_extra",
+        null=True,
+        blank=True,
+    )
     nombre = models.CharField(max_length=120)
     token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     url = models.URLField()

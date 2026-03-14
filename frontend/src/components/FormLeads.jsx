@@ -1,11 +1,8 @@
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
-import Tooltip from '@mui/material/Tooltip';
-import InputAdornment from '@mui/material/InputAdornment';
 import "../assets/css/FormLeads.css";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { markClientesDirty } from "../services/operativo/clientes";
@@ -28,9 +25,9 @@ function generateIdempotencyKey() {
     });
 }
 
-function buildUsername(name, phoneDigits) {
+function buildUsername(name, code) {
     const cleanName = name.replace(/\s+/g, "");
-    const last3 = phoneDigits.slice(-3);
+    const last3 = String(code || "").slice(-3);
     return `${cleanName}${last3}`;
 }
 
@@ -136,20 +133,13 @@ export default function NuevoLead({
     mediosPagoNode = null,
 }) {
     const [name, setName] = useState("");
-    const [phone, setPhone] = useState("");
     const [error, setError] = useState("");
     const sendingRef = useRef(false);
     const retryIndexRef = useRef(0);
     const retryTimerRef = useRef(null);
     const healthTimerRef = useRef(null);
 
-    const phoneDigits = useMemo(() => phone.replace(/\D/g, ""), [phone]);
     const trimmedName = useMemo(() => name.trim(), [name]);
-    const username = useMemo(() => {
-        if (!mostrarFormulario) return "";
-        if (!trimmedName || !phoneDigits) return "";
-        return buildUsername(trimmedName, phoneDigits);
-    }, [mostrarFormulario, trimmedName, phoneDigits]);
 
     const finalButtonText = buttonText || "JUGÁ AHORA";
     const finalInfoText = infoText || "Atencion personalizada las 24hs.";
@@ -205,19 +195,18 @@ export default function NuevoLead({
         () =>
             renderWhatsappMessage(whatsappTemplate, {
                 bono: bonusText || "100%",
-                username,
+                username: "",
                 nombre: trimmedName,
-                contacto: phoneDigits,
+                contacto: "",
             }),
-        [whatsappTemplate, bonusText, username, trimmedName, phoneDigits]
+        [whatsappTemplate, bonusText, trimmedName]
     );
     const whatsappUrl = useMemo(() => buildWhatsappUrl(whatsappNumber, messageText), [whatsappNumber, messageText]);
 
     const isNameValid = trimmedName.length > 1;
-    const isPhoneValid = phoneDigits.length === 10;
     const canSubmit =
         Boolean(landingToken) &&
-        (mostrarFormulario ? (Boolean(username) && isNameValid && isPhoneValid) : true);
+        (mostrarFormulario ? isNameValid : true);
 
     const scheduleRetry = () => {
         if (retryTimerRef.current) return;
@@ -431,8 +420,6 @@ export default function NuevoLead({
         if (!canSubmit) {
             if (!isNameValid) {
                 setError("Ingresá un nombre válido.");
-            } else if (!isPhoneValid) {
-                setError("Ingresá un número válido de 10 dígitos (sin 0, sin 15).");
             } else if (!landingToken) {
                 setError("Landing inválida o sin token.");
             }
@@ -453,12 +440,13 @@ export default function NuevoLead({
                 : undefined;
 
         const generatedCodigo = generateLeadCode();
+        const generatedUsername = buildUsername(trimmedName, generatedCodigo);
 
         const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
             bono: bonusText || "100%",
-            username,
+            username: generatedUsername,
             nombre: trimmedName,
-            contacto: phoneDigits,
+            contacto: "",
             codigo: generatedCodigo,
         });
         const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
@@ -468,8 +456,8 @@ export default function NuevoLead({
             queued_at: new Date().toISOString(),
             landing_token: landingToken,
             nombre: trimmedName,
-            contacto: phoneDigits,
-            username,
+            contacto: "",
+            username: generatedUsername,
             codigo: generatedCodigo,
             ...(fbp ? { fbp } : {}),
             ...(fbc ? { fbc } : {}),
@@ -498,15 +486,9 @@ export default function NuevoLead({
         if (error) setError("");
     };
 
-    const handlePhoneChange = (event) => {
-        const digitsOnly = String(event.target.value || "").replace(/\D/g, "").slice(0, 10);
-        setPhone(digitsOnly);
-        if (error) setError("");
-    };
-
     return (
         <div
-            className={`flex flex-col items-center rounded-xl backdrop-blur-[2px] shadow-xl w-8/10 lg:w-6/10 p-4 lg:p-1 my-2 transition-all duration-300 ${mostrarFormulario ? "h-6/10 lg:h-7/10" : "h-auto py-8 lg:py-12 justify-center"}`}
+            className={`form-leads-panel flex flex-col items-center rounded-[28px] backdrop-blur-[2px] shadow-xl my-2 transition-all duration-300 ${mostrarFormulario ? "" : "justify-center"}`}
             style={{ backgroundColor: resolvedFormBg, fontFamily: formTextFontStack }}
         >
             {mostrarFormulario && (
@@ -520,7 +502,7 @@ export default function NuevoLead({
 
             {mostrarFormulario ? (
                 <>
-                    <Stack spacing={0.5} direction="column" className="form-leads-stack">
+                    <Stack spacing={0.75} direction="column" className="form-leads-stack">
                         <TextField
                             className='textfield'
                             required
@@ -544,40 +526,7 @@ export default function NuevoLead({
                                 "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
                             }}
                         />
-                        <TextField
-                            required
-                            id="celular"
-                            label="Celular"
-                            fullWidth
-                            value={phone}
-                            onChange={handlePhoneChange}
-                            InputProps={{
-                                readOnly: isPreview,
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <Tooltip title="10 dígitos, sin 0, sin 15." arrow>
-                                            <InfoOutlinedIcon sx={{ color: "rgba(255,255,255,0.75)", fontSize: 18 }} />
-                                        </Tooltip>
-                                    </InputAdornment>
-                                ),
-                            }}
-                            inputProps={{ inputMode: "numeric", pattern: "[0-9]*", maxLength: 10 }}
-                            sx={{
-                                "& .MuiOutlinedInput-root": {
-                                    marginBottom: "0",
-                                    borderRadius: "20px",
-                                    backgroundColor: "rgba(49, 36, 146, 0.12)",
-                                    "& fieldset": { borderColor: resolvedFieldBorder },
-                                    "&:hover fieldset": { borderColor: "#fff" },
-                                    "&.Mui-focused fieldset": { borderColor: "#fff" },
-                                },
-                                "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
-                                "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
-                                "& .MuiFormHelperText-root": { color: "rgba(255,255,255,0.6)" },
-                            }}
-                        />
                     </Stack>
-                    <span className='text-xs mt-1 text-white/70' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>No compartiremos tu número con nadie.</span>
                     {error ? <span className='text-red-400 text-xs mt-2' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>{error}</span> : null}
                 </>
             ) : (
@@ -593,11 +542,11 @@ export default function NuevoLead({
                     disabled={isPreview || !canSubmit}
                     sx={{
                         backgroundColor: "transparent",
-                        marginTop: "10px",
+                        marginTop: "14px",
                         color: "#ffffff",
                         border: "none",
                         borderRadius: "20px",
-                        padding: "10px 20px",
+                        padding: "12px 26px",
                         fontWeight: resolvedButtonWeight,
                         fontSize: `${resolvedButtonSize}rem`,
                         fontFamily: buttonFontStack,
@@ -616,7 +565,7 @@ export default function NuevoLead({
                     {finalButtonText}
                 </Button>
             </div>
-            <span className='font-bold text-md mt-4 lg:mt-2' style={{ color: infoColor || "#ffffff", fontFamily: infoFontStack, fontSize: `${resolvedInfoSize}rem`, fontWeight: resolvedInfoWeight }}>{finalInfoText}</span>
+            <span className='font-bold text-md mt-4 text-center' style={{ color: infoColor || "#ffffff", fontFamily: infoFontStack, fontSize: `${resolvedInfoSize}rem`, fontWeight: resolvedInfoWeight }}>{finalInfoText}</span>
             {pasosNode && (
                 <div className="w-full mt-2 flex justify-center">
                     {pasosNode}

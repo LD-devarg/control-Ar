@@ -242,11 +242,10 @@ class ClienteCreateSerializer(serializers.Serializer):
         contacto = normalize_contacto(validated_data.get("contacto"))
         username = (validated_data.get("username") or "").strip()
 
-        if landing.mostrar_formulario:
-            if not nombre or not contacto:
-                raise serializers.ValidationError(
-                    "Nombre y contacto son obligatorios cuando el formulario esta activo."
-                )
+        if landing.mostrar_formulario and not nombre:
+            raise serializers.ValidationError(
+                "Nombre es obligatorio cuando el formulario esta activo."
+            )
 
         validated_data["nombre"] = nombre or None
         validated_data["contacto"] = contacto or None

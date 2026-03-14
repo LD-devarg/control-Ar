@@ -20,6 +20,7 @@ import CampaignOutlinedIcon from "@mui/icons-material/CampaignOutlined";
 import AdsClickOutlinedIcon from "@mui/icons-material/AdsClickOutlined";
 import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
 import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
+import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import User from "../components/User";
 import NuevosLeads from "../components/NuevosLeads.jsx";
@@ -61,6 +62,7 @@ function MobileLayout() {
         items: [
           { label: "Database", icon: <CampaignOutlinedIcon />, path: "/pauta-database" },
           { label: "Rendimientos", icon: <AdsClickOutlinedIcon />, path: "/pauta-kpi" },
+          { label: "Eventos Meta", icon: <HubOutlinedIcon />, path: "/meta-events" },
         ],
       },
       {

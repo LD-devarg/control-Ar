@@ -17,6 +17,7 @@ import Health from './pages/Health.jsx'
 import Tenant from './pages/Tenant.jsx'
 import Users from './pages/Users.jsx'
 import Organizaciones from './pages/Organizaciones.jsx'
+import MetaEvents from './pages/MetaEvents.jsx'
 import DemoApp from './pages/DemoApp.jsx'
 import { canAccessPath, getDefaultPath } from './services/access'
 import { getCurrentUser } from './services/auth'
@@ -93,6 +94,7 @@ function App() {
             <Route path="/empresas" element={<GuardedRoute path="/empresas" element={<Tenant />} />} />
             <Route path="/organizaciones" element={<GuardedRoute path="/organizaciones" element={<Organizaciones />} />} />
             <Route path="/usuarios" element={<GuardedRoute path="/usuarios" element={<Users />} />} />
+            <Route path="/meta-events" element={<GuardedRoute path="/meta-events" element={<MetaEvents />} />} />
           </Route>
           <Route path="/landing" element={<Landing />} />
           <Route path="/demo/*" element={<DemoApp />} />

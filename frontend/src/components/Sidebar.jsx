@@ -14,6 +14,7 @@ import AdsClickOutlinedIcon from "@mui/icons-material/AdsClickOutlined";
 import ContactPageOutlinedIcon from "@mui/icons-material/ContactPageOutlined";
 import HealthAndSafetyOutlinedIcon from "@mui/icons-material/HealthAndSafetyOutlined";
 import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
+import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import { getCurrentUser, logout } from "../services/auth";
 import { canAccessPath } from "../services/access";
 
@@ -47,6 +48,7 @@ function Sidebar() {
       items: [
         { path: "/pauta-database", label: "Database", Icon: CampaignOutlinedIcon },
         { path: "/pauta-kpi", label: "Rendimientos", Icon: AdsClickOutlinedIcon },
+        { path: "/meta-events", label: "Eventos Meta", Icon: HubOutlinedIcon },
       ],
     },
     {

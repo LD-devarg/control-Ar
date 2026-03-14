@@ -491,6 +491,9 @@ class EventosMetaReadSerializer(serializers.ModelSerializer):
     cliente_username = serializers.CharField(source="cliente.username", read_only=True)
     cliente_contacto = serializers.CharField(source="cliente.contacto", read_only=True)
     cliente_codigo = serializers.CharField(source="cliente.codigo", read_only=True)
+    empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
+    landing_nombre = serializers.CharField(source="landing.nombre", read_only=True)
+    operador_username = serializers.CharField(source="operador.username", read_only=True)
     contactado = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -505,12 +508,17 @@ class EventosMetaReadSerializer(serializers.ModelSerializer):
             "cliente_codigo",
             "contactado",
             "empresa",
+            "empresa_nombre",
             "landing",
+            "landing_nombre",
             "operador",
+            "operador_username",
             "tipo",
             "data",
             "fbp",
             "fbc",
+            "ip_address",
+            "user_agent",
             "estado_envio",
             "respuesta_meta",
             "reintentos",

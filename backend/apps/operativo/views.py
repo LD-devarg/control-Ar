@@ -1080,6 +1080,8 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             return True
         if self.action == "test_event":
             return is_admin(request.user) or is_pauta(request.user)
+        if self.action == "retry":
+            return False
         if is_admin(request.user) or is_operador(request.user) or is_pauta(request.user):
             return self.action in {"list", "retrieve"}
         return False
@@ -1088,7 +1090,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         qs = filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
         user = self.request.user
         if self.action == "list":
-            qs = qs.select_related("cliente", "operador").only(
+            qs = qs.select_related("cliente", "operador", "empresa", "landing").only(
                 "id",
                 "id_evento",
                 "cliente_id",
@@ -1097,13 +1099,17 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 "cliente__contacto",
                 "cliente__codigo",
                 "empresa_id",
+                "empresa__nombre",
                 "landing_id",
+                "landing__nombre",
                 "operador_id",
                 "operador__username",
                 "tipo",
                 "data",
                 "fbp",
                 "fbc",
+                "ip_address",
+                "user_agent",
                 "estado_envio",
                 "respuesta_meta",
                 "reintentos",
@@ -1118,6 +1124,9 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         tipo = self.request.query_params.get("tipo")
         if tipo:
             qs = qs.filter(tipo=tipo)
+        estado_envio = self.request.query_params.get("estado_envio")
+        if estado_envio:
+            qs = qs.filter(estado_envio=estado_envio)
         qs = _apply_date_filters(qs, "creado_en", self.request)
         qs = qs.annotate(
             contactado=Exists(
@@ -1308,6 +1317,25 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
 
         output = EventosMetaReadSerializer(evento)
         return Response({"evento": output.data, "meta": respuesta}, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated], url_path="retry")
+    def retry(self, request, pk=None):
+        if not request.user.is_superuser:
+            raise ValidationError("Solo superuser puede reenviar eventos.")
+
+        evento = self.get_object()
+
+        try:
+            respuesta = enviar_evento_meta(evento, request=request)
+        except Exception as exc:
+            evento.estado_envio = "fallido"
+            evento.respuesta_meta = {"error": str(exc)}
+            evento.reintentos = (evento.reintentos or 0) + 1
+            evento.save(update_fields=["estado_envio", "respuesta_meta", "reintentos"])
+            raise ValidationError(str(exc))
+
+        output = EventosMetaReadSerializer(evento)
+        return Response({"evento": output.data, "meta": respuesta}, status=status.HTTP_200_OK)
 
 
 class CompraViewSet(viewsets.ModelViewSet):

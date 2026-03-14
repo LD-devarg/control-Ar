@@ -8,6 +8,7 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Collapse,
   Divider,
   FormControl,
   InputLabel,
@@ -19,6 +20,8 @@ import {
 } from "@mui/material";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import ReplayOutlinedIcon from "@mui/icons-material/ReplayOutlined";
+import ExpandMoreOutlinedIcon from "@mui/icons-material/ExpandMoreOutlined";
+import ExpandLessOutlinedIcon from "@mui/icons-material/ExpandLessOutlined";
 import Page from "../layouts/Page";
 import { apiClient, getCurrentUser } from "../services/auth";
 import { mergeEmpresaParam } from "../services/tenant";
@@ -69,10 +72,10 @@ function resolveStatusColor(estado) {
 function DataRow({ label, value }) {
   return (
     <Box sx={{ minWidth: 0 }}>
-      <Typography variant="caption" color="text.secondary" sx={{ display: "block", letterSpacing: 0.4 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", letterSpacing: 0.3, lineHeight: 1.1 }}>
         {label}
       </Typography>
-      <Typography variant="body2" sx={{ fontWeight: 500, wordBreak: "break-word" }}>
+      <Typography variant="body2" sx={{ fontWeight: 500, wordBreak: "break-word", fontSize: 13 }}>
         {value || "-"}
       </Typography>
     </Box>
@@ -85,10 +88,10 @@ function TargetCard({ target }) {
 
   return (
     <Card variant="outlined" sx={{ borderRadius: 3, backgroundColor: target?.ok ? "rgba(34,197,94,0.06)" : "rgba(239,68,68,0.06)" }}>
-      <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+      <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1, p: 1.5 }}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }}>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 14 }}>
               {target?.nombre || "Pixel"}
             </Typography>
             <Chip size="small" color={target?.ok ? "success" : "error"} label={target?.ok ? "OK" : "Error"} />
@@ -99,7 +102,7 @@ function TargetCard({ target }) {
           </Typography>
         </Stack>
 
-        <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" } }}>
+        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" } }}>
           <DataRow label="Credencial" value={target?.credencial_id ? `#${target.credencial_id}` : "-"} />
           <DataRow label="Eventos recibidos" value={response?.events_received ?? "-"} />
           <DataRow label="FB Trace ID" value={response?.fbtrace_id || "-"} />
@@ -121,51 +124,138 @@ function TargetCard({ target }) {
   );
 }
 
-function EventCard({ event, onRetry, retrying }) {
+function EventDetail({ event }) {
   const payload = event?.data || {};
   const meta = event?.respuesta_meta || {};
   const targets = Array.isArray(meta?.targets) ? meta.targets : [];
 
   return (
+    <Box sx={{ pt: 1.5 }}>
+      <Divider sx={{ mb: 1.5 }} />
+      <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", xl: "1.15fr 0.85fr" } }}>
+        <Card variant="outlined" sx={{ borderRadius: 3 }}>
+          <CardContent sx={{ p: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.25 }}>
+              Payload y matching
+            </Typography>
+            <Box sx={{ display: "grid", gap: 1.1, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" } }}>
+              <DataRow label="Telefono payload" value={payload?.phone || "-"} />
+              <DataRow label="Email" value={payload?.email || "-"} />
+              <DataRow label="Nombre payload" value={payload?.nombre || "-"} />
+              <DataRow label="External ID" value={payload?.external_id || "-"} />
+              <DataRow label="FBP" value={event?.fbp || "-"} />
+              <DataRow label="FBC" value={event?.fbc || "-"} />
+              <DataRow label="IP" value={event?.ip_address || "-"} />
+              <DataRow label="URL origen" value={payload?.event_source_url || "-"} />
+              <Box sx={{ gridColumn: { xs: "1 / -1", sm: "1 / -1" } }}>
+                <DataRow label="User Agent" value={event?.user_agent || "-"} />
+              </Box>
+            </Box>
+            {event?.tipo === "purchase" ? (
+              <Alert severity="info" sx={{ borderRadius: 2.5, mt: 1.25, py: 0 }}>
+                Valor enviado: {formatMoney(payload?.value, payload?.currency)}.
+              </Alert>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        <Card variant="outlined" sx={{ borderRadius: 3 }}>
+          <CardContent sx={{ p: 1.5 }}>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1.25 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                Respuesta Meta
+              </Typography>
+              <Chip size="small" color={meta?.primary_ok ? "success" : "error"} label={`Primario ${boolLabel(Boolean(meta?.primary_ok))}`} />
+              <Chip size="small" variant="outlined" label={`Fallos extra ${meta?.extra_failures ?? 0}`} />
+              <Chip size="small" variant="outlined" label={`Targets ${targets.length}`} />
+            </Stack>
+            {targets.length ? (
+              <Stack spacing={1}>
+                {targets.map((target, index) => (
+                  <TargetCard key={`${event?.id}-target-${index}`} target={target} />
+                ))}
+              </Stack>
+            ) : (
+              <Alert severity="warning" sx={{ borderRadius: 2.5 }}>
+                Este evento no tiene targets registrados.
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </Box>
+    </Box>
+  );
+}
+
+function EventRow({ event, expanded, onToggle, onRetry, retrying }) {
+  return (
     <Card
       variant="outlined"
       sx={{
-        borderRadius: 4,
-        borderColor: "rgba(15,23,42,0.12)",
-        boxShadow: "0 18px 40px rgba(15,23,42,0.06)",
+        borderRadius: 3,
+        borderColor: expanded ? "rgba(59,130,246,0.45)" : "rgba(15,23,42,0.12)",
+        boxShadow: expanded ? "0 18px 40px rgba(15,23,42,0.08)" : "0 8px 20px rgba(15,23,42,0.05)",
       }}
     >
-      <CardContent sx={{ p: { xs: 2, md: 3 }, display: "flex", flexDirection: "column", gap: 2.25 }}>
-        <Stack direction={{ xs: "column", lg: "row" }} justifyContent="space-between" spacing={2}>
-          <Stack spacing={1}>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              <Chip color={resolveStatusColor(event?.estado_envio)} label={ESTADO_LABELS[event?.estado_envio] || event?.estado_envio || "-"} size="small" />
-              <Chip variant="outlined" label={TIPO_LABELS[event?.tipo] || event?.tipo || "-"} size="small" />
-              <Chip variant="outlined" label={event?.empresa_nombre || `Empresa #${event?.empresa}`} size="small" />
-              {event?.landing_nombre ? <Chip variant="outlined" label={`Landing ${event.landing_nombre}`} size="small" /> : null}
-            </Stack>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              {event?.cliente_nombre || "Sin nombre"} {event?.cliente_contacto ? `· ${event.cliente_contacto}` : ""}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Evento #{event?.id} · UUID {event?.id_evento || "-"}
-            </Typography>
-          </Stack>
+      <CardContent sx={{ p: { xs: 1.5, md: 1.75 } }}>
+        <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: "stretch", lg: "center" }}>
+          <Button
+            onClick={onToggle}
+            sx={{
+              p: 0,
+              minWidth: 0,
+              justifyContent: "flex-start",
+              textAlign: "left",
+              textTransform: "none",
+              color: "inherit",
+              flex: 1,
+              "&:hover": { backgroundColor: "transparent" },
+            }}
+          >
+            <Stack spacing={1} sx={{ width: "100%" }}>
+              <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap alignItems="center">
+                <Chip color={resolveStatusColor(event?.estado_envio)} label={ESTADO_LABELS[event?.estado_envio] || event?.estado_envio || "-"} size="small" />
+                <Chip variant="outlined" label={TIPO_LABELS[event?.tipo] || event?.tipo || "-"} size="small" />
+                <Chip variant="outlined" label={event?.empresa_nombre || `Empresa #${event?.empresa}`} size="small" />
+                {event?.landing_nombre ? <Chip variant="outlined" label={event.landing_nombre} size="small" /> : null}
+                {expanded ? <ExpandLessOutlinedIcon fontSize="small" /> : <ExpandMoreOutlinedIcon fontSize="small" />}
+              </Stack>
 
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "center" }}>
-            <Box sx={{ textAlign: { xs: "left", sm: "right" } }}>
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                Creado
-              </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                {formatDateTime(event?.creado_en)}
-              </Typography>
-            </Box>
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 1.25,
+                  gridTemplateColumns: { xs: "1fr", md: "1.5fr 1fr 0.85fr 0.6fr 0.8fr 0.65fr" },
+                  alignItems: "center",
+                }}
+              >
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 800, fontSize: 18 }}>
+                    {event?.cliente_nombre || "Sin nombre"}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    #{event?.id} · {event?.id_evento || "-"}
+                  </Typography>
+                </Box>
+                <DataRow label="Cliente" value={event?.cliente_contacto || event?.cliente_username || "-"} />
+                <DataRow label="Codigo" value={event?.cliente_codigo || "-"} />
+                <DataRow label="Targets" value={String(Array.isArray(event?.respuesta_meta?.targets) ? event.respuesta_meta.targets.length : 0)} />
+                <DataRow label="Creado" value={formatDateTime(event?.creado_en)} />
+                <DataRow label="Retry" value={String(event?.reintentos ?? 0)} />
+              </Box>
+            </Stack>
+          </Button>
+
+          <Stack direction={{ xs: "row", lg: "column" }} spacing={1} alignItems={{ xs: "center", lg: "flex-end" }} justifyContent="space-between" sx={{ minWidth: { lg: 132 } }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "none", lg: "block" } }}>
+              {event?.operador_username ? `Operador ${event.operador_username}` : "Sin operador"}
+            </Typography>
             <Button
               variant="outlined"
               color="primary"
+              size="small"
               startIcon={retrying ? <CircularProgress size={16} color="inherit" /> : <ReplayOutlinedIcon />}
-              onClick={() => onRetry(event)}
+              onClick={onRetry}
               disabled={retrying}
               sx={{ borderRadius: 999 }}
             >
@@ -174,57 +264,9 @@ function EventCard({ event, onRetry, retrying }) {
           </Stack>
         </Stack>
 
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", md: "repeat(4, minmax(0, 1fr))" } }}>
-          <DataRow label="Usuario" value={event?.cliente_username || "-"} />
-          <DataRow label="Codigo cliente" value={event?.cliente_codigo || "-"} />
-          <DataRow label="Operador" value={event?.operador_username || "-"} />
-          <DataRow label="Reintentos" value={String(event?.reintentos ?? 0)} />
-        </Box>
-
-        <Divider />
-
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" } }}>
-          <DataRow label="Telefono payload" value={payload?.phone || "-"} />
-          <DataRow label="Email" value={payload?.email || "-"} />
-          <DataRow label="Nombre payload" value={payload?.nombre || "-"} />
-          <DataRow label="External ID" value={payload?.external_id || "-"} />
-          <DataRow label="FBP" value={event?.fbp || "-"} />
-          <DataRow label="FBC" value={event?.fbc || "-"} />
-          <DataRow label="IP" value={event?.ip_address || "-"} />
-          <DataRow label="User Agent" value={event?.user_agent || "-"} />
-          <DataRow label="URL origen" value={payload?.event_source_url || "-"} />
-        </Box>
-
-        {event?.tipo === "purchase" ? (
-          <Alert severity="info" sx={{ borderRadius: 3 }}>
-            Valor enviado: {formatMoney(payload?.value, payload?.currency)}.
-          </Alert>
-        ) : null}
-
-        <Divider />
-
-        <Stack spacing={1.25}>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-              Respuesta Meta
-            </Typography>
-            <Chip size="small" color={meta?.primary_ok ? "success" : "error"} label={`Primario ${boolLabel(Boolean(meta?.primary_ok))}`} />
-            <Chip size="small" variant="outlined" label={`Fallos extra ${meta?.extra_failures ?? 0}`} />
-            <Chip size="small" variant="outlined" label={`Targets ${targets.length}`} />
-          </Stack>
-
-          {targets.length ? (
-            <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", xl: "repeat(2, minmax(0, 1fr))" } }}>
-              {targets.map((target, index) => (
-                <TargetCard key={`${event?.id}-target-${index}`} target={target} />
-              ))}
-            </Box>
-          ) : (
-            <Alert severity="warning" sx={{ borderRadius: 3 }}>
-              Este evento no tiene targets registrados en `respuesta_meta`.
-            </Alert>
-          )}
-        </Stack>
+        <Collapse in={expanded} timeout="auto" unmountOnExit>
+          <EventDetail event={event} />
+        </Collapse>
       </CardContent>
     </Card>
   );
@@ -238,6 +280,7 @@ export default function MetaEvents() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [retryingId, setRetryingId] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
   const [filters, setFilters] = useState({
     empresa: "",
     tipo: "",
@@ -271,6 +314,7 @@ export default function MetaEvents() {
       const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
       startTransition(() => {
         setRows(items);
+        setExpandedId((prev) => (items.some((item) => item.id === prev) ? prev : items[0]?.id || null));
       });
     } catch (requestError) {
       setError(requestError?.response?.data?.detail || requestError?.message || "No se pudieron cargar los eventos.");
@@ -375,9 +419,17 @@ export default function MetaEvents() {
 
   return (
     <Page title="Eventos Meta" actions={actions}>
-      <Stack spacing={2} sx={{ width: "100%" }}>
+      <Stack
+        spacing={2}
+        sx={{
+          width: "100%",
+          height: { xs: "calc(100dvh - 190px)", md: "calc(100dvh - 170px)" },
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
         <Alert severity="info" sx={{ borderRadius: 3 }}>
-          Vista completa para superusuario. Respeta tenant cuando filtras por empresa y permite reenviar el mismo evento a Meta.
+          Vista completa para superusuario. Cada fila resume un evento y al abrirla ves el detalle completo.
         </Alert>
 
         {error ? (
@@ -386,39 +438,52 @@ export default function MetaEvents() {
           </Alert>
         ) : null}
 
-        {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-            <CircularProgress />
-          </Box>
-        ) : rows.length === 0 ? (
-          <Alert severity="warning" sx={{ borderRadius: 3 }}>
-            No hay eventos para los filtros seleccionados.
-          </Alert>
-        ) : (
-          <Stack spacing={2} sx={{ width: "100%" }}>
-            {rows.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                retrying={retryingId === event.id}
-                onRetry={async (currentEvent) => {
-                  setRetryingId(currentEvent.id);
-                  setError("");
-                  try {
-                    const params = filters.empresa ? { empresa: filters.empresa } : {};
-                    const { data } = await apiClient.post(`/eventos-meta/${currentEvent.id}/retry/`, null, { params });
-                    const nextEvent = data?.evento || currentEvent;
-                    setRows((prev) => prev.map((item) => (item.id === currentEvent.id ? nextEvent : item)));
-                  } catch (requestError) {
-                    setError(requestError?.response?.data?.detail || requestError?.message || "No se pudo reenviar el evento.");
-                  } finally {
-                    setRetryingId(null);
-                  }
-                }}
-              />
-            ))}
-          </Stack>
-        )}
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            pr: 0.5,
+            "&::-webkit-scrollbar": { width: 8 },
+            "&::-webkit-scrollbar-thumb": { backgroundColor: "rgba(148,163,184,0.35)", borderRadius: 999 },
+          }}
+        >
+          {loading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+              <CircularProgress />
+            </Box>
+          ) : rows.length === 0 ? (
+            <Alert severity="warning" sx={{ borderRadius: 3 }}>
+              No hay eventos para los filtros seleccionados.
+            </Alert>
+          ) : (
+            <Stack spacing={1.25} sx={{ width: "100%" }}>
+              {rows.map((event) => (
+                <EventRow
+                  key={event.id}
+                  event={event}
+                  expanded={expandedId === event.id}
+                  retrying={retryingId === event.id}
+                  onToggle={() => setExpandedId((prev) => (prev === event.id ? null : event.id))}
+                  onRetry={async () => {
+                    setRetryingId(event.id);
+                    setError("");
+                    try {
+                      const params = filters.empresa ? { empresa: filters.empresa } : {};
+                      const { data } = await apiClient.post(`/eventos-meta/${event.id}/retry/`, null, { params });
+                      const nextEvent = data?.evento || event;
+                      setRows((prev) => prev.map((item) => (item.id === event.id ? nextEvent : item)));
+                    } catch (requestError) {
+                      setError(requestError?.response?.data?.detail || requestError?.message || "No se pudo reenviar el evento.");
+                    } finally {
+                      setRetryingId(null);
+                    }
+                  }}
+                />
+              ))}
+            </Stack>
+          )}
+        </Box>
       </Stack>
     </Page>
   );

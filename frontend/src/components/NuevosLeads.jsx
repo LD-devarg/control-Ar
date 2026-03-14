@@ -6,6 +6,10 @@ import { useTenant } from "../context/TenantContext";
 import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
 import "../assets/css/RecentPurchasesTable.css";
 
+const REFRESH_DEBOUNCE_MS = 500;
+const REFRESH_COOLDOWN_MS = 5000;
+const POLL_INTERVAL_MS = 60000;
+
 function formatDateTime(value) {
     if (!value) return "-";
     const date = new Date(value);
@@ -29,15 +33,30 @@ function buildLeadTitle(lead) {
     return "Lead";
 }
 
+function readCachedLeads(cacheKey) {
+    if (typeof window === "undefined") return [];
+    try {
+        const raw = window.sessionStorage.getItem(cacheKey);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
 function NuevosLeads() {
     const { tenantId } = useTenant();
-    const [leads, setLeads] = useState([]);
-    const [loading, setLoading] = useState(false);
+    const cacheKey = useMemo(() => `new_leads_aside:${tenantId || "all"}`, [tenantId]);
+    const [leads, setLeads] = useState(() => readCachedLeads(cacheKey));
+    const [loading, setLoading] = useState(() => readCachedLeads(cacheKey).length === 0);
     const [error, setError] = useState("");
     const [selectedLead, setSelectedLead] = useState(null);
     const [clienteDetalle, setClienteDetalle] = useState(null);
     const [detalleLoading, setDetalleLoading] = useState(false);
     const detalleCacheRef = useRef(new Map());
+    const refreshTimerRef = useRef(null);
+    const lastRefreshAtRef = useRef(0);
 
     const loadLeads = useCallback(async (opts = {}) => {
         const { silent } = opts;
@@ -47,9 +66,13 @@ function NuevosLeads() {
         setError("");
         try {
             const { data } = await apiClient.get("/eventos-meta/", {
-                params: { tipo: "lead", sin_contacto: 1 },
+                params: { tipo: "lead", sin_contacto: 1, limit: 25 },
             });
-            setLeads(Array.isArray(data) ? data : []);
+            const nextRows = Array.isArray(data) ? data : [];
+            setLeads(nextRows);
+            if (typeof window !== "undefined") {
+                window.sessionStorage.setItem(cacheKey, JSON.stringify(nextRows));
+            }
         } catch (err) {
             setError("No se pudieron cargar los nuevos leads.");
         } finally {
@@ -57,32 +80,55 @@ function NuevosLeads() {
                 setLoading(false);
             }
         }
-    }, [tenantId]);
+    }, [cacheKey]);
+
+    const triggerRefresh = useCallback((options = {}) => {
+        const { force = false, silent = true } = options;
+        if (refreshTimerRef.current) {
+            clearTimeout(refreshTimerRef.current);
+        }
+        const now = Date.now();
+        const elapsed = now - lastRefreshAtRef.current;
+        const delay = force || elapsed >= REFRESH_COOLDOWN_MS ? 0 : REFRESH_DEBOUNCE_MS;
+        refreshTimerRef.current = setTimeout(() => {
+            lastRefreshAtRef.current = Date.now();
+            loadLeads({ silent });
+        }, delay);
+    }, [loadLeads]);
 
     useEffect(() => {
-        loadLeads();
-        const handleRefresh = () => loadLeads({ silent: true });
+        setLeads(readCachedLeads(cacheKey));
+    }, [cacheKey]);
+
+    useEffect(() => {
+        triggerRefresh({ force: true, silent: false });
+        const intervalId = setInterval(() => triggerRefresh(), POLL_INTERVAL_MS);
+        const handleRefresh = () => triggerRefresh();
         const handleStorage = (event) => {
             if (event.key === "leads_refresh_ts") {
-                loadLeads({ silent: true });
+                triggerRefresh();
             }
         };
         window.addEventListener("leads:refresh", handleRefresh);
         window.addEventListener("storage", handleStorage);
         return () => {
+            clearInterval(intervalId);
+            if (refreshTimerRef.current) {
+                clearTimeout(refreshTimerRef.current);
+            }
             window.removeEventListener("leads:refresh", handleRefresh);
             window.removeEventListener("storage", handleStorage);
         };
-    }, [loadLeads]);
+    }, [cacheKey, triggerRefresh]);
 
     useEffect(() => {
         const unsubscribe = subscribeRealtimeEvents((message) => {
             if (message?.type === "lead_created") {
-                loadLeads({ silent: true });
+                triggerRefresh();
             }
         });
         return unsubscribe;
-    }, [loadLeads]);
+    }, [triggerRefresh]);
 
     const handleOpen = async (lead) => {
         setSelectedLead(lead);

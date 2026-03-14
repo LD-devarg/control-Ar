@@ -9,6 +9,10 @@ import PendingActionsOutlinedIcon from '@mui/icons-material/PendingActionsOutlin
 import ChatBubbleOutlineOutlinedIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 
+const REFRESH_DEBOUNCE_MS = 500;
+const REFRESH_COOLDOWN_MS = 5000;
+const POLL_INTERVAL_MS = 60000;
+
 function normalizeEventType(rawType) {
   return String(rawType || "").toLowerCase();
 }
@@ -38,26 +42,51 @@ function getEventBadgeTheme(rawType) {
 
 function buildEventDisplayName(item) {
   const codigo = String(item?.cliente_codigo || "").trim();
-  const clienteId = String(item?.cliente || "").trim();
-  const username = String(item?.username || "").trim();
   const nombre = String(item?.nombre || "").trim();
+  const username = String(item?.username || "").trim();
+  const clienteId = String(item?.cliente || item?.cliente_id || "").trim();
 
+  if (nombre) return nombre;
+  if (username) return username;
   if (codigo) return `ID ${codigo}`;
   if (clienteId) return `Cliente #${clienteId}`;
-  if (username) return username;
-  if (nombre) return nombre;
   return "Evento";
+}
+
+function buildCacheKey({ tenantId, usePeriod, period, desde, hasta }) {
+  const rangeKey = usePeriod
+    ? `period:${period || ""}`
+    : `from:${desde?.format("YYYY-MM-DD") || ""}:to:${hasta?.format("YYYY-MM-DD") || ""}`;
+  return `stats_events_aside:${tenantId || "all"}:${rangeKey}`;
+}
+
+function readCachedEvents(cacheKey) {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.sessionStorage.getItem(cacheKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight = false }) {
   const { tenantId } = useTenant();
-  const [loading, setLoading] = useState(false);
-  const [events, setEvents] = useState([]);
+  const cacheKey = useMemo(
+    () => buildCacheKey({ tenantId, usePeriod, period, desde, hasta }),
+    [tenantId, usePeriod, period, desde, hasta]
+  );
+  const [events, setEvents] = useState(() => readCachedEvents(cacheKey));
+  const [loading, setLoading] = useState(() => readCachedEvents(cacheKey).length === 0);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [highlightedIds, setHighlightedIds] = useState([]);
   const removeHighlightTimersRef = useRef([]);
   const activeRequestRef = useRef(null);
   const abortTimerRef = useRef(null);
+  const refreshTimerRef = useRef(null);
+  const lastRefreshAtRef = useRef(0);
 
   const queryParams = useMemo(
     () =>
@@ -96,6 +125,9 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
           signal,
         });
         const nextRows = Array.isArray(data) ? data : [];
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem(cacheKey, JSON.stringify(nextRows));
+        }
         setEvents((prevRows) => {
           const prevIds = new Set(prevRows.map((item) => item.id));
           const newIds = nextRows
@@ -119,27 +151,44 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [queryParams]
+    [cacheKey, queryParams]
   );
 
-  const triggerRefresh = useCallback(() => {
+  const triggerRefresh = useCallback((options = {}) => {
+    const { force = false } = options;
     if (activeRequestRef.current) {
       activeRequestRef.current.abort();
     }
     if (abortTimerRef.current) {
       clearTimeout(abortTimerRef.current);
     }
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+    const now = Date.now();
+    const elapsed = now - lastRefreshAtRef.current;
+    const delay = force || elapsed >= REFRESH_COOLDOWN_MS ? 0 : REFRESH_DEBOUNCE_MS;
     const controller = new AbortController();
     activeRequestRef.current = controller;
-    loadEvents(controller.signal);
-    abortTimerRef.current = setTimeout(() => controller.abort(), 15000);
+    refreshTimerRef.current = setTimeout(() => {
+      lastRefreshAtRef.current = Date.now();
+      loadEvents(controller.signal);
+      abortTimerRef.current = setTimeout(() => controller.abort(), 15000);
+    }, delay);
   }, [loadEvents]);
 
   useEffect(() => {
-    triggerRefresh();
-    const pollId = setInterval(() => triggerRefresh(), 30000);
+    setEvents(readCachedEvents(cacheKey));
+  }, [cacheKey]);
+
+  useEffect(() => {
+    triggerRefresh({ force: true });
+    const pollId = setInterval(() => triggerRefresh(), POLL_INTERVAL_MS);
     return () => {
       clearInterval(pollId);
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
       if (activeRequestRef.current) {
         activeRequestRef.current.abort();
       }
@@ -164,17 +213,14 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
         triggerRefresh();
       }
     };
-    const onFocus = () => triggerRefresh();
     window.addEventListener("leads:refresh", onLeadRefresh);
     window.addEventListener("compra:created", onCompraCreated);
     window.addEventListener("storage", onStorage);
-    window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.removeEventListener("leads:refresh", onLeadRefresh);
       window.removeEventListener("compra:created", onCompraCreated);
       window.removeEventListener("storage", onStorage);
-      window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [triggerRefresh]);

@@ -1074,6 +1074,29 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
         user = self.request.user
+        if self.action == "list":
+            qs = qs.select_related("cliente", "operador").only(
+                "id",
+                "id_evento",
+                "cliente_id",
+                "cliente__nombre",
+                "cliente__username",
+                "cliente__contacto",
+                "cliente__codigo",
+                "empresa_id",
+                "landing_id",
+                "operador_id",
+                "operador__username",
+                "tipo",
+                "data",
+                "fbp",
+                "fbc",
+                "estado_envio",
+                "respuesta_meta",
+                "reintentos",
+                "creado_en",
+                "enviado_en",
+            )
         if user.is_authenticated and is_operador(user):
             qs = qs.filter(
                 (models.Q(tipo='lead') & models.Q(operador__isnull=True)) |
@@ -1094,7 +1117,18 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         sin_contacto = self.request.query_params.get("sin_contacto")
         if sin_contacto in {"1", "true", "True"}:
             qs = qs.filter(tipo="lead", contactado=False)
-        return qs.order_by("-creado_en")
+        qs = qs.order_by("-creado_en")
+
+        if self.action == "list":
+            limit_param = self.request.query_params.get("limit")
+            if limit_param not in (None, ""):
+                try:
+                    limit = int(limit_param)
+                except ValueError:
+                    limit = 25
+                limit = max(1, min(limit, 100))
+                qs = qs[:limit]
+        return qs
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -1711,6 +1745,17 @@ class StatsViewSet(viewsets.ViewSet):
         eventos_qs = (
             EventosMeta.objects.filter(empresa_id=empresa_id, tipo__in=["lead", "contact"])
             .select_related("cliente", "operador")
+            .only(
+                "id",
+                "tipo",
+                "creado_en",
+                "cliente_id",
+                "cliente__codigo",
+                "cliente__username",
+                "cliente__nombre",
+                "cliente__contacto",
+                "operador__username",
+            )
         )
         if is_operador(user):
             eventos_qs = eventos_qs.filter(
@@ -1722,6 +1767,20 @@ class StatsViewSet(viewsets.ViewSet):
         compras_qs = (
             Compra.objects.filter(empresa_id=empresa_id)
             .select_related("cliente", "operador")
+            .only(
+                "id",
+                "creado_en",
+                "monto_ars",
+                "monto_usd",
+                "comprobante",
+                "comprobante_archivo",
+                "cliente_id",
+                "cliente__codigo",
+                "cliente__username",
+                "cliente__nombre",
+                "cliente__contacto",
+                "operador__username",
+            )
         )
         if is_operador(user):
             compras_qs = compras_qs.filter(operador=user)
@@ -1736,11 +1795,12 @@ class StatsViewSet(viewsets.ViewSet):
                     "evento": evento.tipo,
                     "evento_label": "Lead" if evento.tipo == "lead" else "Contacto",
                     "fecha_hora": evento.creado_en,
+                    "cliente": evento.cliente_id,
+                    "cliente_codigo": evento.cliente.codigo if evento.cliente else "",
                     "username": evento.cliente.username if evento.cliente else "",
                     "nombre": evento.cliente.nombre if evento.cliente else "",
                     "contacto": evento.cliente.contacto if evento.cliente else "",
                     "operador": evento.operador.username if evento.operador else "",
-                    "cliente_id": evento.cliente_id,
                 }
             )
 
@@ -1760,11 +1820,12 @@ class StatsViewSet(viewsets.ViewSet):
                     "evento": "compra",
                     "evento_label": "Compra",
                     "fecha_hora": compra.creado_en,
+                    "cliente": compra.cliente_id,
+                    "cliente_codigo": compra.cliente.codigo if compra.cliente else "",
                     "username": compra.cliente.username if compra.cliente else "",
                     "nombre": compra.cliente.nombre if compra.cliente else "",
                     "contacto": compra.cliente.contacto if compra.cliente else "",
                     "operador": compra.operador.username if compra.operador else "",
-                    "cliente_id": compra.cliente_id,
                     "compra_id": compra.id,
                     "monto_ars": compra.monto_ars,
                     "monto_usd": compra.monto_usd,

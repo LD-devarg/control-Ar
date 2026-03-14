@@ -206,6 +206,18 @@ def _find_recent_lead_event(*, cliente_id: int, landing_id: int, seconds: int = 
     )
 
 
+def _resolve_latest_lead_landing(*, cliente_id: int):
+    landing_id = (
+        EventosMeta.objects.filter(cliente_id=cliente_id, tipo="lead", landing__isnull=False)
+        .order_by("-creado_en")
+        .values_list("landing_id", flat=True)
+        .first()
+    )
+    if not landing_id:
+        return None
+    return Landing.objects.filter(id=landing_id).first()
+
+
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     filterset_fields = ["empresa__id"]
@@ -817,14 +829,7 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             )
 
         if not landing:
-            landing = (
-                EventosMeta.objects.filter(cliente=cliente, tipo="lead", landing__isnull=False)
-                .order_by("-creado_en")
-                .values_list("landing", flat=True)
-                .first()
-            )
-            if landing:
-                landing = Landing.objects.filter(id=landing).first()
+            landing = _resolve_latest_lead_landing(cliente_id=cliente.id)
 
         evento = EventosMeta.objects.create(
             id_evento=uuid.uuid4(),
@@ -1150,9 +1155,11 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         cliente = (
             Cliente.objects
             .filter(id=serializer.validated_data["cliente_id"])
-            .only("id", "uuid", "fbp", "fbc", "contacto", "nombre")
+            .only("id", "uuid", "fbp", "fbc", "contacto", "nombre", "ip_address", "user_agent")
             .first()
         )
+        if not landing and tipo in {"contact", "purchase"} and cliente:
+            landing = _resolve_latest_lead_landing(cliente_id=cliente.id)
         payload = {
             "value": value,
             "currency": serializer.validated_data.get("currency"),
@@ -1369,7 +1376,7 @@ class CompraViewSet(viewsets.ModelViewSet):
                 id_evento=uuid.uuid4(),
                 cliente=cliente,
                 empresa=cliente.empresa,
-                landing=None,
+                landing=_resolve_latest_lead_landing(cliente_id=cliente.id),
                 operador=request.user,
                 tipo="purchase",
                 data=payload,

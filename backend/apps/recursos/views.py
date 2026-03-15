@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
@@ -6,6 +8,8 @@ from apps.empresas.scope import filter_queryset_by_empresa
 from apps.empresas.notificaciones import crear_notificacion_estructural
 from .models import WhatsApp, TipoCambio
 from .serializers import WhatsAppSerializer, TipoCambioSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class WhatsAppViewSet(viewsets.ModelViewSet):
@@ -30,13 +34,19 @@ class WhatsAppViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         instance = serializer.save()
         actor = self.request.user
-        crear_notificacion_estructural(
-            tipo="whatsapp_activada",
-            actor=actor,
-            empresa=instance.empresa,
-            mensaje=f"El operador {getattr(actor, 'username', 'sistema')} activo la linea {instance.numero}.",
-            payload={"whatsapp_id": instance.id, "numero": instance.numero},
-        )
+        try:
+            crear_notificacion_estructural(
+                tipo="whatsapp_activada",
+                actor=actor,
+                empresa=instance.empresa,
+                mensaje=f"El operador {getattr(actor, 'username', 'sistema')} activo la linea {instance.numero}.",
+                payload={"whatsapp_id": instance.id, "numero": instance.numero},
+            )
+        except Exception:
+            logger.exception(
+                "No se pudo crear la notificacion estructural al activar la linea WhatsApp %s.",
+                instance.id,
+            )
 
     def perform_update(self, serializer):
         previous = self.get_object()
@@ -54,13 +64,19 @@ class WhatsAppViewSet(viewsets.ModelViewSet):
             tipo = "whatsapp_desactivada"
             mensaje = f"El operador {getattr(actor, 'username', 'sistema')} desactivo la linea {instance.numero}."
 
-        crear_notificacion_estructural(
-            tipo=tipo,
-            actor=actor,
-            empresa=instance.empresa,
-            mensaje=mensaje,
-            payload={"whatsapp_id": instance.id, "numero": instance.numero},
-        )
+        try:
+            crear_notificacion_estructural(
+                tipo=tipo,
+                actor=actor,
+                empresa=instance.empresa,
+                mensaje=mensaje,
+                payload={"whatsapp_id": instance.id, "numero": instance.numero},
+            )
+        except Exception:
+            logger.exception(
+                "No se pudo crear la notificacion estructural al actualizar la linea WhatsApp %s.",
+                instance.id,
+            )
 
 
 class TipoCambioViewSet(viewsets.ModelViewSet):

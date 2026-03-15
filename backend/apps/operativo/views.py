@@ -47,7 +47,7 @@ from .servicios.calculos import calcular_compra
 from .servicios.enviador import enviar_evento_meta
 from apps.pauta.servicios.insights import fetch_meta_page_views
 from apps.pauta.servicios.telegram_alerts import send_lead_queue_alert
-from apps.pauta.models import GastoDiario
+from apps.pauta.models import CredencialesMeta, GastoDiario
 from .realtime import publish_empresa_event
 
 def _apply_date_filters(qs, field: str, request):
@@ -1324,9 +1324,29 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             raise ValidationError("Solo superuser puede reenviar eventos.")
 
         evento = self.get_object()
+        credencial_ids = request.data.get("credencial_ids") or []
+        selected_credentials = None
+        if credencial_ids:
+            if not isinstance(credencial_ids, list):
+                raise ValidationError("credencial_ids debe ser una lista.")
+            normalized_ids = []
+            for raw_id in credencial_ids:
+                try:
+                    normalized_ids.append(int(raw_id))
+                except (TypeError, ValueError):
+                    raise ValidationError("credencial_ids contiene valores invalidos.")
+            selected_credentials = list(
+                CredencialesMeta.objects.filter(id__in=normalized_ids, empresa_id=evento.empresa_id).order_by("id")
+            )
+            if len(selected_credentials) != len(set(normalized_ids)):
+                raise ValidationError("Alguna credencial seleccionada no pertenece a la empresa del evento.")
 
         try:
-            respuesta = enviar_evento_meta(evento, request=request)
+            respuesta = enviar_evento_meta(
+                evento,
+                request=request,
+                credenciales_override=selected_credentials,
+            )
         except Exception as exc:
             evento.estado_envio = "fallido"
             evento.respuesta_meta = {"error": str(exc)}

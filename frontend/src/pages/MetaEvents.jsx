@@ -15,6 +15,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  Snackbar,
   TextField,
   Typography,
 } from "@mui/material";
@@ -44,7 +45,15 @@ function formatDateTime(value) {
   if (!value) return "-";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString("es-AR");
+  return parsed.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
 }
 
 function formatMoney(value, currency) {
@@ -124,7 +133,7 @@ function TargetCard({ target }) {
   );
 }
 
-function EventDetail({ event }) {
+function EventDetail({ event, availableTargets, selectedTargetIds, onToggleTarget, loadingTargets }) {
   const payload = event?.data || {};
   const meta = event?.respuesta_meta || {};
   const targets = Array.isArray(meta?.targets) ? meta.targets : [];
@@ -132,6 +141,42 @@ function EventDetail({ event }) {
   return (
     <Box sx={{ pt: 1.5 }}>
       <Divider sx={{ mb: 1.5 }} />
+      <Card variant="outlined" sx={{ borderRadius: 3, mb: 1.25 }}>
+        <CardContent sx={{ p: 1.5 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
+            Targets para reenvio
+          </Typography>
+          {loadingTargets ? (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <CircularProgress size={16} />
+              <Typography variant="body2" color="text.secondary">
+                Cargando pixeles disponibles...
+              </Typography>
+            </Box>
+          ) : availableTargets.length ? (
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              {availableTargets.map((target) => {
+                const selected = selectedTargetIds.includes(target.id);
+                return (
+                  <Chip
+                    key={target.id}
+                    clickable
+                    color={selected ? "primary" : "default"}
+                    variant={selected ? "filled" : "outlined"}
+                    onClick={() => onToggleTarget(target.id)}
+                    label={`${target.nombre || "Pixel"} · ${target.pixel_id}`}
+                  />
+                );
+              })}
+            </Stack>
+          ) : (
+            <Alert severity="warning" sx={{ borderRadius: 2.5 }}>
+              No hay credenciales Meta configuradas para esta empresa.
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
       <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", xl: "1.15fr 0.85fr" } }}>
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent sx={{ p: 1.5 }}>
@@ -187,7 +232,17 @@ function EventDetail({ event }) {
   );
 }
 
-function EventRow({ event, expanded, onToggle, onRetry, retrying }) {
+function EventRow({
+  event,
+  expanded,
+  onToggle,
+  onRetry,
+  retrying,
+  availableTargets,
+  selectedTargetIds,
+  onToggleTarget,
+  loadingTargets,
+}) {
   return (
     <Card
       variant="outlined"
@@ -265,7 +320,13 @@ function EventRow({ event, expanded, onToggle, onRetry, retrying }) {
         </Stack>
 
         <Collapse in={expanded} timeout="auto" unmountOnExit>
-          <EventDetail event={event} />
+          <EventDetail
+            event={event}
+            availableTargets={availableTargets}
+            selectedTargetIds={selectedTargetIds}
+            onToggleTarget={onToggleTarget}
+            loadingTargets={loadingTargets}
+          />
         </Collapse>
       </CardContent>
     </Card>
@@ -281,6 +342,10 @@ export default function MetaEvents() {
   const [error, setError] = useState("");
   const [retryingId, setRetryingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
+  const [targetsByEmpresa, setTargetsByEmpresa] = useState({});
+  const [loadingTargetsByEmpresa, setLoadingTargetsByEmpresa] = useState({});
+  const [selectedTargetsByEvent, setSelectedTargetsByEvent] = useState({});
   const [filters, setFilters] = useState({
     empresa: "",
     tipo: "",
@@ -294,6 +359,23 @@ export default function MetaEvents() {
     const { data } = await apiClient.get("/empresas/");
     const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
     setEmpresas(items);
+  };
+
+  const ensureTargetsForEmpresa = async (empresaId) => {
+    if (!empresaId || targetsByEmpresa[empresaId] || loadingTargetsByEmpresa[empresaId]) return;
+    setLoadingTargetsByEmpresa((prev) => ({ ...prev, [empresaId]: true }));
+    try {
+      const { data } = await apiClient.get("/credenciales-meta/", { params: { empresa: empresaId } });
+      const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+      setTargetsByEmpresa((prev) => ({ ...prev, [empresaId]: items }));
+    } finally {
+      setLoadingTargetsByEmpresa((prev) => ({ ...prev, [empresaId]: false }));
+    }
+  };
+
+  const getDefaultTargetIds = (event) => {
+    const targets = Array.isArray(event?.respuesta_meta?.targets) ? event.respuesta_meta.targets : [];
+    return targets.map((item) => item?.credencial_id).filter(Boolean);
   };
 
   const loadRows = async ({ silent = false } = {}) => {
@@ -314,6 +396,15 @@ export default function MetaEvents() {
       const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
       startTransition(() => {
         setRows(items);
+        setSelectedTargetsByEvent((prev) => {
+          const next = { ...prev };
+          for (const item of items) {
+            if (!next[item.id] || next[item.id].length === 0) {
+              next[item.id] = getDefaultTargetIds(item);
+            }
+          }
+          return next;
+        });
         setExpandedId((prev) => (items.some((item) => item.id === prev) ? prev : items[0]?.id || null));
       });
     } catch (requestError) {
@@ -333,6 +424,12 @@ export default function MetaEvents() {
     if (!isSuperuser) return;
     loadRows();
   }, [filters.empresa, filters.tipo, filters.estado, filters.limit, isSuperuser]);
+
+  useEffect(() => {
+    const expandedEvent = rows.find((item) => item.id === expandedId);
+    if (!expandedEvent?.empresa) return;
+    ensureTargetsForEmpresa(expandedEvent.empresa).catch(() => {});
+  }, [expandedId, rows]);
 
   const actions = useMemo(
     () => (
@@ -464,17 +561,63 @@ export default function MetaEvents() {
                   event={event}
                   expanded={expandedId === event.id}
                   retrying={retryingId === event.id}
-                  onToggle={() => setExpandedId((prev) => (prev === event.id ? null : event.id))}
+                  availableTargets={targetsByEmpresa[event.empresa] || []}
+                  selectedTargetIds={selectedTargetsByEvent[event.id] || getDefaultTargetIds(event)}
+                  loadingTargets={Boolean(loadingTargetsByEmpresa[event.empresa])}
+                  onToggleTarget={(targetId) => {
+                    setSelectedTargetsByEvent((prev) => {
+                      const current = prev[event.id] || getDefaultTargetIds(event);
+                      const exists = current.includes(targetId);
+                      const next = exists ? current.filter((item) => item !== targetId) : [...current, targetId];
+                      return { ...prev, [event.id]: next };
+                    });
+                  }}
+                  onToggle={() => {
+                    setExpandedId((prev) => (prev === event.id ? null : event.id));
+                    ensureTargetsForEmpresa(event.empresa).catch(() => {});
+                  }}
                   onRetry={async () => {
                     setRetryingId(event.id);
                     setError("");
                     try {
                       const params = filters.empresa ? { empresa: filters.empresa } : {};
-                      const { data } = await apiClient.post(`/eventos-meta/${event.id}/retry/`, null, { params });
+                      const selectedIds = selectedTargetsByEvent[event.id] || getDefaultTargetIds(event);
+                      if (!selectedIds.length) {
+                        const message = "Selecciona al menos un target antes de reenviar.";
+                        setError(message);
+                        setToast({
+                          open: true,
+                          severity: "warning",
+                          message,
+                        });
+                        return;
+                      }
+                      const { data } = await apiClient.post(
+                        `/eventos-meta/${event.id}/retry/`,
+                        { credencial_ids: selectedIds },
+                        { params }
+                      );
                       const nextEvent = data?.evento || event;
                       setRows((prev) => prev.map((item) => (item.id === event.id ? nextEvent : item)));
+                      setSelectedTargetsByEvent((prev) => ({
+                        ...prev,
+                        [event.id]: getDefaultTargetIds(nextEvent),
+                      }));
+                      setExpandedId(event.id);
+                      setToast({
+                        open: true,
+                        severity: "success",
+                        message: `Evento #${event.id} reenviado a ${selectedIds.length || 0} target(s).`,
+                      });
                     } catch (requestError) {
-                      setError(requestError?.response?.data?.detail || requestError?.message || "No se pudo reenviar el evento.");
+                      const message =
+                        requestError?.response?.data?.detail || requestError?.message || "No se pudo reenviar el evento.";
+                      setError(message);
+                      setToast({
+                        open: true,
+                        severity: "error",
+                        message,
+                      });
                     } finally {
                       setRetryingId(null);
                     }
@@ -485,6 +628,21 @@ export default function MetaEvents() {
           )}
         </Box>
       </Stack>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          severity={toast.severity}
+          variant="filled"
+          sx={{ borderRadius: 2, minWidth: 280 }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </Page>
   );
 }

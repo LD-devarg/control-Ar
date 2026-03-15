@@ -55,7 +55,15 @@ def obtener_credenciales_meta(empresa_id: int, landing=None) -> CredencialesMeta
     return CredencialesMeta.objects.filter(empresa_id=empresa_id).order_by("id").first()
 
 
-def _resolve_target_credentials(evento, credenciales: CredencialesMeta | None = None) -> tuple[CredencialesMeta, list[CredencialesMeta]]:
+def _resolve_target_credentials(
+    evento,
+    credenciales: CredencialesMeta | None = None,
+    credenciales_override: list[CredencialesMeta] | None = None,
+) -> tuple[CredencialesMeta, list[CredencialesMeta]]:
+    if credenciales_override:
+        primary = credenciales or credenciales_override[0]
+        return primary, credenciales_override
+
     primary = credenciales or obtener_credenciales_meta(
         evento.empresa_id,
         landing=getattr(evento, "landing", None),
@@ -93,12 +101,22 @@ def _merge_payload(evento) -> dict[str, Any]:
     return payload
 
 
-def enviar_evento_meta(evento, request=None, credenciales: CredencialesMeta | None = None, test_event_code: str | None = None) -> dict[str, Any]:
+def enviar_evento_meta(
+    evento,
+    request=None,
+    credenciales: CredencialesMeta | None = None,
+    credenciales_override: list[CredencialesMeta] | None = None,
+    test_event_code: str | None = None,
+) -> dict[str, Any]:
     """
     Envia un evento CAPI a Meta usando las CredencialesMeta de la empresa.
     Actualiza el estado del evento en la base de datos.
     """
-    primary_credencial, target_credentials = _resolve_target_credentials(evento, credenciales=credenciales)
+    primary_credencial, target_credentials = _resolve_target_credentials(
+        evento,
+        credenciales=credenciales,
+        credenciales_override=credenciales_override,
+    )
 
     payload = _merge_payload(evento)
     data, _ = MetaEventBuilder.build(tipo=evento.tipo, payload=payload, request=request)

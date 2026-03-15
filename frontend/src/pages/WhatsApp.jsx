@@ -79,7 +79,7 @@ function WhatsApp() {
             setLines((prev) => prev.map((line) => (line.id === updated.id ? normalized : line)));
             handleConfirmClose();
         } catch (err) {
-            setError("No se pudo desactivar la línea.");
+            setError(err?.response?.data?.detail || err?.response?.data?.activo?.[0] || "No se pudo desactivar la línea.");
         }
     };
 

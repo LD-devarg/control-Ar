@@ -25,12 +25,8 @@ export async function createWhatsapp(numero) {
 
 export async function deactivateWhatsapp(line) {
   const payload = {
-    id: line.id,
-    numero: line.numero,
-    empresa: line.empresa,
     activo: false,
-    ultimo_uso: line.ultimo_uso ?? null,
   };
-  const { data } = await apiClient.put(`/whatsapps/${line.id}/`, payload);
+  const { data } = await apiClient.patch(`/whatsapps/${line.id}/`, payload);
   return data;
 }

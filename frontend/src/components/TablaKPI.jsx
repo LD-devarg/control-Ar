@@ -36,8 +36,8 @@ const BASE_COLUMNS = [
   { key: "cpa", label: "CPA", align: "right", type: "money" },
   { key: "roas", label: "ROAS", align: "right", type: "number" },
   { key: "frecuencia", label: "Frecuencia", align: "right", type: "number" },
-  { key: "ftd", label: "FTD", align: "right", type: "number" },
-  { key: "valor_ftd", label: "Valor FTD", align: "right", type: "money" },
+  { key: "ftd", label: "Compras", align: "right", type: "number" },
+  { key: "valor_ftd", label: "Valor compras", align: "right", type: "money" },
   { key: "leads", label: "Leads", align: "right", type: "number" },
   { key: "contactos", label: "Contactos", align: "right", type: "number" },
   { key: "web_visitors", label: "Web visitors", align: "right", type: "number" },
@@ -60,8 +60,6 @@ function compareValues(a, b, key, direction) {
 }
 
 const PERIOD_LABEL = { day: "Dia", week: "Semana", month: "Mes" };
-const ACCOUNT_LABEL = { all: "Todas", main: "Principal", scale: "Escala" };
-
 function fmtDate(value) {
   if (!value) return "-";
   if (typeof value?.format === "function") return value.format("DD/MM/YYYY");
@@ -116,9 +114,9 @@ function mapApiToLocalShape(payload) {
     { key: "web_visitors", label: "Web Visitors", value: Number(footer.web_visitors || 0) },
     { key: "leads", label: "Leads", value: Number(footer.leads || 0) },
     { key: "contactos", label: "Contactos", value: Number(footer.contactos || 0) },
-    { key: "ftd", label: "FTD", value: Number(footer.ftd ?? footer.compras ?? 0) },
-    { key: "valor_ftd", label: "Valor FTD", value: Number(footer.valor_ftd ?? footer.valor_compras ?? 0), display: moneyDisplay },
-    { key: "efectividad", label: "Efectividad FTD", value: Number(footer.efectividad || 0), display: "percent" },
+    { key: "ftd", label: "Compras", value: Number(footer.ftd ?? footer.compras ?? 0) },
+    { key: "valor_ftd", label: "Valor compras", value: Number(footer.valor_ftd ?? footer.valor_compras ?? 0), display: moneyDisplay },
+    { key: "efectividad", label: "Efectividad compras", value: Number(footer.efectividad || 0), display: "percent" },
   ];
 
   return {
@@ -142,8 +140,10 @@ function mapApiToLocalShape(payload) {
 }
 
 export default function TablaKPI({
+  usePeriod = true,
   period = "week",
   account = "all",
+  accountLabel = "Todas",
   fromDate = null,
   toDate = null,
   view = "executiva",
@@ -165,8 +165,8 @@ export default function TablaKPI({
     return new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: moneyCurrency,
-      maximumFractionDigits: 0,
-      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
     });
   }, [moneyCurrency]);
 
@@ -221,12 +221,16 @@ export default function TablaKPI({
       setLoadingRemote(true);
       setRemoteError("");
       try {
-        const params = {
-          period,
-          account,
-          from: toYmd(fromDate),
-          to: toYmd(toDate),
-        };
+        const params = usePeriod
+          ? {
+              period,
+              account,
+            }
+          : {
+              account,
+              from: toYmd(fromDate),
+              to: toYmd(toDate),
+            };
         const { data } = await apiClient.get("/pauta-kpi/", { params });
         if (!mounted) return;
         const mapped = mapApiToLocalShape(data);
@@ -249,7 +253,7 @@ export default function TablaKPI({
     return () => {
       mounted = false;
     };
-  }, [period, account, fromDate, toDate, onScoreChange, refreshKey]);
+  }, [usePeriod, period, account, fromDate, toDate, onScoreChange, refreshKey]);
 
   const effectiveOperativeData = remoteData?.operativeData || EMPTY_OPERATIVE_DATA;
   const effectiveExecutiveCards = remoteData?.executiveCards || [];
@@ -311,8 +315,8 @@ export default function TablaKPI({
   }, [sortedRows]);
 
   const filterSummary = useMemo(
-    () => `${PERIOD_LABEL[period] || "Semana"} | ${ACCOUNT_LABEL[account] || "Todas"} | ${fmtDate(fromDate)} - ${fmtDate(toDate)}`,
-    [period, account, fromDate, toDate]
+    () => `${PERIOD_LABEL[period] || "Semana"} | ${accountLabel || "Todas"} | ${fmtDate(fromDate)} - ${fmtDate(toDate)}`,
+    [period, accountLabel, fromDate, toDate]
   );
 
   const handleSort = (key) => {

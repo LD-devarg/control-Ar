@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import { apiClient } from "../services/auth";
 import { subscribeRealtimeEvents } from "../services/realtime";
@@ -74,9 +75,36 @@ function readCachedEvents(cacheKey) {
 
 function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight = false }) {
   const { tenantId } = useTenant();
+  const [searchParams] = useSearchParams();
+  const fallbackPeriod = useMemo(() => {
+    const rawPeriod = searchParams.get("period");
+    return ["day", "week", "month"].includes(rawPeriod) ? rawPeriod : "week";
+  }, [searchParams]);
+  const fallbackDesde = useMemo(() => {
+    const rawFrom = searchParams.get("from");
+    const parsed = rawFrom ? dayjs(rawFrom) : null;
+    return parsed?.isValid?.() ? parsed : dayjs();
+  }, [searchParams]);
+  const fallbackHasta = useMemo(() => {
+    const rawTo = searchParams.get("to");
+    const parsed = rawTo ? dayjs(rawTo) : null;
+    return parsed?.isValid?.() ? parsed : dayjs();
+  }, [searchParams]);
+  const effectiveUsePeriod = typeof usePeriod === "boolean"
+    ? usePeriod
+    : !(searchParams.get("from") && searchParams.get("to"));
+  const effectivePeriod = period || fallbackPeriod;
+  const effectiveDesde = desde || fallbackDesde;
+  const effectiveHasta = hasta || fallbackHasta;
   const cacheKey = useMemo(
-    () => buildCacheKey({ tenantId, usePeriod, period, desde, hasta }),
-    [tenantId, usePeriod, period, desde, hasta]
+    () => buildCacheKey({
+      tenantId,
+      usePeriod: effectiveUsePeriod,
+      period: effectivePeriod,
+      desde: effectiveDesde,
+      hasta: effectiveHasta,
+    }),
+    [tenantId, effectiveUsePeriod, effectivePeriod, effectiveDesde, effectiveHasta]
   );
   const [events, setEvents] = useState(() => readCachedEvents(cacheKey));
   const [loading, setLoading] = useState(() => readCachedEvents(cacheKey).length === 0);
@@ -90,14 +118,14 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
 
   const queryParams = useMemo(
     () =>
-      usePeriod
-        ? { period, limit: 25 }
+      effectiveUsePeriod
+        ? { period: effectivePeriod, limit: 25 }
         : {
-            from: desde?.format("YYYY-MM-DD"),
-            to: hasta?.format("YYYY-MM-DD"),
+            from: effectiveDesde?.format("YYYY-MM-DD"),
+            to: effectiveHasta?.format("YYYY-MM-DD"),
             limit: 25,
           },
-    [usePeriod, period, desde, hasta, tenantId]
+    [effectiveUsePeriod, effectivePeriod, effectiveDesde, effectiveHasta, tenantId]
   );
 
   const formatDateTime = (value) => (value ? dayjs(value).format("DD/MM/YYYY HH:mm") : "-");

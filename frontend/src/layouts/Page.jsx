@@ -1,7 +1,7 @@
 export default function Page({ title, actions, children }) {
     return (
-        <div className="flex flex-col p-4 align-center items-center bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl shadow-black w-full h-full">
-            <div className="flex w-full flex-col">
+        <div className="flex h-full min-h-0 w-full flex-col items-center rounded-2xl bg-white p-4 shadow-2xl shadow-black dark:bg-neutral-900">
+            <div className="flex w-full shrink-0 flex-col">
                 <div className="flex w-full bg:transparent items-center justify-between">
                     <div className=" bg:transparent flex h-full items-start w-2/10 dark:bg:transparent">
                         <h1
@@ -15,7 +15,7 @@ export default function Page({ title, actions, children }) {
                     </div>}
                 </div>
             </div>
-            <div className="flex flex-col items-center w-full">
+            <div className="flex w-full min-h-0 flex-1 flex-col items-center overflow-hidden">
                 {children}
             </div>
         </div>

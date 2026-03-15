@@ -176,6 +176,7 @@ export default function Landing() {
     const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
     const token = useMemo(() => searchParams.get("landing_token"), [searchParams]);
     const isPreviewMode = useMemo(() => searchParams.get("preview") === "1", [searchParams]);
+    const isTestMode = useMemo(() => searchParams.get("test") === "1", [searchParams]);
     const fakeWinners = useMemo(() => Array.from({ length: 12 }, () => buildFakeWinner()), []);
 
     const resolveBackgroundUrl = (desktopUrl, mobileUrl) => {
@@ -375,7 +376,7 @@ export default function Landing() {
     }, [isPreviewMode]);
 
     useEffect(() => {
-        if (isPreviewMode) return;
+        if (isPreviewMode || isTestMode) return;
         const pixelId = landing?.pixel_id;
         if (!pixelId) return;
         if (pixelLoadedRef.current === pixelId) return;
@@ -408,10 +409,10 @@ export default function Landing() {
         } else {
             window.setTimeout(loadPixel, 500);
         }
-    }, [landing, isPreviewMode]);
+    }, [landing, isPreviewMode, isTestMode]);
 
     useEffect(() => {
-        if (isPreviewMode) return;
+        if (isPreviewMode || isTestMode) return;
         if (!token || visitSent) return;
         let cancelled = false;
         const sendVisit = async () => {
@@ -429,7 +430,7 @@ export default function Landing() {
         return () => {
             cancelled = true;
         };
-    }, [token, visitSent, isPreviewMode]);
+    }, [token, visitSent, isPreviewMode, isTestMode]);
 
     useEffect(() => {
         if (isPreviewMode) return undefined;
@@ -454,7 +455,7 @@ export default function Landing() {
     }, [fetchWhatsappPeek, token, isPreviewMode]);
 
     const handleWhatsappOpened = useCallback(async () => {
-        if (isPreviewMode) return;
+        if (isPreviewMode || isTestMode) return;
         if (!token || rotatingWhatsappRef.current) return;
         rotatingWhatsappRef.current = true;
         try {
@@ -474,7 +475,7 @@ export default function Landing() {
         } finally {
             rotatingWhatsappRef.current = false;
         }
-    }, [fetchWhatsappPeek, token, isPreviewMode]);
+    }, [fetchWhatsappPeek, token, isPreviewMode, isTestMode]);
 
     const titleText = hasLandingData ? (landing?.titulo || "BONO DE BIENVENIDA") : "";
     const bonusText = hasLandingData ? (landing?.bono || "🎁 100% 🎉") : "";
@@ -736,6 +737,7 @@ export default function Landing() {
                                 mostrarFormulario={hasLandingData ? landing?.mostrar_formulario !== false : true}
                                 imagenReemplazoForm={hasLandingData ? landing?.imagen_reemplazo_form : ""}
                                 isPreview={isPreviewMode}
+                                isTestMode={isTestMode}
                                 pasosNode={hasLandingData && mostrarPasos && textoPasos ? renderPasos(textoPasos) : null}
                                 mediosPagoNode={hasLandingData && mostrarMediosPago ? renderMediosPago() : null}
                             />
@@ -743,6 +745,12 @@ export default function Landing() {
                     ) : (
                         <div className="landing-form-fallback" />
                     )}
+
+                    {isTestMode ? (
+                        <div className="mt-3 rounded-full border border-amber-300/60 bg-amber-500/12 px-4 py-2 text-center text-xs font-semibold tracking-[0.08em] text-amber-100">
+                            MODO TEST · no guarda cliente, no envía Meta y no consume rotación
+                        </div>
+                    ) : null}
 
                     {hasLandingData && landing?.mostrar_disclaimer !== false ? (
                         <div className="flex justify-center w-full mt-6 mb-2 lg:mt-8 landing-fade-in sticky bottom-4 z-10 px-2">

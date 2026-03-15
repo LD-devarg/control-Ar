@@ -10,6 +10,7 @@ export default function FilterDatePicker({ label, value, onChange, sx = {} }) {
       label={label}
       value={value}
       onChange={onChange}
+      format="DD-MM-YYYY"
       slotProps={{
         textField: {
           fullWidth: false,

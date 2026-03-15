@@ -47,7 +47,7 @@ from .servicios.calculos import calcular_compra
 from .servicios.enviador import enviar_evento_meta
 from apps.pauta.servicios.insights import fetch_meta_page_views
 from apps.pauta.servicios.telegram_alerts import send_lead_queue_alert
-from apps.pauta.models import CredencialesMeta, GastoDiario
+from apps.pauta.models import CredencialesMeta, RendimientoPautaDiario
 from .realtime import publish_empresa_event
 
 def _apply_date_filters(qs, field: str, request):
@@ -1554,14 +1554,14 @@ class StatsViewSet(viewsets.ViewSet):
         eventos_qs = EventosMeta.objects.filter(empresa_id=empresa_id)
         compras_qs = Compra.objects.filter(empresa_id=empresa_id)
         retiros_qs = Retiro.objects.filter(empresa_id=empresa_id)
-        gastos_qs = GastoDiario.objects.filter(empresa_id=empresa_id)
+        rendimientos_qs = RendimientoPautaDiario.objects.filter(empresa_id=empresa_id)
 
         visitas_qs = _apply_date_filters(visitas_qs, "creado_en", request)
         eventos_qs = _apply_date_filters(eventos_qs, "creado_en", request)
         compras_qs = _apply_date_filters(compras_qs, "creado_en", request)
         retiros_qs = _apply_date_filters(retiros_qs, "creado_en", request)
         from_date, to_date = _get_date_range(request)
-        gastos_qs = gastos_qs.filter(fecha__gte=from_date, fecha__lte=to_date)
+        rendimientos_qs = rendimientos_qs.filter(fecha__gte=from_date, fecha__lte=to_date)
 
         web_visitors = visitas_qs.count()
         leads = eventos_qs.filter(tipo="lead").count()
@@ -1596,15 +1596,8 @@ class StatsViewSet(viewsets.ViewSet):
         if end_dt:
             primeras_compras_qs = primeras_compras_qs.filter(creado_en__lte=end_dt)
         primeras_compras_count = primeras_compras_qs.count()
-        primeras_compras_total_ars = primeras_compras_qs.aggregate(total=Sum("monto_ars"))["total"] or 0
-        primeras_compras_usd = primeras_compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
-        gasto_ars = gastos_qs.aggregate(total=Sum("monto_ars"))["total"] or 0
-        gasto_usd = gastos_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
-        roas_ftd = (primeras_compras_usd / gasto_usd) if gasto_usd else 0
-        ganancia_neta_ars = (compras_total - retiros_total_ars - bonos_total_ars) if wallet_enabled else 0
-        ganancia_neta_usd = (compras_total_usd - retiros_total_usd - bonos_total_usd) if wallet_enabled else 0
-        roas_neto = ((ganancia_neta_usd / gasto_usd) if gasto_usd else 0) if wallet_enabled else 0
-
+        primeras_compras_total_ars = float(primeras_compras_qs.aggregate(total=Sum("monto_ars"))["total"] or 0)
+        primeras_compras_usd = float(primeras_compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0)
         firsts = (
             compras_qs.values("cliente_id")
             .annotate(first=Min("creado_en"))
@@ -1692,6 +1685,12 @@ class StatsViewSet(viewsets.ViewSet):
             .first()
         )
         tc_vigente = float(tc_vigente_obj.valor) if tc_vigente_obj and tc_vigente_obj.valor is not None else None
+        gasto_usd = float(rendimientos_qs.aggregate(total=Sum("spend_usd"))["total"] or 0)
+        gasto_ars = (gasto_usd * tc_vigente) if tc_vigente else 0
+        roas_ftd = (primeras_compras_usd / gasto_usd) if gasto_usd else 0
+        ganancia_neta_ars = (compras_total - retiros_total_ars - bonos_total_ars) if wallet_enabled else 0
+        ganancia_neta_usd = (compras_total_usd - retiros_total_usd - bonos_total_usd) if wallet_enabled else 0
+        roas_neto = ((ganancia_neta_usd / gasto_usd) if gasto_usd else 0) if wallet_enabled else 0
 
         response = {
             "web_visitors": web_visitors,
@@ -1785,6 +1784,7 @@ class StatsViewSet(viewsets.ViewSet):
         data = [
             {
                 "id": compra.id,
+                "cliente_codigo": compra.cliente.codigo if compra.cliente else "",
                 "username": compra.cliente.username if compra.cliente else "",
                 "contacto": compra.cliente.contacto if compra.cliente else "",
                 "hora": compra.creado_en,

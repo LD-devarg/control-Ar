@@ -129,6 +129,7 @@ export default function NuevoLead({
     mostrarFormulario = true,
     imagenReemplazoForm = "",
     isPreview = false,
+    isTestMode = false,
     pasosNode = null,
     mediosPagoNode = null,
 }) {
@@ -364,7 +365,7 @@ export default function NuevoLead({
     };
 
     useEffect(() => {
-        if (isPreview) return undefined;
+        if (isPreview || isTestMode) return undefined;
         tryFlushQueue();
         checkQueueHealth();
         const handleOnline = () => {
@@ -406,7 +407,7 @@ export default function NuevoLead({
                 healthTimerRef.current = null;
             }
         };
-    }, [isPreview]);
+    }, [isPreview, isTestMode]);
 
     const enqueueClient = (payload) => {
         const queue = loadQueue();
@@ -450,6 +451,11 @@ export default function NuevoLead({
             codigo: generatedCodigo,
         });
         const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
+
+        if (isTestMode) {
+            window.open(currentWhatsappUrl, "_blank", "noopener,noreferrer");
+            return;
+        }
 
         const payload = {
             idempotency_key: generateIdempotencyKey(),

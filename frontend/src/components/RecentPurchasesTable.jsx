@@ -163,7 +163,7 @@ function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
         <table className="w-full min-w-[780px] text-sm">
           <thead>
             <tr className="border-b border-white/10 text-white/70 bg-black sticky top-0 z-10">
-              <th className="text-left py-2 pl-2 pr-3">Username</th>
+              <th className="text-left py-2 pl-2 pr-3">Codigo</th>
               <th className="text-left py-2 pr-3">Contacto</th>
               <th className="text-left py-2 pr-3">Hora</th>
               <th className="text-left py-2 pr-3">Monto ARS</th>
@@ -179,7 +179,7 @@ function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
                   highlightedIds.includes(compra.id) ? "bg-emerald-500/10" : ""
                 }`}
               >
-                <td className="py-2 pl-2 pr-3">{compra.username || "-"}</td>
+                <td className="py-2 pl-2 pr-3">{compra.cliente_codigo || compra.username || "-"}</td>
                 <td className="py-2 pr-3">{compra.contacto || "-"}</td>
                 <td className="py-2 pr-3">{formatDateTime(compra.hora)}</td>
                 <td className="py-2 pr-3">{formatArs(compra.monto_ars)}</td>

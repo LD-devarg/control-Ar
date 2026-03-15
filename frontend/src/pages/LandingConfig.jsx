@@ -650,6 +650,9 @@ function LandingConfig() {
     const publicLandingUrl = selectedLanding?.token
         ? `${publicBaseUrl}/landing?landing_token=${selectedLanding.token}`
         : "";
+    const publicLandingTestUrl = selectedLanding?.token
+        ? `${publicBaseUrl}/landing?landing_token=${selectedLanding.token}&test=1`
+        : "";
     const previewUrl = `${origin}/landing?preview=1`;
 
     const sendPreviewUpdate = useCallback(() => {
@@ -769,6 +772,19 @@ function LandingConfig() {
                                     >
                                         {publicLandingUrl}
                                     </a>
+                                    {publicLandingTestUrl ? (
+                                        <>
+                                            {" · "}
+                                            <a
+                                                href={publicLandingTestUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-amber-500 underline"
+                                            >
+                                                Modo test
+                                            </a>
+                                        </>
+                                    ) : null}
                                 </span>
                             </div>
                         ) : null}

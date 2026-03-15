@@ -12,12 +12,17 @@ import PercentOutlinedIcon from "@mui/icons-material/PercentOutlined";
 import FilterListOutlinedIcon from "@mui/icons-material/FilterListOutlined";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
 import AttachMoneyOutlinedIcon from "@mui/icons-material/AttachMoneyOutlined";
+import HelpOutlineOutlinedIcon from "@mui/icons-material/HelpOutlineOutlined";
+import IconButton from "@mui/material/IconButton";
+import Popover from "@mui/material/Popover";
 import Button from "@mui/material/Button";
+import { useSearchParams } from "react-router-dom";
 import { apiClient } from "../services/auth";
 import { subscribeRealtimeEvents } from "../services/realtime";
 import { useTenant } from "../context/TenantContext";
 import { getUISettings, subscribeUISettings } from "../services/uiSettings";
-import CardFAQ from "../components/CardFAQ.jsx";
+import RecentPurchasesTable from "../components/RecentPurchasesTable.jsx";
+import "../assets/css/RecentPurchasesTable.css";
 
 const POLL_MS = 60 * 60 * 1000;
 const TABLET_MAX_WIDTH = 1024;
@@ -37,6 +42,25 @@ const CARD_SIZE_PRESETS = {
   },
 };
 
+const FAQ_ITEMS = [
+  {
+    title: "Que es FTD",
+    content: "FTD (First Time Deposit) se refiere a la primera compra realizada por un usuario.",
+  },
+  {
+    title: "Como se calcula el ROAS FTD",
+    content: "ROAS FTD se calcula dividiendo los ingresos generados por los FTD entre la inversion publicitaria.",
+  },
+  {
+    title: "Que es la efectividad",
+    content: "La efectividad es el porcentaje de usuarios que pasan a conversion luego de contactarse.",
+  },
+  {
+    title: "Que significa un ROAS de 1",
+    content: "Un ROAS de 1 significa que se recupera el 100% de la inversion con los clientes nuevos.",
+  },
+];
+
 function isIpadDevice() {
   const userAgent = navigator.userAgent || "";
   const isiPadUA = /iPad/i.test(userAgent);
@@ -47,6 +71,33 @@ function isIpadDevice() {
 function safeNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildRangeFromPeriod(period) {
+  const today = dayjs();
+  if (period === "day") {
+    return { desde: today, hasta: today };
+  }
+  if (period === "month") {
+    return { desde: today.subtract(29, "day"), hasta: today };
+  }
+  return { desde: today.subtract(6, "day"), hasta: today };
+}
+
+function parseStatsFilters(searchParams) {
+  const rawPeriod = searchParams.get("period");
+  const rawFrom = searchParams.get("from");
+  const rawTo = searchParams.get("to");
+  const validPeriod = ["day", "week", "month"].includes(rawPeriod) ? rawPeriod : "week";
+  const fromDate = rawFrom ? dayjs(rawFrom) : null;
+  const toDate = rawTo ? dayjs(rawTo) : null;
+  const hasCustomRange = Boolean(fromDate?.isValid() && toDate?.isValid());
+
+  return {
+    period: validPeriod,
+    usePeriod: !hasCustomRange,
+    ...(hasCustomRange ? { desde: fromDate, hasta: toDate } : buildRangeFromPeriod(validPeriod)),
+  };
 }
 
 function buildMockStatsData() {
@@ -95,15 +146,18 @@ function buildMockStatsData() {
 
 function Stats() {
   const { tenantId, features: tenantFeatures, isSuperuser } = useTenant();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialFilters = useMemo(() => parseStatsFilters(searchParams), [searchParams]);
   const [uiSettings, setUiSettings] = useState(() => getUISettings());
-  const [period, setPeriod] = useState("week");
-  const [desde, setDesde] = useState(dayjs());
-  const [hasta, setHasta] = useState(dayjs());
-  const [usePeriod, setUsePeriod] = useState(true);
+  const [period, setPeriod] = useState(initialFilters.period);
+  const [desde, setDesde] = useState(initialFilters.desde);
+  const [hasta, setHasta] = useState(initialFilters.hasta);
+  const [usePeriod, setUsePeriod] = useState(initialFilters.usePeriod);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showResponsiveFilters, setShowResponsiveFilters] = useState(false);
+  const [faqAnchorEl, setFaqAnchorEl] = useState(null);
   const [isCompactViewport, setIsCompactViewport] = useState(() => {
     if (typeof window === "undefined") return false;
     if (isIpadDevice()) return true;
@@ -135,15 +189,42 @@ function Stats() {
     return () => window.removeEventListener("resize", recalcViewport);
   }, []);
 
+  useEffect(() => {
+    const nextFilters = parseStatsFilters(searchParams);
+    setPeriod(nextFilters.period);
+    setUsePeriod(nextFilters.usePeriod);
+    setDesde(nextFilters.desde);
+    setHasta(nextFilters.hasta);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams(searchParams);
+
+    if (usePeriod) {
+      nextParams.set("period", period);
+      nextParams.delete("from");
+      nextParams.delete("to");
+    } else {
+      const safeDesde = desde?.isValid?.() ? desde : dayjs();
+      const safeHasta = hasta?.isValid?.() ? hasta : safeDesde;
+      const normalizedDesde = safeDesde.isAfter(safeHasta, "day") ? safeHasta : safeDesde;
+      const normalizedHasta = safeHasta.isBefore(safeDesde, "day") ? safeDesde : safeHasta;
+      nextParams.delete("period");
+      nextParams.set("from", normalizedDesde.format("YYYY-MM-DD"));
+      nextParams.set("to", normalizedHasta.format("YYYY-MM-DD"));
+    }
+
+    if (nextParams.toString() !== searchParams.toString()) {
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [usePeriod, period, desde, hasta, searchParams, setSearchParams]);
+
   const params = useMemo(
-    () =>
-      usePeriod
-        ? { period }
-        : {
-            from: desde?.format("YYYY-MM-DD"),
-            to: hasta?.format("YYYY-MM-DD"),
-          },
-    [usePeriod, period, desde, hasta]
+    () => ({
+      from: desde?.format("YYYY-MM-DD"),
+      to: hasta?.format("YYYY-MM-DD"),
+    }),
+    [desde, hasta]
   );
 
   const loadStats = useCallback(
@@ -252,17 +333,34 @@ function Stats() {
 
   const onPeriodChange = (value) => {
     setPeriod(value);
+    const nextRange = buildRangeFromPeriod(value);
+    setDesde(nextRange.desde);
+    setHasta(nextRange.hasta);
     setUsePeriod(true);
   };
 
   const onDesdeChange = (value) => {
     setDesde(value);
+    if (value?.isValid?.() && hasta?.isValid?.() && value.isAfter(hasta, "day")) {
+      setHasta(value);
+    }
     setUsePeriod(false);
   };
 
   const onHastaChange = (value) => {
     setHasta(value);
+    if (value?.isValid?.() && desde?.isValid?.() && value.isBefore(desde, "day")) {
+      setDesde(value);
+    }
     setUsePeriod(false);
+  };
+
+  const handleOpenFaq = (event) => {
+    setFaqAnchorEl(event.currentTarget);
+  };
+
+  const handleCloseFaq = () => {
+    setFaqAnchorEl(null);
   };
 
   const numberFormatter = useMemo(
@@ -542,6 +640,22 @@ function Stats() {
       title="Estadisticas"
       actions={
         <div className="flex items-center gap-2">
+          {!showNetMetrics ? (
+            <IconButton
+              size="small"
+              onClick={handleOpenFaq}
+              sx={{
+                border: "1px solid rgba(255,255,255,0.15)",
+                color: "#67e8f9",
+                backgroundColor: "rgba(0,0,0,0.28)",
+                "&:hover": {
+                  backgroundColor: "rgba(34,211,238,0.12)",
+                },
+              }}
+            >
+              <HelpOutlineOutlinedIcon fontSize="inherit" />
+            </IconButton>
+          ) : null}
           <Button
             variant="outlined"
             size="small"
@@ -574,70 +688,98 @@ function Stats() {
         </div>
       }
     >
-      {showResponsiveFilters && isCompactViewport ? (
-        <div className="w-full">
-          <Filter
-            period={period}
-            usePeriod={usePeriod}
-            onPeriodChange={onPeriodChange}
-            desde={desde}
-            hasta={hasta}
-            onDesdeChange={onDesdeChange}
-            onHastaChange={onHastaChange}
-          />
-        </div>
-      ) : null}
+      <div className="flex h-full min-h-0 w-full flex-col items-center">
+        {showResponsiveFilters && isCompactViewport ? (
+          <div className="w-full">
+            <Filter
+              period={period}
+              usePeriod={usePeriod}
+              onPeriodChange={onPeriodChange}
+              desde={desde}
+              hasta={hasta}
+              onDesdeChange={onDesdeChange}
+              onHastaChange={onHastaChange}
+            />
+          </div>
+        ) : null}
 
-      {error ? (
-        <div className="w-full rounded-md border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200 md:w-[95%]">
-          {error}
-        </div>
-      ) : null}
-      <div className="mt-2 w-full md:w-[95%]">
-        <section className="min-w-0 space-y-4">
-            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
-              {negocioCards.map((card) => (
-              <Card key={card.title} {...card} variant="kpi" />
+        {error ? (
+          <div className="w-full rounded-md border border-red-400/40 bg-red-500/10 p-3 text-sm text-red-200 md:w-[95%]">
+            {error}
+          </div>
+        ) : null}
+        <Popover
+          open={Boolean(faqAnchorEl)}
+          anchorEl={faqAnchorEl}
+          onClose={handleCloseFaq}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          transformOrigin={{ vertical: "top", horizontal: "left" }}
+          PaperProps={{
+            sx: {
+              mt: 1,
+              width: 360,
+              maxWidth: "calc(100vw - 2rem)",
+              borderRadius: 2,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(10,10,10,0.96)",
+              color: "#fff",
+              p: 2,
+            },
+          }}
+        >
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-white">Ayuda</p>
+              <p className="text-[11px] text-white/60">Referencias rapidas de los KPI principales.</p>
+            </div>
+            {FAQ_ITEMS.map((item) => (
+              <div key={item.title} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-300">{item.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-white/80">{item.content}</p>
+              </div>
             ))}
           </div>
-          {gastosCards.length > 0 ? (
+        </Popover>
+        <div className="mt-2 flex w-full min-h-0 flex-1 flex-col md:w-[95%] lg:w-full">
+          <section className="recent-compras-scroll min-w-0 flex-1 space-y-4 overflow-y-auto pr-1">
             <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
-              {gastosCards.map((card) => (
+              {negocioCards.map((card) => (
                 <Card key={card.title} {...card} variant="kpi" />
               ))}
             </div>
-          ) : null}
-          <div
-            className={`grid w-full grid-cols-2 gap-3 pt-2 sm:grid-cols-2 md:gap-2 ${
-              showNetMetrics ? "md:grid-cols-5 xl:grid-cols-5" : "md:grid-cols-3 xl:grid-cols-3"
-            }`}
-          >
-            {pautaCards.map((card) => (
-              <Card key={card.title} {...card} variant="kpi" />
-            ))}
-          </div>
-          <div className={`grid w-full grid-cols-2 gap-3 pt-2 sm:grid-cols-2 md:gap-2 ${
-              showNetMetrics ? "md:grid-cols-5 xl:grid-cols-5" : "md:grid-cols-2 xl:grid-cols-2"
-            }`}>
-            {porcentajesCards.map((card) => (
-              <Card key={card.title} {...card} variant="kpi" />
-            ))}
-          </div>
-            {showNetMetrics ? (null) :(
-              <div className="">
-                <h3>
-                  <span className="text-base text-black dark:text-white font-semibold">FAQ</span>
-                </h3>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-                  <CardFAQ title="¿Que es FTD?" content="FTD (First Time Deposit) se refiere a la primera compra realizada por un usuario." />
-                  <CardFAQ title="¿Cómo se calcula el ROAS FTD?" content="ROAS FTD se calcula dividiendo los ingresos generados por los FTD entre la inversión publicitaria." />
-                  <CardFAQ title="¿Qué es la efectividad?" content="La efectividad es el porcentaje de usuarios que pasan a conversión luego de contactarse." />
-                  <CardFAQ title="¿Qué significa un ROAS de 1?" content="Un ROAS de 1 significa que se recupera el 100% de la inversión con los clientes nuevos." />
-                </div>
+            {gastosCards.length > 0 ? (
+              <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
+                {gastosCards.map((card) => (
+                  <Card key={card.title} {...card} variant="kpi" />
+                ))}
               </div>
-              )
-            }
-        </section>
+            ) : null}
+            <div
+              className={`grid w-full grid-cols-2 gap-3 pt-2 sm:grid-cols-2 md:gap-2 ${
+                showNetMetrics ? "md:grid-cols-5 xl:grid-cols-5" : "md:grid-cols-3 xl:grid-cols-3"
+              }`}
+            >
+              {pautaCards.map((card) => (
+                <Card key={card.title} {...card} variant="kpi" />
+              ))}
+            </div>
+            <div
+              className={`grid w-full grid-cols-2 gap-3 pt-2 sm:grid-cols-2 md:gap-2 ${
+                showNetMetrics ? "md:grid-cols-5 xl:grid-cols-5" : "md:grid-cols-2 xl:grid-cols-2"
+              }`}
+            >
+              {porcentajesCards.map((card) => (
+                <Card key={card.title} {...card} variant="kpi" />
+              ))}
+            </div>
+            <RecentPurchasesTable
+              usePeriod={usePeriod}
+              period={period}
+              desde={desde}
+              hasta={hasta}
+            />
+          </section>
+        </div>
       </div>
     </Page>
   );

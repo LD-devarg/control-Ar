@@ -18,17 +18,12 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { useTheme } from "@mui/material/styles";
 import { apiClient } from "../services/auth";
 import { getEffectiveTenantId } from "../services/tenant";
+import { useTenant } from "../context/TenantContext";
 
 const PERIOD_OPTIONS = [
     { value: "day", label: "Dia" },
     { value: "week", label: "Semana" },
     { value: "month", label: "Mes" },
-];
-
-const ACCOUNT_OPTIONS = [
-    { value: "all", label: "Todas" },
-    { value: "main", label: "Principal" },
-    { value: "scale", label: "Escala" },
 ];
 
 const VIEW_OPTIONS = [
@@ -45,12 +40,15 @@ function isIpadDevice() {
 }
 
 function PautaKPI() {
+    const { tenantId } = useTenant();
     const theme = useTheme();
     const isDark = theme.palette.mode === "dark";
     const [modalOpen, setModalOpen] = useState(false);
     const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
     const [period, setPeriod] = useState("week");
+    const [usePeriod, setUsePeriod] = useState(true);
     const [account, setAccount] = useState("all");
+    const [accountOptions, setAccountOptions] = useState([{ value: "all", label: "Todas" }]);
     const [view, setView] = useState("executiva");
     const [fromDate, setFromDate] = useState(dayjs().subtract(6, "day"));
     const [toDate, setToDate] = useState(dayjs());
@@ -159,6 +157,37 @@ function PautaKPI() {
         };
     }, []);
 
+    useEffect(() => {
+        let mounted = true;
+        const loadAccounts = async () => {
+            try {
+                const { data } = await apiClient.get("/cuentas-publicitarias/");
+                if (!mounted) return;
+                const dynamicOptions = [
+                    { value: "all", label: "Todas" },
+                    ...(Array.isArray(data)
+                        ? data.map((item) => ({
+                            value: String(item.id),
+                            label: item.nombre || `Cuenta #${item.id}`,
+                          }))
+                        : []),
+                ];
+                setAccountOptions(dynamicOptions);
+                setAccount((current) =>
+                    dynamicOptions.some((option) => option.value === current) ? current : "all"
+                );
+            } catch {
+                if (!mounted) return;
+                setAccountOptions([{ value: "all", label: "Todas" }]);
+                setAccount("all");
+            }
+        };
+        loadAccounts();
+        return () => {
+            mounted = false;
+        };
+    }, [tenantId]);
+
     const handleCreated = () => {
         setToast({
             open: true,
@@ -193,6 +222,27 @@ function PautaKPI() {
 
     const handleObjectiveChange = (key, value) => {
         setObjectivesForm((prev) => ({ ...prev, [key]: value }));
+    };
+
+    const handlePeriodChange = (nextPeriod) => {
+        setPeriod(nextPeriod);
+        setUsePeriod(true);
+    };
+
+    const handleFromDateChange = (value) => {
+        setFromDate(value);
+        if (value?.isValid?.() && toDate?.isValid?.() && value.isAfter(toDate, "day")) {
+            setToDate(value);
+        }
+        setUsePeriod(false);
+    };
+
+    const handleToDateChange = (value) => {
+        setToDate(value);
+        if (value?.isValid?.() && fromDate?.isValid?.() && value.isBefore(fromDate, "day")) {
+            setFromDate(value);
+        }
+        setUsePeriod(false);
     };
 
     const handleSaveObjectives = async () => {
@@ -275,7 +325,7 @@ function PautaKPI() {
                 disableClearable
                 options={PERIOD_OPTIONS}
                 value={PERIOD_OPTIONS.find((item) => item.value === period) || PERIOD_OPTIONS[0]}
-                onChange={(_, option) => setPeriod(option?.value || "week")}
+                onChange={(_, option) => handlePeriodChange(option?.value || "week")}
                 getOptionLabel={(option) => option.label}
                 sx={{ ...fieldSx, width: 120 }}
                 renderInput={(params) => (
@@ -289,11 +339,11 @@ function PautaKPI() {
             <Autocomplete
                 size="small"
                 disableClearable
-                options={ACCOUNT_OPTIONS}
-                value={ACCOUNT_OPTIONS.find((item) => item.value === account) || ACCOUNT_OPTIONS[0]}
+                options={accountOptions}
+                value={accountOptions.find((item) => item.value === account) || accountOptions[0]}
                 onChange={(_, option) => setAccount(option?.value || "all")}
                 getOptionLabel={(option) => option.label}
-                sx={{ ...fieldSx, width: 126 }}
+                sx={{ ...fieldSx, width: 200 }}
                 renderInput={(params) => (
                     <TextField
                         {...params}
@@ -319,8 +369,8 @@ function PautaKPI() {
                 )}
             />
             <LocalizationProvider dateAdapter={AdapterDayjs}>
-                <FilterDatePicker label="Desde" value={fromDate} onChange={setFromDate} sx={{ width: 150 }} />
-                <FilterDatePicker label="Hasta" value={toDate} onChange={setToDate} sx={{ width: 150 }} />
+                <FilterDatePicker label="Desde" value={fromDate} onChange={handleFromDateChange} sx={{ width: 150 }} />
+                <FilterDatePicker label="Hasta" value={toDate} onChange={handleToDateChange} sx={{ width: 150 }} />
             </LocalizationProvider>
         </div>
     );
@@ -354,8 +404,10 @@ function PautaKPI() {
             ) : null}
             <div className="h-full min-h-0 w-full">
                 <TablaKPI
+                    usePeriod={usePeriod}
                     period={period}
                     account={account}
+                    accountLabel={(accountOptions.find((item) => item.value === account) || accountOptions[0])?.label || "Todas"}
                     fromDate={fromDate}
                     toDate={toDate}
                     view={view}

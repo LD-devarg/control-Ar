@@ -22,7 +22,7 @@ function DesktopLayout() {
                 <User />
             </header>
             <main className="flex grow overflow-hidden flex-row p-5 min-w-0">
-                <div className="flex-[3] min-w-0">
+                <div className="flex-[3] min-w-0 h-full min-h-0">
                     <Outlet />
                 </div>
                 {showNuevosLeads && (

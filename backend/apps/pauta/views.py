@@ -3,6 +3,7 @@ import re
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Sum, OuterRef, Subquery
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -13,6 +14,7 @@ from rest_framework.decorators import action
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
 from apps.empresas.models import Empresa
 from apps.empresas.scope import filter_queryset_by_empresa, get_user_empresa_ids, resolve_request_empresa_id
+from apps.operativo.models import Compra, EventosMeta, LandingVisit
 from .models import (
     BM,
     CuentaPublicitaria,
@@ -496,7 +498,13 @@ class PautaKPIViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"], url_path="refresh")
     def refresh(self, request):
         empresa_id = resolve_request_empresa_id(request, allow_empty_for_superuser=False)
-        kpi_result = sync_rendimientos_meta_diarios(empresa_ids=[empresa_id], force=True)
+        from_date, to_date = self._date_range(request)
+        kpi_result = sync_rendimientos_meta_diarios(
+            empresa_ids=[empresa_id],
+            force=True,
+            from_date=from_date,
+            to_date=to_date,
+        )
         estado_result = sync_pauta_estado_15m(empresa_ids=[empresa_id], force=True)
         return Response(
             {
@@ -563,7 +571,15 @@ class PautaKPIViewSet(viewsets.ViewSet):
         }
 
     def _apply_account_scope(self, rows, empresa_id, account_scope):
-        if account_scope not in {"main", "scale"} or not empresa_id:
+        if not account_scope or account_scope == "all" or not empresa_id:
+            return rows
+        try:
+            account_id = int(account_scope)
+        except (TypeError, ValueError):
+            account_id = None
+        if account_id is not None:
+            return [row for row in rows if row["cuenta_publicitaria_id"] == account_id]
+        if account_scope not in {"main", "scale"}:
             return rows
         cuentas = list(
             CuentaPublicitaria.objects.filter(empresa_id=empresa_id)
@@ -662,15 +678,10 @@ class PautaKPIViewSet(viewsets.ViewSet):
 
         totals = {
             "inversion": 0.0,
-            "ingresos": 0.0,
             "impressions": 0.0,
             "reach": 0.0,
             "clicks": 0.0,
             "link_clicks": 0.0,
-            "web_visitors": 0.0,
-            "leads": 0.0,
-            "contactos": 0.0,
-            "ftd": 0.0,
         }
         daily = {}
         by_level = {"campaign": {}, "adset": {}, "ad": {}, "naming": {}}
@@ -688,15 +699,10 @@ class PautaKPIViewSet(viewsets.ViewSet):
             ftd = float(row["purchases"] or 0)
 
             totals["inversion"] += inversion
-            totals["ingresos"] += ingresos
             totals["impressions"] += impressions
             totals["reach"] += reach
             totals["clicks"] += clicks
             totals["link_clicks"] += link_clicks
-            totals["web_visitors"] += web_visitors
-            totals["leads"] += leads
-            totals["contactos"] += contactos
-            totals["ftd"] += ftd
 
             date_key = row["fecha"].isoformat()
             if date_key not in daily:
@@ -817,14 +823,30 @@ class PautaKPIViewSet(viewsets.ViewSet):
         }
 
         inv = totals["inversion"]
-        ing = totals["ingresos"]
-        leads = totals["leads"]
-        contactos = totals["contactos"]
-        ftd = totals["ftd"]
         impressions = totals["impressions"]
         link_clicks = totals["link_clicks"]
         reach = totals["reach"]
-        web_visitors = totals["web_visitors"]
+
+        operational_filters = {"empresa_id": empresa_id} if empresa_id else {}
+        start_dt = timezone.make_aware(timezone.datetime.combine(from_date, timezone.datetime.min.time()))
+        end_dt = timezone.make_aware(timezone.datetime.combine(to_date, timezone.datetime.max.time()))
+
+        visitas_qs = LandingVisit.objects.filter(creado_en__gte=start_dt, creado_en__lte=end_dt, **operational_filters)
+        eventos_qs = EventosMeta.objects.filter(creado_en__gte=start_dt, creado_en__lte=end_dt, **operational_filters)
+        compras_qs = Compra.objects.filter(creado_en__gte=start_dt, creado_en__lte=end_dt, **operational_filters)
+
+        first_purchase_id_subquery = (
+            Compra.objects.filter(empresa_id=OuterRef("empresa_id"), cliente_id=OuterRef("cliente_id"))
+            .order_by("creado_en", "id")
+            .values("id")[:1]
+        )
+        primeras_compras_qs = compras_qs.filter(id=Subquery(first_purchase_id_subquery))
+
+        web_visitors = float(visitas_qs.count())
+        leads = float(eventos_qs.filter(tipo="lead").count())
+        contactos = float(eventos_qs.filter(tipo="contact").count())
+        ftd = float(primeras_compras_qs.count())
+        ing = float(primeras_compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0)
 
         executive = {
             "cards": {
@@ -844,7 +866,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 "contactos": contactos,
                 "ftd": ftd,
                 "valor_ftd": ing,
-                "efectividad": self._safe_div(ftd, web_visitors),
+                "efectividad": self._safe_div(ftd, contactos),
                 # Backward compatibility for older front clients.
                 "compras": ftd,
                 "valor_compras": ing,

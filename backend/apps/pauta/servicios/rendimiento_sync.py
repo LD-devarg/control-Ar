@@ -180,11 +180,31 @@ def _upsert_row(empresa: Empresa, cuenta: CuentaPublicitaria, fecha: dt.date, ro
     )
 
 
-def sync_rendimientos_meta_diarios(*, empresa_ids: list[int] | None = None, force: bool = False) -> dict:
-    fecha_objetivo = timezone.localdate()
-    if PAUTA_SYNC_START_DATE and fecha_objetivo < PAUTA_SYNC_START_DATE:
+def _resolve_sync_dates(from_date: dt.date | None, to_date: dt.date | None) -> list[dt.date]:
+    today = timezone.localdate()
+    start = from_date or today
+    end = to_date or start
+    if start > end:
+        start, end = end, start
+    if PAUTA_SYNC_START_DATE and end < PAUTA_SYNC_START_DATE:
+        return []
+    if PAUTA_SYNC_START_DATE and start < PAUTA_SYNC_START_DATE:
+        start = PAUTA_SYNC_START_DATE
+    total_days = (end - start).days + 1
+    return [start + dt.timedelta(days=offset) for offset in range(max(0, total_days))]
+
+
+def sync_rendimientos_meta_diarios(
+    *,
+    empresa_ids: list[int] | None = None,
+    force: bool = False,
+    from_date: dt.date | None = None,
+    to_date: dt.date | None = None,
+) -> dict:
+    sync_dates = _resolve_sync_dates(from_date, to_date)
+    if not sync_dates:
         return {
-            "fecha": fecha_objetivo.isoformat(),
+            "fecha": (to_date or timezone.localdate()).isoformat(),
             "empresas_evaluadas": 0,
             "empresas_procesadas": 0,
             "insertados": 0,
@@ -201,7 +221,8 @@ def sync_rendimientos_meta_diarios(*, empresa_ids: list[int] | None = None, forc
     empresas = empresas_qs.only("id", "nombre", "beat_tasks_config").order_by("id")
 
     result = {
-        "fecha": fecha_objetivo.isoformat(),
+        "from": sync_dates[0].isoformat(),
+        "to": sync_dates[-1].isoformat(),
         "empresas_evaluadas": empresas.count(),
         "empresas_procesadas": 0,
         "insertados": 0,
@@ -227,35 +248,43 @@ def sync_rendimientos_meta_diarios(*, empresa_ids: list[int] | None = None, forc
                     ad_account_id = f"act_{ad_account_id}"
 
                 tokens = _credential_tokens_for_empresa(empresa_id=empresa.id, cuenta=cuenta) or base_tokens
-                rows = None
-                last_exc: Exception | None = None
-                for token in tokens:
-                    try:
-                        rows = _fetch_insights_rows(ad_account_id, token, fecha_objetivo)
-                        last_exc = None
-                        break
-                    except Exception as exc:
-                        last_exc = exc
+                for sync_date in sync_dates:
+                    rows = None
+                    last_exc: Exception | None = None
+                    for token in tokens:
+                        try:
+                            rows = _fetch_insights_rows(ad_account_id, token, sync_date)
+                            last_exc = None
+                            break
+                        except Exception as exc:
+                            last_exc = exc
+                            continue
+
+                    if rows is None:
+                        if last_exc is not None:
+                            result["errores"].append(
+                                {
+                                    "empresa_id": empresa.id,
+                                    "cuenta_id": cuenta.id,
+                                    "fecha": sync_date.isoformat(),
+                                    "error": str(last_exc),
+                                }
+                            )
                         continue
 
-                if rows is None:
-                    if last_exc is not None:
-                        result["errores"].append({"empresa_id": empresa.id, "cuenta_id": cuenta.id, "error": str(last_exc)})
-                    continue
+                    account_currency = str((rows[0] or {}).get("account_currency") or "").upper() if rows else ""
+                    if account_currency in {CuentaPublicitaria.MONEDA_USD, CuentaPublicitaria.MONEDA_ARS} and cuenta.moneda != account_currency:
+                        cuenta.moneda = account_currency
+                        cuenta.save(update_fields=["moneda"])
 
-                account_currency = str((rows[0] or {}).get("account_currency") or "").upper() if rows else ""
-                if account_currency in {CuentaPublicitaria.MONEDA_USD, CuentaPublicitaria.MONEDA_ARS} and cuenta.moneda != account_currency:
-                    cuenta.moneda = account_currency
-                    cuenta.save(update_fields=["moneda"])
-
-                with transaction.atomic():
-                    for row in rows:
-                        created, _obj = _upsert_row(empresa, cuenta, fecha_objetivo, row)
-                        if created:
-                            result["insertados"] += 1
-                        else:
-                            result["actualizados"] += 1
-                empresa_ok = True
+                    with transaction.atomic():
+                        for row in rows:
+                            created, _obj = _upsert_row(empresa, cuenta, sync_date, row)
+                            if created:
+                                result["insertados"] += 1
+                            else:
+                                result["actualizados"] += 1
+                    empresa_ok = True
 
             empresa.kpi_sync_last_run_at = timezone.now()
             empresa.kpi_sync_last_status = "ok" if empresa_ok else "error"

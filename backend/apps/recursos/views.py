@@ -1,7 +1,9 @@
 import logging
 
 from rest_framework import viewsets
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
 from apps.empresas.scope import filter_queryset_by_empresa
@@ -31,52 +33,47 @@ class WhatsAppViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
 
-    def perform_create(self, serializer):
-        instance = serializer.save()
+    def _emit_whatsapp_notification(self, *, instance, activated: bool):
         actor = self.request.user
-        try:
-            crear_notificacion_estructural(
-                tipo="whatsapp_activada",
-                actor=actor,
-                empresa=instance.empresa,
-                mensaje=f"El operador {getattr(actor, 'username', 'sistema')} activo la linea {instance.numero}.",
-                payload={"whatsapp_id": instance.id, "numero": instance.numero},
-            )
-        except Exception:
-            logger.exception(
-                "No se pudo crear la notificacion estructural al activar la linea WhatsApp %s.",
-                instance.id,
-            )
-
-    def perform_update(self, serializer):
-        previous = self.get_object()
-        was_active = bool(previous.activo)
-        instance = serializer.save()
-
-        if was_active == bool(instance.activo):
-            return
-
-        actor = self.request.user
-        if instance.activo:
-            tipo = "whatsapp_activada"
-            mensaje = f"El operador {getattr(actor, 'username', 'sistema')} activo la linea {instance.numero}."
-        else:
-            tipo = "whatsapp_desactivada"
-            mensaje = f"El operador {getattr(actor, 'username', 'sistema')} desactivo la linea {instance.numero}."
-
+        tipo = "whatsapp_activada" if activated else "whatsapp_desactivada"
+        accion = "activo" if activated else "desactivo"
         try:
             crear_notificacion_estructural(
                 tipo=tipo,
                 actor=actor,
                 empresa=instance.empresa,
-                mensaje=mensaje,
+                mensaje=f"El operador {getattr(actor, 'username', 'sistema')} {accion} la linea {instance.numero}.",
                 payload={"whatsapp_id": instance.id, "numero": instance.numero},
             )
         except Exception:
             logger.exception(
-                "No se pudo crear la notificacion estructural al actualizar la linea WhatsApp %s.",
+                "No se pudo crear la notificacion estructural para la linea WhatsApp %s.",
                 instance.id,
             )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        self._emit_whatsapp_notification(instance=instance, activated=bool(instance.activo))
+        output = self.get_serializer(instance)
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        was_active = bool(instance.activo)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        instance = serializer.save()
+        if was_active != bool(instance.activo):
+            self._emit_whatsapp_notification(instance=instance, activated=bool(instance.activo))
+        output = self.get_serializer(instance)
+        return Response(output.data, status=status.HTTP_200_OK)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs["partial"] = True
+        return self.update(request, *args, **kwargs)
 
 
 class TipoCambioViewSet(viewsets.ModelViewSet):

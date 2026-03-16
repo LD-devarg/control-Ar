@@ -16,6 +16,21 @@ from .serializers import WhatsAppSerializer, TipoCambioSerializer
 logger = logging.getLogger(__name__)
 
 
+def _extract_database_error_message(exc: Exception) -> str:
+    candidates = [exc, getattr(exc, "__cause__", None), getattr(exc, "__context__", None)]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        diag = getattr(candidate, "diag", None)
+        primary = getattr(diag, "message_primary", None) if diag else None
+        if isinstance(primary, str) and primary.strip():
+            return primary.strip()
+        message = str(candidate).strip()
+        if message:
+            return message
+    return "Error de base de datos no identificado."
+
+
 def _resolve_whatsapp_empresa_for_write(request, *, empresa_input=None) -> int:
     if empresa_input not in (None, ""):
         try:
@@ -93,9 +108,15 @@ class WhatsAppViewSet(viewsets.ModelViewSet):
         try:
             instance = serializer.save()
         except (IntegrityError, DatabaseError) as exc:
-            logger.exception("Fallo al crear linea WhatsApp para user=%s payload=%s", request.user.id, payload)
+            db_message = _extract_database_error_message(exc)
+            logger.exception(
+                "Fallo al crear linea WhatsApp para user=%s payload=%s db_error=%s",
+                request.user.id,
+                payload,
+                db_message,
+            )
             raise ValidationError(
-                {"detail": "No se pudo crear la linea por un conflicto de datos. Verifica empresa y numero."}
+                {"detail": f"No se pudo crear la linea. Error DB: {db_message}"}
             ) from exc
         self._emit_whatsapp_notification(instance=instance, activated=bool(instance.activo))
         output = self.get_serializer(instance)
@@ -116,9 +137,15 @@ class WhatsAppViewSet(viewsets.ModelViewSet):
         try:
             instance = serializer.save()
         except (IntegrityError, DatabaseError) as exc:
-            logger.exception("Fallo al actualizar linea WhatsApp %s para user=%s", instance.id, request.user.id)
+            db_message = _extract_database_error_message(exc)
+            logger.exception(
+                "Fallo al actualizar linea WhatsApp %s para user=%s db_error=%s",
+                instance.id,
+                request.user.id,
+                db_message,
+            )
             raise ValidationError(
-                {"detail": "No se pudo actualizar la linea por un conflicto de datos. Reintenta."}
+                {"detail": f"No se pudo actualizar la linea. Error DB: {db_message}"}
             ) from exc
         if was_active != bool(instance.activo):
             self._emit_whatsapp_notification(instance=instance, activated=bool(instance.activo))

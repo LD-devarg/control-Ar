@@ -1,16 +1,9 @@
 from rest_framework import serializers
 import re
 from django.db import IntegrityError, transaction
-from django.db.models import Q
-from django.utils import timezone
-from datetime import timedelta
-
 from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit, Retiro, generar_codigo_corto
 from apps.pauta.models import CredencialesMeta
 from apps.empresas.scope import get_user_empresa_ids
-
-
-LEAD_IDENTITY_DEDUPE_DAYS = 7
 
 
 def normalize_contacto(value):
@@ -121,83 +114,7 @@ class ClienteCreateSerializer(serializers.Serializer):
         except Landing.DoesNotExist:
             raise serializers.ValidationError("Landing invalida o inactiva.")
         data["landing"] = landing
-        data["existing_cliente"] = self._find_recent_cliente_by_identity(landing, data)
         return data
-
-    def _find_recent_cliente_by_identity(self, landing, data):
-        fbp = (data.get("fbp") or "").strip()
-        fbc = (data.get("fbc") or "").strip()
-        if not fbp and not fbc:
-            return None
-
-        window_start = timezone.now() - timedelta(days=LEAD_IDENTITY_DEDUPE_DAYS)
-        signal_filter = Q()
-        if fbp:
-            signal_filter |= Q(fbp=fbp) | Q(eventos_meta__fbp=fbp)
-        if fbc:
-            signal_filter |= Q(fbc=fbc) | Q(eventos_meta__fbc=fbc)
-        if not signal_filter:
-            return None
-
-        return (
-            Cliente.objects.filter(
-                empresa=landing.empresa,
-                creado_en__gte=window_start,
-                eventos_meta__tipo="lead",
-                eventos_meta__landing=landing,
-                eventos_meta__creado_en__gte=window_start,
-            )
-            .filter(signal_filter)
-            .order_by("-creado_en")
-            .distinct()
-            .first()
-        )
-
-    def _update_existing_cliente(self, cliente, validated_data):
-        update_fields = []
-        for field_name in (
-            "fbp",
-            "fbc",
-            "fbclid",
-            "utm_source",
-            "utm_medium",
-            "utm_campaign",
-            "utm_content",
-            "utm_term",
-            "event_source_url",
-        ):
-            next_value = validated_data.get(field_name)
-            if next_value and getattr(cliente, field_name) != next_value:
-                setattr(cliente, field_name, next_value)
-                update_fields.append(field_name)
-
-        request = self.context.get("request")
-        request_ip = get_request_ip(request)
-        request_user_agent = get_request_user_agent(request)
-        if request_ip and cliente.ip_address != request_ip:
-            cliente.ip_address = request_ip
-            update_fields.append("ip_address")
-        if request_user_agent and cliente.user_agent != request_user_agent:
-            cliente.user_agent = request_user_agent
-            update_fields.append("user_agent")
-
-        nombre = validated_data.get("nombre")
-        contacto = validated_data.get("contacto")
-        username = validated_data.get("username")
-        if nombre and cliente.nombre != nombre:
-            cliente.nombre = nombre
-            update_fields.append("nombre")
-        if contacto and cliente.contacto != contacto:
-            cliente.contacto = contacto
-            update_fields.append("contacto")
-        if username and cliente.username != username:
-            cliente.username = self._unique_username(username)
-            update_fields.append("username")
-
-        if update_fields:
-            cliente.save(update_fields=sorted(set(update_fields)))
-        self.context["dedupe_reason"] = "identity_window"
-        return cliente
 
     def _unique_username(self, base_username):
         if not Cliente.objects.filter(username=base_username).exists():
@@ -230,7 +147,6 @@ class ClienteCreateSerializer(serializers.Serializer):
     def create(self, validated_data):
         landing = validated_data.pop("landing")
         validated_data.pop("landing_token", None)
-        existing_cliente = validated_data.pop("existing_cliente", None)
         idempotency_key = validated_data.pop("idempotency_key", None)
         if idempotency_key:
             existing = Cliente.objects.filter(idempotency_key=idempotency_key).first()
@@ -242,7 +158,13 @@ class ClienteCreateSerializer(serializers.Serializer):
         contacto = normalize_contacto(validated_data.get("contacto"))
         username = (validated_data.get("username") or "").strip()
 
-        if landing.mostrar_formulario and not nombre:
+        request = self.context.get("request")
+        require_nombre = landing.mostrar_formulario and not (
+            request
+            and getattr(request, "user", None)
+            and request.user.is_authenticated
+        )
+        if require_nombre and not nombre:
             raise serializers.ValidationError(
                 "Nombre es obligatorio cuando el formulario esta activo."
             )
@@ -251,12 +173,8 @@ class ClienteCreateSerializer(serializers.Serializer):
         validated_data["contacto"] = contacto or None
         validated_data["username"] = self._unique_username(username) if username else None
         validated_data["codigo"] = self._resolve_unique_codigo(requested_codigo)
-        request = self.context.get("request")
         validated_data["ip_address"] = get_request_ip(request)
         validated_data["user_agent"] = get_request_user_agent(request)
-
-        if existing_cliente:
-            return self._update_existing_cliente(existing_cliente, validated_data)
 
         for _ in range(3):
             try:

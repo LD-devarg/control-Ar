@@ -136,6 +136,7 @@ export default function NuevoLead({
     const [name, setName] = useState("");
     const [error, setError] = useState("");
     const sendingRef = useRef(false);
+    const submittingLeadRef = useRef(false);
     const retryIndexRef = useRef(0);
     const retryTimerRef = useRef(null);
     const healthTimerRef = useRef(null);
@@ -485,6 +486,103 @@ export default function NuevoLead({
         }
     };
 
+    const handleWhatsappClickSafe = async () => {
+        if (isPreview || submittingLeadRef.current) return;
+        if (!canSubmit) {
+            handleWhatsappClick();
+            return;
+        }
+        if (!whatsappNumber) {
+            handleWhatsappClick();
+            return;
+        }
+
+        submittingLeadRef.current = true;
+        try {
+            const fbp = getCookieValue("_fbp") || undefined;
+            const fbc = getCookieValue("_fbc") || undefined;
+            const tracking = getTrackingParams();
+            const eventSourceUrl =
+                typeof window !== "undefined"
+                    ? `${window.location.origin}${window.location.pathname}`
+                    : undefined;
+
+            const generatedCodigo = generateLeadCode();
+            const generatedUsername = buildUsername(trimmedName, generatedCodigo);
+            if (isTestMode) {
+                const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
+                    bono: bonusText || "100%",
+                    username: generatedUsername,
+                    nombre: trimmedName,
+                    contacto: "",
+                    codigo: generatedCodigo,
+                });
+                const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
+                window.open(currentWhatsappUrl, "_blank", "noopener,noreferrer");
+                return;
+            }
+
+            const payload = {
+                idempotency_key: generateIdempotencyKey(),
+                queued_at: new Date().toISOString(),
+                landing_token: landingToken,
+                nombre: trimmedName,
+                contacto: "",
+                username: generatedUsername,
+                codigo: generatedCodigo,
+                ...(fbp ? { fbp } : {}),
+                ...(fbc ? { fbc } : {}),
+                ...Object.fromEntries(Object.entries(tracking).filter(([, value]) => Boolean(value))),
+                ...(eventSourceUrl ? { event_source_url: eventSourceUrl } : {}),
+            };
+            const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+            let finalCodigo = generatedCodigo;
+            let finalUsername = generatedUsername;
+            let finalNombre = trimmedName;
+
+            try {
+                const { data } = await axios.post(`${baseUrl}/clientes/`, payload, { timeout: 4000 });
+                finalCodigo = String(data?.codigo || generatedCodigo);
+                finalUsername = String(data?.username || generatedUsername);
+                finalNombre = String(data?.nombre || trimmedName);
+                markClientesDirty();
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("leads:refresh"));
+                    try {
+                        localStorage.setItem("leads_dirty", "1");
+                        localStorage.setItem("leads_refresh_ts", String(Date.now()));
+                    } catch {
+                        // ignore storage errors
+                    }
+                }
+            } catch {
+                enqueueClient(payload);
+                sendWithBeacon(baseUrl, payload);
+                sendWithKeepalive(baseUrl, payload).catch(() => {
+                    // keepalive is best-effort only
+                });
+                tryFlushQueue();
+                checkQueueHealth();
+            }
+
+            const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
+                bono: bonusText || "100%",
+                username: finalUsername,
+                nombre: finalNombre,
+                contacto: "",
+                codigo: finalCodigo,
+            });
+            const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
+
+            window.open(currentWhatsappUrl, "_blank", "noopener,noreferrer");
+            if (typeof onWhatsappOpened === "function") {
+                onWhatsappOpened();
+            }
+        } finally {
+            submittingLeadRef.current = false;
+        }
+    };
+
     const handleNameChange = (event) => {
         const value = event.target.value;
         const onlyLetters = value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "");
@@ -544,7 +642,7 @@ export default function NuevoLead({
             )}
             <div className={`landing-submit-wrap ${canSubmit ? "is-active" : ""}`}>
                 <Button variant="contained" startIcon={<WhatsAppIcon />}
-                    onClick={handleWhatsappClick}
+                    onClick={handleWhatsappClickSafe}
                     disabled={isPreview || !canSubmit}
                     sx={{
                         backgroundColor: "transparent",

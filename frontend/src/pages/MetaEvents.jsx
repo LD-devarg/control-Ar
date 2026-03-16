@@ -10,6 +10,9 @@ import {
   CircularProgress,
   Collapse,
   Divider,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   FormControl,
   InputLabel,
   MenuItem,
@@ -26,6 +29,8 @@ import ExpandLessOutlinedIcon from "@mui/icons-material/ExpandLessOutlined";
 import Page from "../layouts/Page";
 import { apiClient, getCurrentUser } from "../services/auth";
 import { mergeEmpresaParam } from "../services/tenant";
+import FormLeadEvent from "../components/FormLeadEvent.jsx";
+import { useTenant } from "../context/TenantContext";
 
 const TIPO_LABELS = {
   lead: "Lead",
@@ -137,6 +142,7 @@ function EventDetail({ event, availableTargets, selectedTargetIds, onToggleTarge
   const payload = event?.data || {};
   const meta = event?.respuesta_meta || {};
   const targets = Array.isArray(meta?.targets) ? meta.targets : [];
+  const hasCodigoMismatch = Boolean(payload?.codigo_provisorio_distinto);
 
   return (
     <Box sx={{ pt: 1.5 }}>
@@ -183,11 +189,18 @@ function EventDetail({ event, availableTargets, selectedTargetIds, onToggleTarge
             <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1.25 }}>
               Payload y matching
             </Typography>
+            {hasCodigoMismatch ? (
+              <Alert severity="warning" sx={{ borderRadius: 2.5, mb: 1.25 }}>
+                Codigo provisorio distinto. Se envio {payload?.codigo_solicitado || "-"} pero el cliente quedo con {payload?.codigo_final || "-"}.
+              </Alert>
+            ) : null}
             <Box sx={{ display: "grid", gap: 1.1, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" } }}>
               <DataRow label="Telefono payload" value={payload?.phone || "-"} />
               <DataRow label="Email" value={payload?.email || "-"} />
               <DataRow label="Nombre payload" value={payload?.nombre || "-"} />
               <DataRow label="External ID" value={payload?.external_id || "-"} />
+              <DataRow label="Codigo solicitado" value={payload?.codigo_solicitado || "-"} />
+              <DataRow label="Codigo final" value={payload?.codigo_final || event?.cliente_codigo || "-"} />
               <DataRow label="FBP" value={event?.fbp || "-"} />
               <DataRow label="FBC" value={event?.fbc || "-"} />
               <DataRow label="IP" value={event?.ip_address || "-"} />
@@ -335,6 +348,7 @@ function EventRow({
 
 export default function MetaEvents() {
   const currentUser = getCurrentUser();
+  const { tenantId } = useTenant();
   const [rows, setRows] = useState([]);
   const [empresas, setEmpresas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -342,6 +356,7 @@ export default function MetaEvents() {
   const [error, setError] = useState("");
   const [retryingId, setRetryingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [openCreateLead, setOpenCreateLead] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
   const [targetsByEmpresa, setTargetsByEmpresa] = useState({});
   const [loadingTargetsByEmpresa, setLoadingTargetsByEmpresa] = useState({});
@@ -354,6 +369,7 @@ export default function MetaEvents() {
   });
 
   const isSuperuser = Boolean(currentUser?.is_superuser);
+  const selectedEmpresaId = filters.empresa || tenantId || "";
 
   const loadEmpresas = async () => {
     const { data } = await apiClient.get("/empresas/");
@@ -495,6 +511,14 @@ export default function MetaEvents() {
             </MenuItem>
           ))}
         </TextField>
+
+        <Button
+          variant="outlined"
+          onClick={() => setOpenCreateLead(true)}
+          sx={{ borderRadius: 999 }}
+        >
+          Crear lead
+        </Button>
 
         <Button
           variant="outlined"
@@ -643,6 +667,19 @@ export default function MetaEvents() {
           {toast.message}
         </Alert>
       </Snackbar>
+      <Dialog open={openCreateLead} onClose={() => setOpenCreateLead(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Crear lead</DialogTitle>
+        <DialogContent>
+          <FormLeadEvent
+            empresaId={selectedEmpresaId}
+            onCreated={() => {
+              setOpenCreateLead(false);
+              loadRows({ silent: true });
+              setToast({ open: true, severity: "success", message: "Lead manual creado." });
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </Page>
   );
 }

@@ -298,12 +298,12 @@ class ClienteViewSet(viewsets.ModelViewSet):
 
         landing = serializer.validated_data["landing"]
         cliente = serializer.save()
-        dedupe_reason = serializer.context.get("dedupe_reason")
         recent_event = _find_recent_lead_event(cliente_id=cliente.id, landing_id=landing.id)
-        if dedupe_reason == "identity_window" or recent_event:
+        if recent_event:
             output = ClienteSerializer(cliente)
             return Response(output.data, status=status.HTTP_200_OK)
 
+        requested_codigo = str(request.data.get("codigo") or "").strip()
         evento = EventosMeta.objects.create(
             id_evento=uuid.uuid4(),
             cliente=cliente,
@@ -315,6 +315,9 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 "phone": cliente.contacto,
                 "external_id": str(cliente.uuid),
                 "event_source_url": cliente.event_source_url,
+                "codigo_solicitado": requested_codigo or None,
+                "codigo_final": cliente.codigo,
+                "codigo_provisorio_distinto": bool(requested_codigo and requested_codigo != cliente.codigo),
             },
             fbp=request.data.get("fbp"),
             fbc=request.data.get("fbc"),

@@ -9,6 +9,28 @@ import Page from "../layouts/Page.jsx";
 import { createWhatsapp, deactivateWhatsapp, fetchWhatsapps } from "../services/recursos/whatsapp";
 import { useTenant } from "../context/TenantContext";
 
+function extractApiErrorMessage(err, fallback) {
+    const detail = err?.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+
+    const body = err?.response?.data;
+    if (Array.isArray(body) && body.length) {
+        const first = body[0];
+        if (typeof first === "string" && first.trim()) return first;
+    }
+    if (body && typeof body === "object") {
+        const firstKey = Object.keys(body)[0];
+        const firstValue = body[firstKey];
+        if (Array.isArray(firstValue) && firstValue.length) {
+            const first = firstValue[0];
+            if (typeof first === "string" && first.trim()) return first;
+        }
+        if (typeof firstValue === "string" && firstValue.trim()) return firstValue;
+    }
+    if (typeof err?.message === "string" && err.message.trim()) return err.message;
+    return fallback;
+}
+
 function WhatsApp() {
     const { tenantId } = useTenant();
     const [lines, setLines] = useState([]);
@@ -79,7 +101,7 @@ function WhatsApp() {
             setLines((prev) => prev.map((line) => (line.id === updated.id ? normalized : line)));
             handleConfirmClose();
         } catch (err) {
-            setError(err?.response?.data?.detail || err?.response?.data?.activo?.[0] || "No se pudo desactivar la línea.");
+            setError(extractApiErrorMessage(err, "No se pudo desactivar la línea."));
         }
     };
 
@@ -110,7 +132,7 @@ function WhatsApp() {
             setLines((prev) => [...prev, normalized]);
             handleAddClose();
         } catch (err) {
-            setError("No se pudo crear la línea. Verificá permisos.");
+            setError(extractApiErrorMessage(err, "No se pudo crear la línea."));
         }
     };
 

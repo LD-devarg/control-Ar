@@ -1,17 +1,48 @@
 import logging
 
+from django.db import DatabaseError, IntegrityError
 from rest_framework import viewsets
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
-from apps.empresas.scope import filter_queryset_by_empresa
+from apps.empresas.scope import filter_queryset_by_empresa, get_user_empresa_ids
 from apps.empresas.notificaciones import crear_notificacion_estructural
 from .models import WhatsApp, TipoCambio
 from .serializers import WhatsAppSerializer, TipoCambioSerializer
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_whatsapp_empresa_for_write(request, *, empresa_input=None) -> int:
+    if empresa_input not in (None, ""):
+        try:
+            empresa_input = int(empresa_input)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError({"empresa": "Parametro empresa invalido."}) from exc
+    else:
+        empresa_input = None
+
+    user = request.user
+    if user.is_superuser:
+        if not empresa_input:
+            raise ValidationError({"empresa": "Empresa requerida para crear la linea."})
+        return int(empresa_input)
+
+    allowed_ids = get_user_empresa_ids(user)
+    if not allowed_ids:
+        raise ValidationError({"empresa": "Empresa no disponible en el usuario actual."})
+
+    if empresa_input is None:
+        if len(allowed_ids) == 1:
+            return int(allowed_ids[0])
+        raise ValidationError({"empresa": "Empresa requerida para crear la linea."})
+
+    if empresa_input not in allowed_ids:
+        raise ValidationError({"empresa": "No tenes acceso a la empresa seleccionada."})
+    return int(empresa_input)
 
 
 class WhatsAppViewSet(viewsets.ModelViewSet):
@@ -52,9 +83,20 @@ class WhatsAppViewSet(viewsets.ModelViewSet):
             )
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        payload = request.data.copy()
+        payload["empresa"] = _resolve_whatsapp_empresa_for_write(
+            request,
+            empresa_input=payload.get("empresa"),
+        )
+        serializer = self.get_serializer(data=payload)
         serializer.is_valid(raise_exception=True)
-        instance = serializer.save()
+        try:
+            instance = serializer.save()
+        except (IntegrityError, DatabaseError) as exc:
+            logger.exception("Fallo al crear linea WhatsApp para user=%s payload=%s", request.user.id, payload)
+            raise ValidationError(
+                {"detail": "No se pudo crear la linea por un conflicto de datos. Verifica empresa y numero."}
+            ) from exc
         self._emit_whatsapp_notification(instance=instance, activated=bool(instance.activo))
         output = self.get_serializer(instance)
         return Response(output.data, status=status.HTTP_201_CREATED)
@@ -63,9 +105,21 @@ class WhatsAppViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
         was_active = bool(instance.activo)
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        payload = request.data.copy()
+        if "empresa" in payload:
+            payload["empresa"] = _resolve_whatsapp_empresa_for_write(
+                request,
+                empresa_input=payload.get("empresa"),
+            )
+        serializer = self.get_serializer(instance, data=payload, partial=partial)
         serializer.is_valid(raise_exception=True)
-        instance = serializer.save()
+        try:
+            instance = serializer.save()
+        except (IntegrityError, DatabaseError) as exc:
+            logger.exception("Fallo al actualizar linea WhatsApp %s para user=%s", instance.id, request.user.id)
+            raise ValidationError(
+                {"detail": "No se pudo actualizar la linea por un conflicto de datos. Reintenta."}
+            ) from exc
         if was_active != bool(instance.activo):
             self._emit_whatsapp_notification(instance=instance, activated=bool(instance.activo))
         output = self.get_serializer(instance)

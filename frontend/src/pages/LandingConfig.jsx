@@ -31,6 +31,8 @@ const EMPTY_FORM = {
     mostrarDisclaimer: true,
     mostrarTicker: true,
     mostrarFormulario: true,
+    mostrarCampoNombre: true,
+    mostrarCampoTelefono: false,
     mostrarMediosPago: false,
     mostrarComunidad: false,
     textoComunidad: "",
@@ -103,6 +105,16 @@ const FIELD_MAP = [
     {
         formKey: "mostrarFormulario",
         apiKey: "mostrar_formulario",
+        normalize: (value) => String(Boolean(value)),
+    },
+    {
+        formKey: "mostrarCampoNombre",
+        apiKey: "mostrar_campo_nombre",
+        normalize: (value) => String(Boolean(value)),
+    },
+    {
+        formKey: "mostrarCampoTelefono",
+        apiKey: "mostrar_campo_telefono",
         normalize: (value) => String(Boolean(value)),
     },
     {
@@ -236,6 +248,8 @@ const buildPreviewPayload = (form, previewUrls, currentGradient) => ({
     mostrar_disclaimer: form?.mostrarDisclaimer !== false,
     mostrar_ticker: form?.mostrarTicker !== false,
     mostrar_formulario: form?.mostrarFormulario !== false,
+    mostrar_campo_nombre: form?.mostrarCampoNombre !== false,
+    mostrar_campo_telefono: form?.mostrarCampoTelefono === true,
     mostrar_medios_pago: form?.mostrarMediosPago === true,
     mostrar_comunidad: form?.mostrarComunidad === true,
     texto_comunidad: form?.textoComunidad || "",
@@ -365,6 +379,8 @@ function LandingConfig() {
             mostrarDisclaimer: value.mostrar_disclaimer ?? EMPTY_FORM.mostrarDisclaimer,
             mostrarTicker: value.mostrar_ticker ?? EMPTY_FORM.mostrarTicker,
             mostrarFormulario: value.mostrar_formulario ?? EMPTY_FORM.mostrarFormulario,
+            mostrarCampoNombre: value.mostrar_campo_nombre ?? EMPTY_FORM.mostrarCampoNombre,
+            mostrarCampoTelefono: value.mostrar_campo_telefono ?? EMPTY_FORM.mostrarCampoTelefono,
             mostrarMediosPago: value.mostrar_medios_pago ?? EMPTY_FORM.mostrarMediosPago,
             mostrarComunidad: value.mostrar_comunidad ?? EMPTY_FORM.mostrarComunidad,
             textoComunidad: value.texto_comunidad || "",
@@ -840,6 +856,8 @@ function LandingConfig() {
                     <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarDisclaimer)} onChange={(e) => setForm(p => ({ ...p, mostrarDisclaimer: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Disclaimer" sx={{ color: "#fff", m: 0 }} />
                     <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarTicker)} onChange={(e) => setForm(p => ({ ...p, mostrarTicker: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Barra ganadores" sx={{ color: "#fff", m: 0 }} />
                     <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarFormulario)} onChange={(e) => setForm(p => ({ ...p, mostrarFormulario: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Formulario" sx={{ color: "#fff", m: 0 }} />
+                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarCampoNombre)} onChange={(e) => setForm(p => ({ ...p, mostrarCampoNombre: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Campo nombre" sx={{ color: "#fff", m: 0 }} />
+                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarCampoTelefono)} onChange={(e) => setForm(p => ({ ...p, mostrarCampoTelefono: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Campo telefono" sx={{ color: "#fff", m: 0 }} />
                     <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarMediosPago)} onChange={(e) => setForm(p => ({ ...p, mostrarMediosPago: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Medios de Pago" sx={{ color: "#fff", m: 0 }} />
                     <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarComunidad)} onChange={(e) => setForm(p => ({ ...p, mostrarComunidad: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Testimonio Comunidad" sx={{ color: "#fff", m: 0 }} />
                     <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarPasos)} onChange={(e) => setForm(p => ({ ...p, mostrarPasos: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Paso a Paso" sx={{ color: "#fff", m: 0 }} />

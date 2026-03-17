@@ -206,6 +206,60 @@ def _find_recent_lead_event(*, cliente_id: int, landing_id: int, seconds: int = 
     )
 
 
+def _lead_dedup_window_minutes() -> int:
+    try:
+        return max(int(getattr(settings, "LANDING_LEAD_DEDUP_MINUTES", 10) or 10), 0)
+    except (TypeError, ValueError):
+        return 10
+
+
+def _find_recent_duplicate_lead_cliente(
+    *,
+    landing_id: int,
+    contacto: str = "",
+    fbp: str = "",
+    fbc: str = "",
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+):
+    window_minutes = _lead_dedup_window_minutes()
+    if window_minutes <= 0:
+        return None
+
+    window_start = timezone.now() - timedelta(minutes=window_minutes)
+    base_qs = (
+        EventosMeta.objects.filter(
+            landing_id=landing_id,
+            tipo="lead",
+            creado_en__gte=window_start,
+        )
+        .select_related("cliente")
+        .order_by("-creado_en")
+    )
+
+    if contacto:
+        by_phone = base_qs.filter(cliente__contacto=contacto).first()
+        if by_phone:
+            return by_phone.cliente
+
+    tracking_q = Q()
+    if fbp:
+        tracking_q |= Q(fbp=fbp)
+    if fbc:
+        tracking_q |= Q(fbc=fbc)
+    if tracking_q:
+        by_tracking = base_qs.filter(tracking_q).first()
+        if by_tracking:
+            return by_tracking.cliente
+
+    if ip_address and user_agent:
+        by_device = base_qs.filter(ip_address=ip_address, user_agent=user_agent).first()
+        if by_device:
+            return by_device.cliente
+
+    return None
+
+
 def _resolve_latest_lead_landing(*, cliente_id: int):
     landing_id = (
         EventosMeta.objects.filter(cliente_id=cliente_id, tipo="lead", landing__isnull=False)
@@ -297,6 +351,18 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 return Response(output.data, status=status.HTTP_200_OK)
 
         landing = serializer.validated_data["landing"]
+        duplicate_cliente = _find_recent_duplicate_lead_cliente(
+            landing_id=landing.id,
+            contacto=normalize_contacto(serializer.validated_data.get("contacto")),
+            fbp=str(serializer.validated_data.get("fbp") or "").strip(),
+            fbc=str(serializer.validated_data.get("fbc") or "").strip(),
+            ip_address=get_request_ip(request),
+            user_agent=get_request_user_agent(request),
+        )
+        if duplicate_cliente:
+            output = ClienteSerializer(duplicate_cliente)
+            return Response(output.data, status=status.HTTP_200_OK)
+
         cliente = serializer.save()
         recent_event = _find_recent_lead_event(cliente_id=cliente.id, landing_id=landing.id)
         if recent_event:

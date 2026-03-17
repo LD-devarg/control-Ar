@@ -89,6 +89,8 @@ class Landing(models.Model):
     texto_info = models.CharField(max_length=255, null=True, blank=True)
     texto_whatsapp = models.TextField(blank=True, default="")
     mostrar_formulario = models.BooleanField(default=True)
+    mostrar_campo_nombre = models.BooleanField(default=True)
+    mostrar_campo_telefono = models.BooleanField(default=False)
     mostrar_disclaimer = models.BooleanField(default=True)
     mostrar_ticker = models.BooleanField(default=True)
     mostrar_medios_pago = models.BooleanField(default=False)

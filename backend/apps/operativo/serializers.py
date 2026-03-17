@@ -159,15 +159,23 @@ class ClienteCreateSerializer(serializers.Serializer):
         username = (validated_data.get("username") or "").strip()
 
         request = self.context.get("request")
-        require_nombre = landing.mostrar_formulario and not (
+        enforce_form_requirements = landing.mostrar_formulario and not (
             request
             and getattr(request, "user", None)
             and request.user.is_authenticated
         )
-        if require_nombre and not nombre:
-            raise serializers.ValidationError(
-                "Nombre es obligatorio cuando el formulario esta activo."
-            )
+        if enforce_form_requirements:
+            require_nombre = bool(landing.mostrar_campo_nombre)
+            require_telefono = bool(landing.mostrar_campo_telefono)
+            if require_nombre or require_telefono:
+                has_nombre = bool(nombre)
+                has_contacto = bool(contacto)
+                if require_nombre and require_telefono and not (has_nombre or has_contacto):
+                    raise serializers.ValidationError("Completa nombre, telefono o ambos.")
+                if require_nombre and not require_telefono and not has_nombre:
+                    raise serializers.ValidationError("Nombre es obligatorio para esta landing.")
+                if require_telefono and not require_nombre and not has_contacto:
+                    raise serializers.ValidationError("Telefono es obligatorio para esta landing.")
 
         validated_data["nombre"] = nombre or None
         validated_data["contacto"] = contacto or None
@@ -235,6 +243,22 @@ class LandingSerializer(serializers.ModelSerializer):
         if send_extra and effective_main and effective_extra and effective_main.id == effective_extra.id:
             raise serializers.ValidationError(
                 {"credencial_meta_extra": "La credencial Meta extra debe ser distinta del pixel principal de la landing."}
+            )
+        effective_mostrar_formulario = attrs.get(
+            "mostrar_formulario",
+            getattr(self.instance, "mostrar_formulario", True),
+        )
+        effective_mostrar_campo_nombre = attrs.get(
+            "mostrar_campo_nombre",
+            getattr(self.instance, "mostrar_campo_nombre", True),
+        )
+        effective_mostrar_campo_telefono = attrs.get(
+            "mostrar_campo_telefono",
+            getattr(self.instance, "mostrar_campo_telefono", False),
+        )
+        if effective_mostrar_formulario and not (effective_mostrar_campo_nombre or effective_mostrar_campo_telefono):
+            raise serializers.ValidationError(
+                {"mostrar_campo_nombre": "Activa al menos uno de los campos del formulario."}
             )
         size_fields = (
             "size_titulo",
@@ -327,6 +351,8 @@ class LandingSerializer(serializers.ModelSerializer):
             "texto_info",
             "texto_whatsapp",
             "mostrar_formulario",
+            "mostrar_campo_nombre",
+            "mostrar_campo_telefono",
             "mostrar_disclaimer",
             "mostrar_ticker",
             "mostrar_medios_pago",

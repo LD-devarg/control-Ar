@@ -51,6 +51,8 @@ function normalizePreviewLanding(payload = {}) {
         texto_info: payload.texto_info || "💬 Atención personalizada las 24hs.",
         texto_whatsapp: payload.texto_whatsapp || "",
         mostrar_formulario: payload.mostrar_formulario !== false,
+        mostrar_campo_nombre: payload.mostrar_campo_nombre !== false,
+        mostrar_campo_telefono: payload.mostrar_campo_telefono === true,
         mostrar_disclaimer: payload.mostrar_disclaimer !== false,
         mostrar_ticker: payload.mostrar_ticker !== false,
         mostrar_medios_pago: payload.mostrar_medios_pago === true,
@@ -735,6 +737,8 @@ export default function Landing() {
                                 infoFontSize={sizeInfo}
                                 infoFontWeight={weightInfo}
                                 mostrarFormulario={hasLandingData ? landing?.mostrar_formulario !== false : true}
+                                mostrarCampoNombre={hasLandingData ? landing?.mostrar_campo_nombre !== false : true}
+                                mostrarCampoTelefono={hasLandingData ? landing?.mostrar_campo_telefono === true : false}
                                 imagenReemplazoForm={hasLandingData ? landing?.imagen_reemplazo_form : ""}
                                 isPreview={isPreviewMode}
                                 isTestMode={isTestMode}

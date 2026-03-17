@@ -1,6 +1,7 @@
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
+import CircularProgress from '@mui/material/CircularProgress';
 import "../assets/css/FormLeads.css";
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -26,9 +27,9 @@ function generateIdempotencyKey() {
 }
 
 function buildUsername(name, code) {
-    const cleanName = name.replace(/\s+/g, "");
+    const cleanName = String(name || "").replace(/\s+/g, "");
     const last3 = String(code || "").slice(-3);
-    return `${cleanName}${last3}`;
+    return `${cleanName || "lead"}${last3}`;
 }
 
 function buildWhatsappUrl(number, text) {
@@ -127,6 +128,8 @@ export default function NuevoLead({
     infoFontSize,
     infoFontWeight,
     mostrarFormulario = true,
+    mostrarCampoNombre = true,
+    mostrarCampoTelefono = false,
     imagenReemplazoForm = "",
     isPreview = false,
     isTestMode = false,
@@ -134,7 +137,9 @@ export default function NuevoLead({
     mediosPagoNode = null,
 }) {
     const [name, setName] = useState("");
+    const [phone, setPhone] = useState("");
     const [error, setError] = useState("");
+    const [isRedirecting, setIsRedirecting] = useState(false);
     const sendingRef = useRef(false);
     const submittingLeadRef = useRef(false);
     const retryIndexRef = useRef(0);
@@ -142,6 +147,10 @@ export default function NuevoLead({
     const healthTimerRef = useRef(null);
 
     const trimmedName = useMemo(() => name.trim(), [name]);
+    const trimmedPhone = useMemo(() => phone.trim(), [phone]);
+    const normalizedPhone = useMemo(() => trimmedPhone.replace(/\D/g, "").slice(0, 15), [trimmedPhone]);
+    const showNameField = mostrarFormulario && mostrarCampoNombre !== false;
+    const showPhoneField = mostrarFormulario && mostrarCampoTelefono === true;
 
     const finalButtonText = buttonText || "JUGÁ AHORA";
     const finalInfoText = infoText || "Atencion personalizada las 24hs.";
@@ -199,16 +208,26 @@ export default function NuevoLead({
                 bono: bonusText || "100%",
                 username: "",
                 nombre: trimmedName,
-                contacto: "",
+                contacto: normalizedPhone,
             }),
-        [whatsappTemplate, bonusText, trimmedName]
+        [whatsappTemplate, bonusText, trimmedName, normalizedPhone]
     );
     const whatsappUrl = useMemo(() => buildWhatsappUrl(whatsappNumber, messageText), [whatsappNumber, messageText]);
 
     const isNameValid = trimmedName.length > 1;
+    const isPhoneValid = normalizedPhone.length >= 6;
     const canSubmit =
         Boolean(landingToken) &&
-        (mostrarFormulario ? isNameValid : true);
+        (
+            mostrarFormulario
+                ? (
+                    (showNameField && showPhoneField && (isNameValid || isPhoneValid)) ||
+                    (showNameField && !showPhoneField && isNameValid) ||
+                    (!showNameField && showPhoneField && isPhoneValid) ||
+                    (!showNameField && !showPhoneField)
+                )
+                : true
+        );
 
     const scheduleRetry = () => {
         if (retryTimerRef.current) return;
@@ -420,8 +439,12 @@ export default function NuevoLead({
     const handleWhatsappClick = () => {
         if (isPreview) return;
         if (!canSubmit) {
-            if (!isNameValid) {
+            if (showNameField && showPhoneField && !(isNameValid || isPhoneValid)) {
                 setError("Ingresá un nombre válido.");
+            } else if (showNameField && !showPhoneField && !isNameValid) {
+                setError("Ingresa un nombre valido.");
+            } else if (!showNameField && showPhoneField && !isPhoneValid) {
+                setError("Ingresa un telefono valido.");
             } else if (!landingToken) {
                 setError("Landing inválida o sin token.");
             }
@@ -448,7 +471,7 @@ export default function NuevoLead({
             bono: bonusText || "100%",
             username: generatedUsername,
             nombre: trimmedName,
-            contacto: "",
+            contacto: normalizedPhone,
             codigo: generatedCodigo,
         });
         const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
@@ -463,7 +486,7 @@ export default function NuevoLead({
             queued_at: new Date().toISOString(),
             landing_token: landingToken,
             nombre: trimmedName,
-            contacto: "",
+            contacto: normalizedPhone,
             username: generatedUsername,
             codigo: generatedCodigo,
             ...(fbp ? { fbp } : {}),
@@ -487,7 +510,7 @@ export default function NuevoLead({
     };
 
     const handleWhatsappClickSafe = async () => {
-        if (isPreview || submittingLeadRef.current) return;
+        if (isPreview || submittingLeadRef.current || isRedirecting) return;
         if (!canSubmit) {
             handleWhatsappClick();
             return;
@@ -498,6 +521,7 @@ export default function NuevoLead({
         }
 
         submittingLeadRef.current = true;
+        setIsRedirecting(true);
         try {
             const fbp = getCookieValue("_fbp") || undefined;
             const fbc = getCookieValue("_fbc") || undefined;
@@ -514,7 +538,7 @@ export default function NuevoLead({
                     bono: bonusText || "100%",
                     username: generatedUsername,
                     nombre: trimmedName,
-                    contacto: "",
+                    contacto: normalizedPhone,
                     codigo: generatedCodigo,
                 });
                 const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
@@ -527,7 +551,7 @@ export default function NuevoLead({
                 queued_at: new Date().toISOString(),
                 landing_token: landingToken,
                 nombre: trimmedName,
-                contacto: "",
+                contacto: normalizedPhone,
                 username: generatedUsername,
                 codigo: generatedCodigo,
                 ...(fbp ? { fbp } : {}),
@@ -569,7 +593,7 @@ export default function NuevoLead({
                 bono: bonusText || "100%",
                 username: finalUsername,
                 nombre: finalNombre,
-                contacto: "",
+                contacto: normalizedPhone,
                 codigo: finalCodigo,
             });
             const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
@@ -580,6 +604,9 @@ export default function NuevoLead({
             }
         } finally {
             submittingLeadRef.current = false;
+            window.setTimeout(() => {
+                setIsRedirecting(false);
+            }, 1200);
         }
     };
 
@@ -590,11 +617,58 @@ export default function NuevoLead({
         if (error) setError("");
     };
 
+    const handlePhoneChange = (event) => {
+        const value = event.target.value.replace(/[^\d+\s()-]/g, "");
+        setPhone(value);
+        if (error) setError("");
+    };
+
     return (
         <div
             className={`form-leads-panel flex flex-col items-center rounded-[28px] backdrop-blur-[2px] shadow-xl my-2 transition-all duration-300 ${mostrarFormulario ? "" : "justify-center"}`}
-            style={{ backgroundColor: resolvedFormBg, fontFamily: formTextFontStack }}
+            style={{ backgroundColor: resolvedFormBg, fontFamily: formTextFontStack, position: "relative", overflow: "hidden" }}
         >
+            {isRedirecting ? (
+                <div
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        zIndex: 3,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "20px",
+                        background: "linear-gradient(180deg, rgba(4, 10, 20, 0.72) 0%, rgba(4, 10, 20, 0.88) 100%)",
+                        backdropFilter: "blur(6px)",
+                    }}
+                >
+                    <div
+                        style={{
+                            minWidth: "220px",
+                            maxWidth: "320px",
+                            borderRadius: "22px",
+                            border: "1px solid rgba(255,255,255,0.16)",
+                            background: "rgba(10, 16, 28, 0.82)",
+                            boxShadow: "0 18px 40px rgba(0,0,0,0.28)",
+                            padding: "18px 20px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "14px",
+                            color: "#fff",
+                        }}
+                    >
+                        <CircularProgress size={26} thickness={4.6} sx={{ color: "#4ade80", flexShrink: 0 }} />
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <strong style={{ fontSize: `${0.98 * resolvedFormSize}rem`, fontWeight: 700 }}>
+                                Te estamos redirigiendo
+                            </strong>
+                            <span style={{ fontSize: `${0.82 * resolvedFormSize}rem`, color: "rgba(255,255,255,0.78)" }}>
+                                Estamos preparando tu acceso a WhatsApp.
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
             {mostrarFormulario && (
                 <h3
                     className='text-white text-xl lg:text-2xl my-1'
@@ -607,29 +681,56 @@ export default function NuevoLead({
             {mostrarFormulario ? (
                 <>
                     <Stack spacing={0.75} direction="column" className="form-leads-stack">
-                        <TextField
-                            className='textfield'
-                            required
-                            id="nombre"
-                            label="Nombre"
-                            variant="outlined"
-                            fullWidth
-                            value={name}
-                            onChange={handleNameChange}
-                            InputProps={{ readOnly: isPreview }}
-                            sx={{
-                                "& .MuiOutlinedInput-root": {
-                                    marginBottom: "10px",
-                                    borderRadius: "20px",
-                                    backgroundColor: "rgba(49, 36, 146, 0.12)",
-                                    "& fieldset": { borderColor: resolvedFieldBorder },
-                                    "&:hover fieldset": { borderColor: "#fff" },
-                                    "&.Mui-focused fieldset": { borderColor: "#fff" },
-                                },
-                                "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
-                                "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
-                            }}
-                        />
+                        {showNameField ? (
+                            <TextField
+                                className='textfield'
+                                required={!showPhoneField}
+                                id="nombre"
+                                label="Nombre"
+                                variant="outlined"
+                                fullWidth
+                                value={name}
+                                onChange={handleNameChange}
+                                InputProps={{ readOnly: isPreview }}
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        marginBottom: "10px",
+                                        borderRadius: "20px",
+                                        backgroundColor: "rgba(49, 36, 146, 0.12)",
+                                        "& fieldset": { borderColor: resolvedFieldBorder },
+                                        "&:hover fieldset": { borderColor: "#fff" },
+                                        "&.Mui-focused fieldset": { borderColor: "#fff" },
+                                    },
+                                    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
+                                    "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
+                                }}
+                            />
+                        ) : null}
+                        {showPhoneField ? (
+                            <TextField
+                                className='textfield'
+                                required={!showNameField}
+                                id="telefono"
+                                label="Telefono"
+                                variant="outlined"
+                                fullWidth
+                                value={phone}
+                                onChange={handlePhoneChange}
+                                InputProps={{ readOnly: isPreview }}
+                                sx={{
+                                    "& .MuiOutlinedInput-root": {
+                                        marginBottom: "10px",
+                                        borderRadius: "20px",
+                                        backgroundColor: "rgba(49, 36, 146, 0.12)",
+                                        "& fieldset": { borderColor: resolvedFieldBorder },
+                                        "&:hover fieldset": { borderColor: "#fff" },
+                                        "&.Mui-focused fieldset": { borderColor: "#fff" },
+                                    },
+                                    "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
+                                    "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
+                                }}
+                            />
+                        ) : null}
                     </Stack>
                     {error ? <span className='text-red-400 text-xs mt-2' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>{error}</span> : null}
                 </>
@@ -643,7 +744,7 @@ export default function NuevoLead({
             <div className={`landing-submit-wrap ${canSubmit ? "is-active" : ""}`}>
                 <Button variant="contained" startIcon={<WhatsAppIcon />}
                     onClick={handleWhatsappClickSafe}
-                    disabled={isPreview || !canSubmit}
+                    disabled={isPreview || !canSubmit || isRedirecting}
                     sx={{
                         backgroundColor: "transparent",
                         marginTop: "14px",

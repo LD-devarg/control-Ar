@@ -6,7 +6,7 @@ from datetime import datetime, time, timedelta
 import requests
 
 from django.db import models, transaction
-from django.db.models import Sum, Min, Subquery, Count, Value, DecimalField, IntegerField
+from django.db.models import Sum, Min, Subquery, Count, Value, DecimalField, IntegerField, Q
 from django.db.models import Exists, OuterRef
 from django.db.models.functions import Coalesce
 from django.core.cache import cache

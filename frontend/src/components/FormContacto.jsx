@@ -3,6 +3,7 @@ import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
 import Snackbar from "@mui/material/Snackbar";
 import Alert from "@mui/material/Alert";
 import "../assets/css/Form.css";
@@ -18,6 +19,9 @@ export default function FormContacto() {
   const color = isDarkMode ? '#f4f4f5' : '#000000';
   const [usuarios, setUsuarios] = useState([]);
   const [selectedCliente, setSelectedCliente] = useState(null);
+  const [missingDataChoice, setMissingDataChoice] = useState(null);
+  const [extraContacto, setExtraContacto] = useState("");
+  const [extraNombre, setExtraNombre] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
@@ -130,15 +134,52 @@ export default function FormContacto() {
     };
   }, [empresaId]);
 
+  useEffect(() => {
+    setMissingDataChoice(null);
+    setExtraContacto("");
+    setExtraNombre("");
+  }, [selectedCliente?.id]);
+
+  const selectedClienteHasContacto = Boolean(String(selectedCliente?.contacto || "").trim());
+  const needsMissingDataDecision = Boolean(selectedCliente?.id) && !selectedClienteHasContacto;
+  const shouldShowExtraFields = needsMissingDataDecision && missingDataChoice === "add";
+
   const canSubmit = useMemo(
-    () => Boolean(selectedCliente?.id) && Boolean(empresaId),
-    [selectedCliente, empresaId]
+    () => {
+      if (!selectedCliente?.id || !empresaId) {
+        return false;
+      }
+      if (!needsMissingDataDecision) {
+        return true;
+      }
+      if (missingDataChoice === "skip") {
+        return true;
+      }
+      if (missingDataChoice !== "add") {
+        return false;
+      }
+      return Boolean(extraContacto.trim() || extraNombre.trim());
+    },
+    [selectedCliente, empresaId, needsMissingDataDecision, missingDataChoice, extraContacto, extraNombre]
   );
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
+      if (shouldShowExtraFields) {
+        const payload = {};
+        if (extraContacto.trim()) {
+          payload.contacto = extraContacto.trim();
+        }
+        if (extraNombre.trim()) {
+          payload.nombre = extraNombre.trim();
+        }
+        if (Object.keys(payload).length) {
+          await apiClient.patch(`/clientes/${selectedCliente.id}/`, payload);
+        }
+      }
+
       await apiClient.post("/eventos-meta/", {
         cliente_id: selectedCliente.id,
         tipo: "contact",
@@ -183,6 +224,48 @@ export default function FormContacto() {
         )}
         renderInput={(params) => <TextField {...params} label="Seleccione el cliente" sx={fieldSx} />}
       />
+      {needsMissingDataDecision ? (
+        <Stack spacing={1.25}>
+          <Alert severity="warning" variant="outlined">
+            Este cliente no tiene numero cargado. Queres agregar datos antes de enviar el evento?
+          </Alert>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant={missingDataChoice === "add" ? "contained" : "outlined"}
+              onClick={() => setMissingDataChoice("add")}
+              disabled={submitting}
+            >
+              Si
+            </Button>
+            <Button
+              variant={missingDataChoice === "skip" ? "contained" : "outlined"}
+              onClick={() => setMissingDataChoice("skip")}
+              disabled={submitting}
+            >
+              No
+            </Button>
+          </Stack>
+          {shouldShowExtraFields ? (
+            <Stack spacing={1.5}>
+              <Typography variant="body2" sx={{ color }}>
+                Completa nombre, numero o ambos. Para habilitar el envio, al menos uno tiene que estar completo.
+              </Typography>
+              <TextField
+                label="Numero"
+                value={extraContacto}
+                onChange={(event) => setExtraContacto(event.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                label="Nombre"
+                value={extraNombre}
+                onChange={(event) => setExtraNombre(event.target.value)}
+                sx={fieldSx}
+              />
+            </Stack>
+          ) : null}
+        </Stack>
+      ) : null}
         <Button variant="outlined" onClick={handleSubmit} disabled={!canSubmit || submitting}>
           {submitting ? "Guardando..." : "Guardar"}
         </Button>

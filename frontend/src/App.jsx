@@ -20,7 +20,7 @@ import Organizaciones from './pages/Organizaciones.jsx'
 import MetaEvents from './pages/MetaEvents.jsx'
 import DemoApp from './pages/DemoApp.jsx'
 import { canAccessPath, getDefaultPath } from './services/access'
-import { getCurrentUser } from './services/auth'
+import { getCurrentUser, initializeAuthSession } from './services/auth'
 
 const MOBILE_MAX_WIDTH = 767
 const TABLET_MAX_WIDTH = 1024
@@ -44,12 +44,21 @@ function getViewportType() {
 
 function App() {
   const [viewportType, setViewportType] = useState(() => getViewportType())
+  const [, setAuthVersion] = useState(0)
 
   useEffect(() => {
     const onResize = () => setViewportType(getViewportType())
 
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
+    initializeAuthSession()
+
+    const syncAuthState = () => setAuthVersion((value) => value + 1)
+    window.addEventListener('auth:user-changed', syncAuthState)
+    return () => window.removeEventListener('auth:user-changed', syncAuthState)
   }, [])
 
   const ActiveLayout =

@@ -851,7 +851,7 @@ function LandingConfig() {
                 </div>
             }>
             <div className="flex flex-col w-full px-1 sm:px-2 py-2 justify-center">
-                <div className="flex flex-row flex-wrap gap-2 sm:gap-4 items-center justify-center w-full mt-1 mb-1 border-b border-white/10">
+                <div className="flex flex-row flex-wrap items-center justify-center w-full mb-2 border-b border-white/10">
                     <FormControlLabel control={<Checkbox checked={activo} onChange={(e) => setActivo(e.target.checked)} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Activo" sx={{ color: "#fff", m: 0 }} />
                     <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarDisclaimer)} onChange={(e) => setForm(p => ({ ...p, mostrarDisclaimer: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Disclaimer" sx={{ color: "#fff", m: 0 }} />
                     <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarTicker)} onChange={(e) => setForm(p => ({ ...p, mostrarTicker: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Barra ganadores" sx={{ color: "#fff", m: 0 }} />

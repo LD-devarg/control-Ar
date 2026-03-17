@@ -7,6 +7,22 @@ export const apiClient = axios.create({
   baseURL: API_URL,
 });
 
+function clearStoredAuth() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("current_user");
+  localStorage.removeItem("clientes_cache");
+  localStorage.removeItem("clientes_cache_ts");
+  localStorage.removeItem("clientes_dirty");
+  localStorage.removeItem("active_tenant_id");
+}
+
+function notifyAuthChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("auth:user-changed"));
+  }
+}
+
 function shouldSkipTenantParam(url = "") {
   const normalized = String(url || "").toLowerCase();
   return (
@@ -48,6 +64,23 @@ function addRefreshSubscriber(cb) {
   refreshQueue.push(cb);
 }
 
+function clearRefreshTimer() {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+export function stopTokenRefresh() {
+  clearRefreshTimer();
+}
+
+function handleExpiredSession() {
+  clearStoredAuth();
+  stopTokenRefresh();
+  notifyAuthChanged();
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -55,12 +88,14 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest?._retry) {
       const refreshToken = localStorage.getItem("refresh_token");
       if (!refreshToken) {
+        handleExpiredSession();
         return Promise.reject(error);
       }
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           addRefreshSubscriber((newToken) => {
             if (!newToken) return reject(error);
+            originalRequest.headers = originalRequest.headers || {};
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             resolve(apiClient(originalRequest));
           });
@@ -75,11 +110,14 @@ apiClient.interceptors.response.use(
         localStorage.setItem("access_token", data.access);
         isRefreshing = false;
         onRefreshed(data.access);
+        originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${data.access}`;
+        startTokenRefresh();
         return apiClient(originalRequest);
       } catch (refreshError) {
         isRefreshing = false;
         onRefreshed(null);
+        handleExpiredSession();
         return Promise.reject(refreshError);
       }
     }
@@ -87,11 +125,23 @@ apiClient.interceptors.response.use(
   }
 );
 
-function clearRefreshTimer() {
-  if (refreshTimer) {
-    clearTimeout(refreshTimer);
-    refreshTimer = null;
+function parseJwt(token) {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = atob(payload);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
   }
+}
+
+function isTokenExpired(token, skewMs = 0) {
+  const payload = parseJwt(token);
+  if (!payload?.exp) return true;
+  return payload.exp * 1000 <= Date.now() + skewMs;
 }
 
 export async function refreshAccessToken() {
@@ -118,28 +168,46 @@ export function startTokenRefresh() {
       const newToken = await refreshAccessToken();
       if (newToken) {
         startTokenRefresh();
+      } else {
+        handleExpiredSession();
       }
     } catch {
-      clearRefreshTimer();
+      handleExpiredSession();
     }
   }, refreshInMs);
 }
 
-export function stopTokenRefresh() {
-  clearRefreshTimer();
-}
+export async function initializeAuthSession() {
+  const accessToken = localStorage.getItem("access_token");
+  const refreshToken = localStorage.getItem("refresh_token");
+  const currentUser = localStorage.getItem("current_user");
 
-function parseJwt(token) {
-  if (!token) return null;
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  try {
-    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const decoded = atob(payload);
-    return JSON.parse(decoded);
-  } catch {
-    return null;
+  if (!accessToken || !refreshToken || !currentUser) {
+    if (accessToken || refreshToken || currentUser) {
+      handleExpiredSession();
+    }
+    return;
   }
+
+  if (isTokenExpired(refreshToken, 5_000)) {
+    handleExpiredSession();
+    return;
+  }
+
+  if (isTokenExpired(accessToken, 5_000)) {
+    try {
+      const newToken = await refreshAccessToken();
+      if (!newToken) {
+        handleExpiredSession();
+        return;
+      }
+    } catch {
+      handleExpiredSession();
+      return;
+    }
+  }
+
+  startTokenRefresh();
 }
 
 export function getAccessToken() {
@@ -173,7 +241,7 @@ export async function login(username, password) {
   const user = await fetchCurrentUser(data.access);
   if (user) {
     localStorage.setItem("current_user", JSON.stringify(user));
-    window.dispatchEvent(new CustomEvent("auth:user-changed"));
+    notifyAuthChanged();
   }
   startTokenRefresh();
   return user;
@@ -187,13 +255,7 @@ export async function logout() {
   } catch {
     // No bloquea el cierre de sesion local si falla el log estructural.
   }
-  localStorage.removeItem("access_token");
-  localStorage.removeItem("refresh_token");
-  localStorage.removeItem("current_user");
-  localStorage.removeItem("clientes_cache");
-  localStorage.removeItem("clientes_cache_ts");
-  localStorage.removeItem("clientes_dirty");
-  localStorage.removeItem("active_tenant_id");
+  clearStoredAuth();
   stopTokenRefresh();
-  window.dispatchEvent(new CustomEvent("auth:user-changed"));
+  notifyAuthChanged();
 }

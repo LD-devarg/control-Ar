@@ -37,11 +37,30 @@ def get_request_user_agent(request):
 
 
 class ClienteSerializer(serializers.ModelSerializer):
-    total_bonos_ars = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    total_bonos_usd = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    cant_retiros = serializers.IntegerField(read_only=True)
-    total_retiros_ars = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    total_retiros_usd = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_bonos_ars = serializers.SerializerMethodField()
+    total_bonos_usd = serializers.SerializerMethodField()
+    cant_retiros = serializers.SerializerMethodField()
+    total_retiros_ars = serializers.SerializerMethodField()
+    total_retiros_usd = serializers.SerializerMethodField()
+
+    def _decimal_or_zero(self, obj, attr_name):
+        value = getattr(obj, attr_name, None)
+        return value if value is not None else "0.00"
+
+    def get_total_bonos_ars(self, obj):
+        return self._decimal_or_zero(obj, "total_bonos_ars")
+
+    def get_total_bonos_usd(self, obj):
+        return self._decimal_or_zero(obj, "total_bonos_usd")
+
+    def get_cant_retiros(self, obj):
+        return getattr(obj, "cant_retiros", 0) or 0
+
+    def get_total_retiros_ars(self, obj):
+        return self._decimal_or_zero(obj, "total_retiros_ars")
+
+    def get_total_retiros_usd(self, obj):
+        return self._decimal_or_zero(obj, "total_retiros_usd")
 
     class Meta:
         model = Cliente

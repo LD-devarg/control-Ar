@@ -2,6 +2,7 @@ import uuid
 from unittest.mock import patch
 
 from django.test import TestCase
+from django.test.utils import override_settings
 from rest_framework.test import APIClient
 
 from apps.empresas.models import Empresa
@@ -58,6 +59,44 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(Cliente.objects.count(), 1)
         self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
         self.assertEqual(response_1.data["id"], response_2.data["id"])
+
+    @patch("apps.operativo.views.publish_empresa_event", side_effect=RuntimeError("redis caido"))
+    @patch("apps.operativo.views.enviar_evento_meta")
+    def test_create_no_falla_si_realtime_explota(self, mock_enviar_evento_meta, mock_publish_empresa_event):
+        response = self.client.post(
+            "/clientes/",
+            {
+                "landing_token": str(self.landing.token),
+                "idempotency_key": str(uuid.uuid4()),
+                "nombre": "Lead Realtime",
+                "username": "leadrealtime",
+                "codigo": "555555",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Cliente.objects.count(), 1)
+        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
+        self.assertEqual(response.data["cant_retiros"], 0)
+        self.assertEqual(response.data["total_bonos_ars"], "0.00")
+        self.assertEqual(response.data["total_retiros_usd"], "0.00")
+
+    @override_settings(
+        CORS_ALLOWED_ORIGINS=["https://app.control-ar.com"],
+        CORS_ALLOW_CREDENTIALS=True,
+    )
+    def test_options_clientes_devuelve_cors_credentials(self):
+        response = self.client.options(
+            "/clientes/",
+            HTTP_ORIGIN="https://app.control-ar.com",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Access-Control-Allow-Origin"], "https://app.control-ar.com")
+        self.assertEqual(response["Access-Control-Allow-Credentials"], "true")
 
     @patch("apps.operativo.views.publish_empresa_event")
     @patch("apps.operativo.views.enviar_evento_meta")

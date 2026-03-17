@@ -51,6 +51,16 @@ cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "")
 CORS_ALLOWED_ORIGINS = [
     origin.strip() for origin in cors_origins_env.split(",") if origin.strip()
 ]
+CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", True)
+
+default_public_origins = [
+    "https://app.control-ar.com",
+    "https://control-ar.com",
+    "https://www.control-ar.com",
+]
+for origin in default_public_origins:
+    if origin not in CORS_ALLOWED_ORIGINS:
+        CORS_ALLOWED_ORIGINS.append(origin)
 
 csrf_trusted_origins_env = os.getenv("CSRF_TRUSTED_ORIGINS", "")
 CSRF_TRUSTED_ORIGINS = [
@@ -58,6 +68,9 @@ CSRF_TRUSTED_ORIGINS = [
     for origin in csrf_trusted_origins_env.split(",")
     if origin.strip()
 ]
+for origin in default_public_origins:
+    if origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True

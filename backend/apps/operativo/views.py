@@ -1,5 +1,6 @@
 import uuid
 import json
+import logging
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 import requests
@@ -49,6 +50,23 @@ from apps.pauta.servicios.insights import fetch_meta_page_views
 from apps.pauta.servicios.telegram_alerts import send_lead_queue_alert
 from apps.pauta.models import CredencialesMeta, RendimientoPautaDiario
 from .realtime import publish_empresa_event
+
+logger = logging.getLogger(__name__)
+
+
+def _safe_publish_empresa_event(*, empresa_id: int, event_type: str, payload: dict) -> None:
+    try:
+        publish_empresa_event(
+            empresa_id=empresa_id,
+            event_type=event_type,
+            payload=payload,
+        )
+    except Exception:
+        logger.exception(
+            "No se pudo publicar el evento realtime %s para empresa_id=%s",
+            event_type,
+            empresa_id,
+        )
 
 def _apply_date_filters(qs, field: str, request):
     period = request.query_params.get("period")
@@ -397,7 +415,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
             evento.respuesta_meta = {"error": str(exc)}
             evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
-        publish_empresa_event(
+        _safe_publish_empresa_event(
             empresa_id=landing.empresa_id,
             event_type="lead_created",
             payload={
@@ -838,7 +856,7 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             evento.respuesta_meta = {"error": str(exc)}
             evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
-        publish_empresa_event(
+        _safe_publish_empresa_event(
             empresa_id=cliente.empresa_id,
             event_type="contact_created",
             payload={
@@ -928,7 +946,7 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             evento.respuesta_meta = {"error": str(exc)}
             evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
-        publish_empresa_event(
+        _safe_publish_empresa_event(
             empresa_id=cliente.empresa_id,
             event_type="contact_created",
             payload={
@@ -1067,7 +1085,7 @@ class LandingViewSet(viewsets.ModelViewSet):
             source=source,
         )
 
-        publish_empresa_event(
+        _safe_publish_empresa_event(
             empresa_id=empresa.id,
             event_type="lead_queue_alert",
             payload={
@@ -1122,7 +1140,7 @@ class LandingVisitViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         visit = serializer.save()
-        publish_empresa_event(
+        _safe_publish_empresa_event(
             empresa_id=visit.empresa_id,
             event_type="landing_visit_created",
             payload={
@@ -1521,7 +1539,7 @@ class CompraViewSet(viewsets.ModelViewSet):
                 evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
         output = self.get_serializer(compra)
-        publish_empresa_event(
+        _safe_publish_empresa_event(
             empresa_id=cliente.empresa_id,
             event_type="compra_created",
             payload={
@@ -1590,7 +1608,7 @@ class RetiroViewSet(viewsets.ModelViewSet):
         )
 
         output = self.get_serializer(retiro)
-        publish_empresa_event(
+        _safe_publish_empresa_event(
             empresa_id=cliente.empresa_id,
             event_type="retiro_created",
             payload={

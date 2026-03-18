@@ -3,7 +3,9 @@ from unittest.mock import patch
 
 from django.test import TestCase
 from django.test.utils import override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
+from datetime import timedelta
 
 from apps.empresas.models import Empresa
 from apps.operativo.models import Cliente, EventosMeta, Landing
@@ -59,6 +61,115 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(Cliente.objects.count(), 1)
         self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
         self.assertEqual(response_1.data["id"], response_2.data["id"])
+
+    @override_settings(
+        LANDING_LEAD_DEDUP_MINUTES=0,
+        LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS=7,
+    )
+    @patch("apps.operativo.views.publish_empresa_event")
+    @patch("apps.operativo.views.enviar_evento_meta")
+    def test_deduplica_cliente_por_fingerprint_meta_en_7_dias_y_completa_datos(
+        self,
+        mock_enviar_evento_meta,
+        mock_publish_empresa_event,
+    ):
+        response_1 = self.client.post(
+            "/clientes/",
+            {
+                "landing_token": str(self.landing.token),
+                "idempotency_key": str(uuid.uuid4()),
+                "fbp": "fb.1.meta.shared",
+                "event_source_url": "https://app.control-ar.com/landing",
+                "nombre": "",
+                "contacto": "",
+                "username": "",
+                "codigo": "345678",
+            },
+            format="json",
+            HTTP_USER_AGENT="Instagram-UA-1",
+        )
+        response_2 = self.client.post(
+            "/clientes/",
+            {
+                "landing_token": str(self.landing.token),
+                "idempotency_key": str(uuid.uuid4()),
+                "fbp": "fb.1.meta.shared",
+                "fbc": "fb.1.meta.click",
+                "fbclid": "fbclid-1",
+                "event_source_url": "https://app.control-ar.com/landing",
+                "utm_source": "ig",
+                "utm_medium": "paid",
+                "nombre": "Luis Norberto Dechat",
+                "contacto": "5493772454143",
+                "username": "norberto",
+                "codigo": "876543",
+            },
+            format="json",
+            HTTP_USER_AGENT="Instagram-UA-1",
+            REMOTE_ADDR="181.9.213.220",
+        )
+
+        self.assertEqual(response_1.status_code, 201)
+        self.assertEqual(response_2.status_code, 200)
+        self.assertEqual(Cliente.objects.count(), 1)
+        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
+        self.assertEqual(response_1.data["id"], response_2.data["id"])
+
+        cliente = Cliente.objects.get(id=response_1.data["id"])
+        self.assertEqual(cliente.nombre, "Luis Norberto Dechat")
+        self.assertEqual(cliente.contacto, "5493772454143")
+        self.assertEqual(cliente.username, "norberto")
+        self.assertEqual(cliente.fbc, "fb.1.meta.click")
+        self.assertEqual(cliente.fbclid, "fbclid-1")
+        self.assertEqual(cliente.utm_source, "ig")
+        self.assertEqual(cliente.utm_medium, "paid")
+        self.assertEqual(cliente.ip_address, "181.9.213.220")
+
+    @override_settings(
+        LANDING_LEAD_DEDUP_MINUTES=0,
+        LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS=7,
+    )
+    @patch("apps.operativo.views.publish_empresa_event")
+    @patch("apps.operativo.views.enviar_evento_meta")
+    def test_no_deduplica_fingerprint_meta_fuera_de_ventana(
+        self,
+        mock_enviar_evento_meta,
+        mock_publish_empresa_event,
+    ):
+        cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Cliente Viejo",
+            contacto="5491111111111",
+            username="clienteviejo",
+            codigo="112233",
+            fbp="fb.1.meta.shared",
+            event_source_url="https://app.control-ar.com/landing",
+            user_agent="Instagram-UA-2",
+        )
+        Cliente.objects.filter(id=cliente.id).update(
+            creado_en=timezone.now() - timedelta(days=8),
+            first_touch_at=timezone.now() - timedelta(days=8),
+        )
+
+        response = self.client.post(
+            "/clientes/",
+            {
+                "landing_token": str(self.landing.token),
+                "idempotency_key": str(uuid.uuid4()),
+                "fbp": "fb.1.meta.shared",
+                "event_source_url": "https://app.control-ar.com/landing",
+                "nombre": "Cliente Nuevo",
+                "contacto": "5492222222222",
+                "username": "clientenuevo",
+                "codigo": "445566",
+            },
+            format="json",
+            HTTP_USER_AGENT="Instagram-UA-2",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Cliente.objects.count(), 2)
+        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
 
     @patch("apps.operativo.views.publish_empresa_event", side_effect=RuntimeError("redis caido"))
     @patch("apps.operativo.views.enviar_evento_meta")

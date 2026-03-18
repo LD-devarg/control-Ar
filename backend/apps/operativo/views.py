@@ -231,6 +231,62 @@ def _lead_dedup_window_minutes() -> int:
         return 10
 
 
+def _landing_client_fingerprint_dedup_days() -> int:
+    try:
+        return max(int(getattr(settings, "LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS", 7) or 7), 0)
+    except (TypeError, ValueError):
+        return 7
+
+
+def _find_recent_fingerprint_cliente(
+    *,
+    empresa_id: int,
+    fbp: str = "",
+    event_source_url: str = "",
+    user_agent: str = "",
+):
+    if not (empresa_id and fbp and event_source_url and user_agent):
+        return None
+
+    window_days = _landing_client_fingerprint_dedup_days()
+    if window_days <= 0:
+        return None
+
+    window_start = timezone.now() - timedelta(days=window_days)
+    return (
+        Cliente.objects.filter(
+            empresa_id=empresa_id,
+            creado_en__gte=window_start,
+            fbp=fbp,
+            event_source_url=event_source_url,
+            user_agent=user_agent,
+        )
+        .only(
+            "id",
+            "uuid",
+            "empresa_id",
+            "nombre",
+            "contacto",
+            "username",
+            "codigo",
+            "fbp",
+            "fbc",
+            "fbclid",
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_content",
+            "utm_term",
+            "event_source_url",
+            "ip_address",
+            "user_agent",
+            "creado_en",
+        )
+        .order_by("-creado_en")
+        .first()
+    )
+
+
 def _find_recent_duplicate_lead_cliente(
     *,
     landing_id: int,
@@ -276,6 +332,45 @@ def _find_recent_duplicate_lead_cliente(
             return by_device.cliente
 
     return None
+
+
+def _merge_cliente_missing_fields(*, cliente: Cliente, validated_data: dict, request) -> Cliente:
+    normalized_contacto = normalize_contacto(validated_data.get("contacto"))
+    normalized_nombre = str(validated_data.get("nombre") or "").strip()
+    normalized_username = str(validated_data.get("username") or "").strip()
+    normalized_fbc = str(validated_data.get("fbc") or "").strip()
+    normalized_fbclid = str(validated_data.get("fbclid") or "").strip()
+    normalized_utm_source = str(validated_data.get("utm_source") or "").strip()
+    normalized_utm_medium = str(validated_data.get("utm_medium") or "").strip()
+    normalized_utm_campaign = str(validated_data.get("utm_campaign") or "").strip()
+    normalized_utm_content = str(validated_data.get("utm_content") or "").strip()
+    normalized_utm_term = str(validated_data.get("utm_term") or "").strip()
+    normalized_ip = get_request_ip(request)
+    normalized_user_agent = get_request_user_agent(request)
+
+    update_fields = []
+
+    for field_name, value in (
+        ("nombre", normalized_nombre),
+        ("contacto", normalized_contacto),
+        ("username", normalized_username),
+        ("fbc", normalized_fbc),
+        ("fbclid", normalized_fbclid),
+        ("utm_source", normalized_utm_source),
+        ("utm_medium", normalized_utm_medium),
+        ("utm_campaign", normalized_utm_campaign),
+        ("utm_content", normalized_utm_content),
+        ("utm_term", normalized_utm_term),
+        ("ip_address", normalized_ip),
+        ("user_agent", normalized_user_agent),
+    ):
+        if value and not getattr(cliente, field_name):
+            setattr(cliente, field_name, value)
+            update_fields.append(field_name)
+
+    if update_fields:
+        cliente.save(update_fields=update_fields)
+    return cliente
 
 
 def _resolve_latest_lead_landing(*, cliente_id: int):
@@ -369,16 +464,43 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 return Response(output.data, status=status.HTTP_200_OK)
 
         landing = serializer.validated_data["landing"]
+        normalized_contacto = normalize_contacto(serializer.validated_data.get("contacto"))
+        normalized_fbp = str(serializer.validated_data.get("fbp") or "").strip()
+        normalized_fbc = str(serializer.validated_data.get("fbc") or "").strip()
+        normalized_event_source_url = str(serializer.validated_data.get("event_source_url") or "").strip()
+        request_ip = get_request_ip(request)
+        request_user_agent = get_request_user_agent(request)
+
+        fingerprint_cliente = _find_recent_fingerprint_cliente(
+            empresa_id=landing.empresa_id,
+            fbp=normalized_fbp,
+            event_source_url=normalized_event_source_url,
+            user_agent=request_user_agent or "",
+        )
+        if fingerprint_cliente:
+            cliente = _merge_cliente_missing_fields(
+                cliente=fingerprint_cliente,
+                validated_data=serializer.validated_data,
+                request=request,
+            )
+            output = ClienteSerializer(cliente)
+            return Response(output.data, status=status.HTTP_200_OK)
+
         duplicate_cliente = _find_recent_duplicate_lead_cliente(
             landing_id=landing.id,
-            contacto=normalize_contacto(serializer.validated_data.get("contacto")),
-            fbp=str(serializer.validated_data.get("fbp") or "").strip(),
-            fbc=str(serializer.validated_data.get("fbc") or "").strip(),
-            ip_address=get_request_ip(request),
-            user_agent=get_request_user_agent(request),
+            contacto=normalized_contacto,
+            fbp=normalized_fbp,
+            fbc=normalized_fbc,
+            ip_address=request_ip,
+            user_agent=request_user_agent,
         )
         if duplicate_cliente:
-            output = ClienteSerializer(duplicate_cliente)
+            cliente = _merge_cliente_missing_fields(
+                cliente=duplicate_cliente,
+                validated_data=serializer.validated_data,
+                request=request,
+            )
+            output = ClienteSerializer(cliente)
             return Response(output.data, status=status.HTTP_200_OK)
 
         cliente = serializer.save()

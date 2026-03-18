@@ -57,15 +57,10 @@ export default function PerformanceObjectivesModal({
         <div className="mt-1 grid grid-cols-2 gap-3">
           <TextField
             size="small"
-            label="Ingresos objetivo (USD)"
-            value={objectivesForm.ingresos_objetivo_usd}
-            onChange={(e) => onObjectiveChange("ingresos_objetivo_usd", e.target.value)}
-          />
-          <TextField
-            size="small"
             label="ROAS objetivo"
             value={objectivesForm.roas_objetivo}
             onChange={(e) => onObjectiveChange("roas_objetivo", e.target.value)}
+            helperText="El ingreso objetivo diario se calcula como presupuesto diario activo x ROAS."
           />
           <TextField
             size="small"

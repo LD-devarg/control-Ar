@@ -116,7 +116,7 @@ PERFORMANCE_WEIGHTS = {
 }
 
 DEFAULT_OBJECTIVES = {
-    "ingresos_objetivo_usd": 1000.0,
+    "ingresos_objetivo_usd": 0.0,
     "roas_objetivo": 2.0,
     "cpa_objetivo_usd": 20.0,
     "cpc_objetivo_usd": 5.0,
@@ -125,6 +125,8 @@ DEFAULT_OBJECTIVES = {
     "frecuencia_objetivo": 3.0,
     "ctr_objetivo": 0.02,
 }
+
+ACTIVE_META_STATUSES = {"ACTIVE"}
 
 
 class BMViewSet(viewsets.ModelViewSet):
@@ -570,6 +572,20 @@ class PautaKPIViewSet(viewsets.ViewSet):
             "ctr_objetivo": float(obj.ctr_objetivo),
         }
 
+    def _resolve_active_daily_budget_usd(self, empresa_id):
+        if not empresa_id:
+            return 0.0
+        today = timezone.localdate()
+        qs = ConjuntoAnuncios.objects.filter(
+            empresa_id=empresa_id,
+            estado__in=ACTIVE_META_STATUSES,
+            presupuesto_diario__isnull=False,
+        )
+        qs = qs.filter(Q(fecha_inicio__isnull=True) | Q(fecha_inicio__lte=today))
+        qs = qs.filter(Q(fecha_fin__isnull=True) | Q(fecha_fin__gte=today))
+        total = qs.aggregate(total=Sum("presupuesto_diario"))["total"] or 0
+        return float(total)
+
     def _apply_account_scope(self, rows, empresa_id, account_scope):
         if not account_scope or account_scope == "all" or not empresa_id:
             return rows
@@ -883,6 +899,17 @@ class PautaKPIViewSet(viewsets.ViewSet):
         }
 
         objectives = self._resolve_objectives(empresa_id)
+        active_daily_budget_usd = self._resolve_active_daily_budget_usd(empresa_id)
+        days_in_range = max((to_date - from_date).days + 1, 1)
+        ingresos_objetivo_diario_usd = round(active_daily_budget_usd * objectives["roas_objetivo"], 2)
+        effective_objectives = {
+            **objectives,
+            "active_daily_budget_usd": round(active_daily_budget_usd, 2),
+            "ingresos_objetivo_usd": ingresos_objetivo_diario_usd,
+            "ingresos_objetivo_diario_usd": ingresos_objetivo_diario_usd,
+            "ingresos_objetivo_total_usd": round(ingresos_objetivo_diario_usd * days_in_range, 2),
+            "days_in_range": days_in_range,
+        }
         empresa_sync = {}
         if empresa_id:
             empresa = Empresa.objects.filter(id=empresa_id).only(
@@ -909,7 +936,10 @@ class PautaKPIViewSet(viewsets.ViewSet):
             "ctr": executive["cards"]["ctr"],
         }
         component_scores = {
-            "ingresos": self._score_higher_better(metrics["ingresos"], objectives["ingresos_objetivo_usd"]),
+            "ingresos": self._score_higher_better(
+                metrics["ingresos"],
+                effective_objectives["ingresos_objetivo_total_usd"],
+            ),
             "roas": self._score_higher_better(metrics["roas"], objectives["roas_objetivo"]),
             "cpa": self._score_lower_better(metrics["cpa"], objectives["cpa_objetivo_usd"]),
             "cpc": self._score_lower_better(metrics["cpc"], objectives["cpc_objetivo_usd"]),
@@ -931,7 +961,11 @@ class PautaKPIViewSet(viewsets.ViewSet):
                 "period": request.query_params.get("period", "week"),
                 "account": account_scope,
                 "money_currency": money_currency,
-                "objectives": objectives,
+                "objectives": {
+                    **objectives,
+                    "ingresos_objetivo_usd": ingresos_objetivo_diario_usd,
+                },
+                "effective_objectives": effective_objectives,
                 "weights": PERFORMANCE_WEIGHTS,
                 "component_scores": component_scores,
                 "last_sync": empresa_sync,

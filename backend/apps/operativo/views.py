@@ -244,8 +244,9 @@ def _find_recent_fingerprint_cliente(
     fbp: str = "",
     event_source_url: str = "",
     user_agent: str = "",
+    ip_address: str | None = None,
 ):
-    if not (empresa_id and fbp and event_source_url and user_agent):
+    if not (empresa_id and event_source_url and user_agent):
         return None
 
     window_days = _landing_client_fingerprint_dedup_days()
@@ -253,11 +254,10 @@ def _find_recent_fingerprint_cliente(
         return None
 
     window_start = timezone.now() - timedelta(days=window_days)
-    return (
+    base_qs = (
         Cliente.objects.filter(
             empresa_id=empresa_id,
             creado_en__gte=window_start,
-            fbp=fbp,
             event_source_url=event_source_url,
             user_agent=user_agent,
         )
@@ -283,8 +283,19 @@ def _find_recent_fingerprint_cliente(
             "creado_en",
         )
         .order_by("-creado_en")
-        .first()
     )
+
+    if fbp:
+        by_fbp = base_qs.filter(fbp=fbp).first()
+        if by_fbp:
+            return by_fbp
+
+    if ip_address:
+        by_device = base_qs.filter(ip_address=ip_address).first()
+        if by_device:
+            return by_device
+
+    return None
 
 
 def _find_recent_duplicate_lead_cliente(
@@ -476,6 +487,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
             fbp=normalized_fbp,
             event_source_url=normalized_event_source_url,
             user_agent=request_user_agent or "",
+            ip_address=request_ip,
         )
         if fingerprint_cliente:
             cliente = _merge_cliente_missing_fields(
@@ -2023,6 +2035,7 @@ class StatsViewSet(viewsets.ViewSet):
             .only(
                 "id",
                 "tipo",
+                "data",
                 "creado_en",
                 "cliente_id",
                 "cliente__codigo",
@@ -2064,6 +2077,7 @@ class StatsViewSet(viewsets.ViewSet):
         feed = []
 
         for evento in eventos_qs:
+            payload = evento.data if isinstance(evento.data, dict) else {}
             feed.append(
                 {
                     "id": f"{evento.tipo}-{evento.id}",
@@ -2076,6 +2090,9 @@ class StatsViewSet(viewsets.ViewSet):
                     "nombre": evento.cliente.nombre if evento.cliente else "",
                     "contacto": evento.cliente.contacto if evento.cliente else "",
                     "operador": evento.operador.username if evento.operador else "",
+                    "codigo_solicitado": payload.get("codigo_solicitado") or "",
+                    "codigo_final": payload.get("codigo_final") or (evento.cliente.codigo if evento.cliente else ""),
+                    "codigo_provisorio_distinto": bool(payload.get("codigo_provisorio_distinto")),
                 }
             )
 

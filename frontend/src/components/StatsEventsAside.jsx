@@ -54,6 +54,15 @@ function buildEventDisplayName(item) {
   return "Evento";
 }
 
+function resolveEventCodes(item) {
+  const requestedCodigo = String(item?.codigo_solicitado || "").trim();
+  const finalCodigo = String(item?.codigo_final || item?.cliente_codigo || "").trim();
+  const hasCodigoMismatch = Boolean(
+    item?.codigo_provisorio_distinto && requestedCodigo && finalCodigo && requestedCodigo !== finalCodigo
+  );
+  return { requestedCodigo, finalCodigo, hasCodigoMismatch };
+}
+
 function buildCacheKey({ tenantId, usePeriod, period, desde, hasta }) {
   const rangeKey = usePeriod
     ? `period:${period || ""}`
@@ -119,11 +128,11 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
   const queryParams = useMemo(
     () =>
       effectiveUsePeriod
-        ? { period: effectivePeriod, limit: 25 }
+        ? { period: effectivePeriod, limit: 50 }
         : {
             from: effectiveDesde?.format("YYYY-MM-DD"),
             to: effectiveHasta?.format("YYYY-MM-DD"),
-            limit: 25,
+            limit: 50,
           },
     [effectiveUsePeriod, effectivePeriod, effectiveDesde, effectiveHasta, tenantId]
   );
@@ -337,12 +346,27 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
       >
         {selectedEvent ? (
           <div className="space-y-2 text-sm">
+            {resolveEventCodes(selectedEvent).hasCodigoMismatch ? (
+              <div className="rounded-xl border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-amber-200">
+                <strong>Codigo reasignado:</strong> se solicito {resolveEventCodes(selectedEvent).requestedCodigo || "-"} y se asigno {resolveEventCodes(selectedEvent).finalCodigo || "-"}.
+              </div>
+            ) : null}
             <p>
               <strong>Usuario:</strong> {buildEventDisplayName(selectedEvent)}
             </p>
             <p>
               <strong>Fecha y hora:</strong> {formatDateTime(selectedEvent.fecha_hora)}
             </p>
+            {(selectedEvent.codigo_solicitado || selectedEvent.codigo_final || selectedEvent.cliente_codigo) ? (
+              <>
+                <p>
+                  <strong>Codigo solicitado:</strong> {resolveEventCodes(selectedEvent).requestedCodigo || "-"}
+                </p>
+                <p>
+                  <strong>Codigo final:</strong> {resolveEventCodes(selectedEvent).finalCodigo || "-"}
+                </p>
+              </>
+            ) : null}
             {selectedEvent.nombre ? (
               <p>
                 <strong>Nombre:</strong> {selectedEvent.nombre}

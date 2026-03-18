@@ -33,6 +33,18 @@ function buildLeadTitle(lead) {
     return "Lead";
 }
 
+function resolveLeadCodes(lead, clienteDetalle) {
+    const payload = lead?.data && typeof lead.data === "object" ? lead.data : {};
+    const requestedCodigo = String(payload.codigo_solicitado || "").trim();
+    const finalCodigo = String(
+        clienteDetalle?.codigo || payload.codigo_final || lead?.cliente_codigo || ""
+    ).trim();
+    const hasCodigoMismatch = Boolean(
+        payload.codigo_provisorio_distinto && requestedCodigo && finalCodigo && requestedCodigo !== finalCodigo
+    );
+    return { requestedCodigo, finalCodigo, hasCodigoMismatch };
+}
+
 function readCachedLeads(cacheKey) {
     if (typeof window === "undefined") return [];
     try {
@@ -66,7 +78,7 @@ function NuevosLeads() {
         setError("");
         try {
             const { data } = await apiClient.get("/eventos-meta/", {
-                params: { tipo: "lead", sin_contacto: 1, limit: 25 },
+                params: { tipo: "lead", sin_contacto: 1, limit: 50 },
             });
             const nextRows = Array.isArray(data) ? data : [];
             setLeads(nextRows);
@@ -160,6 +172,10 @@ function NuevosLeads() {
         title: buildLeadTitle(lead),
         fecha: formatDateTime(lead.creado_en),
     })), [leads]);
+    const selectedLeadCodes = useMemo(
+        () => resolveLeadCodes(selectedLead, clienteDetalle),
+        [selectedLead, clienteDetalle]
+    );
 
     return (
         <aside className="w-full rounded-2xl shadow-xl shadow-black bg-white dark:bg-neutral-900 p-4 text-white h-full flex flex-col">
@@ -199,6 +215,11 @@ function NuevosLeads() {
                                 {lead.cliente_codigo ? `ID ${lead.cliente_codigo}` : (lead.cliente_contacto || "-")}
                             </span>
                         </div>
+                        {lead?.data?.codigo_provisorio_distinto ? (
+                            <div className="mt-2 rounded-xl border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-200">
+                                Solicitado {lead?.data?.codigo_solicitado || "-"} {"->"} asignado {lead?.data?.codigo_final || lead?.cliente_codigo || "-"}
+                            </div>
+                        ) : null}
                     </button>
                 ))}
             </div>
@@ -215,6 +236,13 @@ function NuevosLeads() {
                     <>
                         <p><strong>Nombre:</strong> {clienteDetalle?.nombre || selectedLead?.cliente_nombre || "-"}</p>
                         <p><strong>ID:</strong> {clienteDetalle?.codigo || selectedLead?.cliente_codigo || "-"}</p>
+                        {selectedLeadCodes.hasCodigoMismatch ? (
+                            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+                                <strong>Codigo reasignado:</strong> se solicito {selectedLeadCodes.requestedCodigo || "-"} y se asigno {selectedLeadCodes.finalCodigo || "-"}.
+                            </div>
+                        ) : null}
+                        <p><strong>Codigo solicitado:</strong> {selectedLeadCodes.requestedCodigo || "-"}</p>
+                        <p><strong>Codigo final:</strong> {selectedLeadCodes.finalCodigo || "-"}</p>
                         <p><strong>Contacto:</strong> {clienteDetalle?.contacto || "-"}</p>
                         <p><strong>Username:</strong> {clienteDetalle?.username || selectedLead?.cliente_username || "-"}</p>
                         <p><strong>Fecha de Lead:</strong> {formatDateTime(selectedLead?.creado_en)}</p>

@@ -171,6 +171,53 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(Cliente.objects.count(), 2)
         self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
 
+    @override_settings(
+        LANDING_LEAD_DEDUP_MINUTES=0,
+        LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS=7,
+    )
+    @patch("apps.operativo.views.publish_empresa_event")
+    @patch("apps.operativo.views.enviar_evento_meta")
+    def test_deduplica_por_mismo_dispositivo_ip_y_origen_aunque_cambie_fbp(
+        self,
+        mock_enviar_evento_meta,
+        mock_publish_empresa_event,
+    ):
+        response_1 = self.client.post(
+            "/clientes/",
+            {
+                "landing_token": str(self.landing.token),
+                "idempotency_key": str(uuid.uuid4()),
+                "fbp": "fb.1.meta.old",
+                "event_source_url": "https://app.control-ar.com/landing",
+                "contacto": "5493754527821",
+                "username": "915",
+                "codigo": "267915",
+            },
+            format="json",
+            HTTP_USER_AGENT="Mozilla/5.0 Test Device",
+            REMOTE_ADDR="179.63.35.162",
+        )
+        response_2 = self.client.post(
+            "/clientes/",
+            {
+                "landing_token": str(self.landing.token),
+                "idempotency_key": str(uuid.uuid4()),
+                "fbp": "fb.1.meta.new",
+                "event_source_url": "https://app.control-ar.com/landing",
+                "username": "lead122",
+                "codigo": "144122",
+            },
+            format="json",
+            HTTP_USER_AGENT="Mozilla/5.0 Test Device",
+            REMOTE_ADDR="179.63.35.162",
+        )
+
+        self.assertEqual(response_1.status_code, 201)
+        self.assertEqual(response_2.status_code, 200)
+        self.assertEqual(Cliente.objects.count(), 1)
+        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
+        self.assertEqual(response_1.data["id"], response_2.data["id"])
+
     @patch("apps.operativo.views.publish_empresa_event", side_effect=RuntimeError("redis caido"))
     @patch("apps.operativo.views.enviar_evento_meta")
     def test_create_no_falla_si_realtime_explota(self, mock_enviar_evento_meta, mock_publish_empresa_event):

@@ -39,6 +39,13 @@ function isIpadDevice() {
     return isiPadUA || isiPadOSDesktopUA;
 }
 
+function parseDecimalInput(value) {
+    if (value === null || value === undefined) return 0;
+    const normalized = String(value).trim().replace(",", ".");
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function PautaKPI() {
     const { tenantId } = useTenant();
     const theme = useTheme();
@@ -60,7 +67,6 @@ function PautaKPI() {
     const [objectiveId, setObjectiveId] = useState(null);
     const [savingObjectives, setSavingObjectives] = useState(false);
     const [objectivesForm, setObjectivesForm] = useState({
-        ingresos_objetivo_usd: "1000",
         roas_objetivo: "2",
         cpa_objetivo_usd: "20",
         cpc_objetivo_usd: "5",
@@ -132,13 +138,25 @@ function PautaKPI() {
         let mounted = true;
         const loadObjectives = async () => {
             try {
-                const { data } = await apiClient.get("/kpi-objetivos/");
+                const params = tenantId ? { empresa: tenantId } : undefined;
+                const { data } = await apiClient.get("/kpi-objetivos/", { params });
                 if (!mounted) return;
                 const first = Array.isArray(data) && data.length > 0 ? data[0] : null;
-                if (!first) return;
+                if (!first) {
+                    setObjectiveId(null);
+                    setObjectivesForm({
+                        roas_objetivo: "2",
+                        cpa_objetivo_usd: "20",
+                        cpc_objetivo_usd: "5",
+                        cpl_objetivo_usd: "10",
+                        efectividad_objetivo_pct: "3",
+                        frecuencia_objetivo: "3",
+                        ctr_objetivo_pct: "2",
+                    });
+                    return;
+                }
                 setObjectiveId(first.id);
                 setObjectivesForm({
-                    ingresos_objetivo_usd: String(first.ingresos_objetivo_usd ?? "1000"),
                     roas_objetivo: String(first.roas_objetivo ?? "2"),
                     cpa_objetivo_usd: String(first.cpa_objetivo_usd ?? "20"),
                     cpc_objetivo_usd: String(first.cpc_objetivo_usd ?? "5"),
@@ -155,7 +173,7 @@ function PautaKPI() {
         return () => {
             mounted = false;
         };
-    }, []);
+    }, [tenantId]);
 
     useEffect(() => {
         let mounted = true;
@@ -246,30 +264,44 @@ function PautaKPI() {
     };
 
     const handleSaveObjectives = async () => {
+        const currentTenantId = getEffectiveTenantId();
         const payload = {
-            ingresos_objetivo_usd: Number(objectivesForm.ingresos_objetivo_usd || 0),
-            roas_objetivo: Number(objectivesForm.roas_objetivo || 0),
-            cpa_objetivo_usd: Number(objectivesForm.cpa_objetivo_usd || 0),
-            cpc_objetivo_usd: Number(objectivesForm.cpc_objetivo_usd || 0),
-            cpl_objetivo_usd: Number(objectivesForm.cpl_objetivo_usd || 0),
-            efectividad_objetivo: Number(objectivesForm.efectividad_objetivo_pct || 0) / 100,
-            frecuencia_objetivo: Number(objectivesForm.frecuencia_objetivo || 0),
-            ctr_objetivo: Number(objectivesForm.ctr_objetivo_pct || 0) / 100,
+            roas_objetivo: parseDecimalInput(objectivesForm.roas_objetivo),
+            cpa_objetivo_usd: parseDecimalInput(objectivesForm.cpa_objetivo_usd),
+            cpc_objetivo_usd: parseDecimalInput(objectivesForm.cpc_objetivo_usd),
+            cpl_objetivo_usd: parseDecimalInput(objectivesForm.cpl_objetivo_usd),
+            efectividad_objetivo: parseDecimalInput(objectivesForm.efectividad_objetivo_pct) / 100,
+            frecuencia_objetivo: parseDecimalInput(objectivesForm.frecuencia_objetivo),
+            ctr_objetivo: parseDecimalInput(objectivesForm.ctr_objetivo_pct) / 100,
+            ...(currentTenantId ? { empresa: currentTenantId } : {}),
         };
 
         setSavingObjectives(true);
         try {
             if (objectiveId) {
-                const { data } = await apiClient.patch(`/kpi-objetivos/${objectiveId}/`, payload);
+                const { data } = await apiClient.patch(
+                    `/kpi-objetivos/${objectiveId}/`,
+                    payload,
+                    { params: currentTenantId ? { empresa: currentTenantId } : undefined }
+                );
                 setObjectiveId(data?.id || objectiveId);
             } else {
-                const { data } = await apiClient.post("/kpi-objetivos/", payload);
+                const { data } = await apiClient.post(
+                    "/kpi-objetivos/",
+                    payload,
+                    { params: currentTenantId ? { empresa: currentTenantId } : undefined }
+                );
                 setObjectiveId(data?.id || null);
             }
             setToast({ open: true, severity: "success", message: "Objetivos de performance actualizados." });
             setPerformanceModalOpen(false);
-        } catch (_err) {
-            setToast({ open: true, severity: "error", message: "No se pudieron guardar los objetivos." });
+        } catch (err) {
+            const detail =
+                err?.response?.data?.detail ||
+                err?.response?.data?.empresa?.[0] ||
+                err?.response?.data?.non_field_errors?.[0] ||
+                "No se pudieron guardar los objetivos.";
+            setToast({ open: true, severity: "error", message: String(detail) });
         } finally {
             setSavingObjectives(false);
         }

@@ -583,4 +583,4 @@ class KPIObjetivoSerializer(serializers.ModelSerializer):
             "creado_en",
             "actualizado_en",
         ]
-        read_only_fields = ["id", "creado_en", "actualizado_en"]
+        read_only_fields = ["id", "ingresos_objetivo_usd", "creado_en", "actualizado_en"]

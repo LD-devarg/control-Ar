@@ -15,6 +15,7 @@ import Snackbar from '@mui/material/Snackbar';
 import Alert from '@mui/material/Alert';
 import { useTenant } from '../context/TenantContext';
 import { apiClient } from '../services/auth';
+import * as XLSX from 'xlsx';
 
 const baseColumns = [
   {
@@ -231,6 +232,34 @@ export default function TablaContactos() {
     setToast({ open: true, severity, message });
   };
 
+  const handleExportExcel = React.useCallback(() => {
+    if (!sortedRows.length) {
+      showToast('error', 'No hay contactos para exportar.');
+      return;
+    }
+
+    const exportRows = sortedRows.map((row) => {
+      const item = {};
+      columns.forEach((column) => {
+        item[column.label] = formatValue(column, row[column.dataKey]);
+      });
+      return item;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Agenda');
+    const now = new Date();
+    const stamp = [
+      now.getFullYear(),
+      String(now.getMonth() + 1).padStart(2, '0'),
+      String(now.getDate()).padStart(2, '0'),
+      String(now.getHours()).padStart(2, '0'),
+      String(now.getMinutes()).padStart(2, '0'),
+    ].join('');
+    XLSX.writeFile(workbook, `agenda_contactos_${stamp}.xlsx`);
+  }, [columns, sortedRows]);
+
   const startEdit = (row, key) => {
     if (!editableKeys.has(key)) return;
     setEditingCell({ rowId: row.id, key });
@@ -351,6 +380,14 @@ export default function TablaContactos() {
             disabled={loading}
           >
             {loading ? 'Actualizando...' : 'Refresh'}
+          </button>
+          <button
+            type="button"
+            className="tabla-contactos-clear"
+            onClick={handleExportExcel}
+            disabled={loading || !sortedRows.length}
+          >
+            Exportar Excel
           </button>
         </div>
 

@@ -404,6 +404,59 @@ def _client_first_user_agent(request, cliente):
     return (getattr(cliente, "user_agent", None) if cliente else None) or get_request_user_agent(request)
 
 
+def _build_lead_event_payload(*, cliente, request, requested_codigo: str = "", resultado: str, motivo: str):
+    requested_codigo = str(requested_codigo or "").strip()
+    final_codigo = str(getattr(cliente, "codigo", "") or "").strip()
+    skipped_meta = resultado.startswith("deduplicado")
+    return {
+        "phone": cliente.contacto,
+        "external_id": str(cliente.uuid),
+        "event_source_url": cliente.event_source_url,
+        "codigo_solicitado": requested_codigo or None,
+        "codigo_final": final_codigo or None,
+        "codigo_provisorio_distinto": bool(requested_codigo and final_codigo and requested_codigo != final_codigo),
+        "resultado": resultado,
+        "motivo": motivo,
+        "cliente_resuelto_id": cliente.id,
+        "cliente_resuelto_codigo": final_codigo or None,
+        "cliente_nuevo": resultado in {"creado", "creado_reasignado"},
+        "deduplicado": resultado.startswith("deduplicado"),
+        "meta_skipped": skipped_meta,
+    }
+
+
+def _create_lead_event(*, landing, cliente, request, requested_codigo: str = "", resultado: str, motivo: str):
+    payload = _build_lead_event_payload(
+        cliente=cliente,
+        request=request,
+        requested_codigo=requested_codigo,
+        resultado=resultado,
+        motivo=motivo,
+    )
+    evento = EventosMeta.objects.create(
+        id_evento=uuid.uuid4(),
+        cliente=cliente,
+        empresa=landing.empresa,
+        landing=landing,
+        operador=None,
+        tipo="lead",
+        data=payload,
+        fbp=request.data.get("fbp"),
+        fbc=request.data.get("fbc"),
+        ip_address=_client_first_ip(request, cliente),
+        user_agent=_client_first_user_agent(request, cliente),
+    )
+    if payload["meta_skipped"]:
+        evento.estado_envio = "enviado"
+        evento.respuesta_meta = {
+            "skipped": True,
+            "reason": motivo,
+            "resultado": resultado,
+        }
+        evento.save(update_fields=["estado_envio", "respuesta_meta"])
+    return evento
+
+
 class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     filterset_fields = ["empresa__id"]
@@ -466,6 +519,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        requested_codigo = str(request.data.get("codigo") or "").strip()
 
         idempotency_key = serializer.validated_data.get("idempotency_key")
         if idempotency_key:
@@ -495,6 +549,14 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 validated_data=serializer.validated_data,
                 request=request,
             )
+            _create_lead_event(
+                landing=landing,
+                cliente=cliente,
+                request=request,
+                requested_codigo=requested_codigo,
+                resultado="deduplicado_fingerprint",
+                motivo="cliente_existente_por_fingerprint",
+            )
             output = ClienteSerializer(cliente)
             return Response(output.data, status=status.HTTP_200_OK)
 
@@ -512,35 +574,40 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 validated_data=serializer.validated_data,
                 request=request,
             )
+            _create_lead_event(
+                landing=landing,
+                cliente=cliente,
+                request=request,
+                requested_codigo=requested_codigo,
+                resultado="deduplicado_lead",
+                motivo="lead_reciente_duplicado",
+            )
             output = ClienteSerializer(cliente)
             return Response(output.data, status=status.HTTP_200_OK)
 
         cliente = serializer.save()
         recent_event = _find_recent_lead_event(cliente_id=cliente.id, landing_id=landing.id)
         if recent_event:
+            _create_lead_event(
+                landing=landing,
+                cliente=cliente,
+                request=request,
+                requested_codigo=requested_codigo,
+                resultado="deduplicado_evento_reciente",
+                motivo="lead_reciente_existente",
+            )
             output = ClienteSerializer(cliente)
             return Response(output.data, status=status.HTTP_200_OK)
 
-        requested_codigo = str(request.data.get("codigo") or "").strip()
-        evento = EventosMeta.objects.create(
-            id_evento=uuid.uuid4(),
-            cliente=cliente,
-            empresa=landing.empresa,
+        resultado = "creado_reasignado" if requested_codigo and requested_codigo != cliente.codigo else "creado"
+        motivo = "codigo_reasignado" if resultado == "creado_reasignado" else "cliente_nuevo"
+        evento = _create_lead_event(
             landing=landing,
-            operador=None,
-            tipo="lead",
-            data={
-                "phone": cliente.contacto,
-                "external_id": str(cliente.uuid),
-                "event_source_url": cliente.event_source_url,
-                "codigo_solicitado": requested_codigo or None,
-                "codigo_final": cliente.codigo,
-                "codigo_provisorio_distinto": bool(requested_codigo and requested_codigo != cliente.codigo),
-            },
-            fbp=request.data.get("fbp"),
-            fbc=request.data.get("fbc"),
-            ip_address=_client_first_ip(request, cliente),
-            user_agent=_client_first_user_agent(request, cliente),
+            cliente=cliente,
+            request=request,
+            requested_codigo=requested_codigo,
+            resultado=resultado,
+            motivo=motivo,
         )
         try:
             enviar_evento_meta(evento, request=request)
@@ -2093,6 +2160,9 @@ class StatsViewSet(viewsets.ViewSet):
                     "codigo_solicitado": payload.get("codigo_solicitado") or "",
                     "codigo_final": payload.get("codigo_final") or (evento.cliente.codigo if evento.cliente else ""),
                     "codigo_provisorio_distinto": bool(payload.get("codigo_provisorio_distinto")),
+                    "resultado": payload.get("resultado") or "",
+                    "motivo": payload.get("motivo") or "",
+                    "deduplicado": bool(payload.get("deduplicado")),
                 }
             )
 

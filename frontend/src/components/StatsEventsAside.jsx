@@ -63,6 +63,23 @@ function resolveEventCodes(item) {
   return { requestedCodigo, finalCodigo, hasCodigoMismatch };
 }
 
+function formatEventResult(item) {
+  switch (item?.resultado) {
+    case "creado":
+      return "Cliente nuevo";
+    case "creado_reasignado":
+      return "Cliente nuevo con codigo reasignado";
+    case "deduplicado_fingerprint":
+      return "Intento deduplicado por fingerprint";
+    case "deduplicado_lead":
+      return "Intento deduplicado por lead reciente";
+    case "deduplicado_evento_reciente":
+      return "Intento deduplicado por evento reciente";
+    default:
+      return "";
+  }
+}
+
 function buildCacheKey({ tenantId, usePeriod, period, desde, hasta }) {
   const rangeKey = usePeriod
     ? `period:${period || ""}`
@@ -357,6 +374,16 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
             <p>
               <strong>Fecha y hora:</strong> {formatDateTime(selectedEvent.fecha_hora)}
             </p>
+            {formatEventResult(selectedEvent) ? (
+              <p>
+                <strong>Resultado:</strong> {formatEventResult(selectedEvent)}
+              </p>
+            ) : null}
+            {selectedEvent.motivo ? (
+              <p>
+                <strong>Motivo:</strong> {selectedEvent.motivo}
+              </p>
+            ) : null}
             {(selectedEvent.codigo_solicitado || selectedEvent.codigo_final || selectedEvent.cliente_codigo) ? (
               <>
                 <p>

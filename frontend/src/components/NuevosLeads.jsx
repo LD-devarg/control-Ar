@@ -45,6 +45,24 @@ function resolveLeadCodes(lead, clienteDetalle) {
     return { requestedCodigo, finalCodigo, hasCodigoMismatch };
 }
 
+function formatLeadResult(lead) {
+    const payload = lead?.data && typeof lead.data === "object" ? lead.data : {};
+    switch (payload.resultado) {
+        case "creado":
+            return "Cliente nuevo";
+        case "creado_reasignado":
+            return "Cliente nuevo con codigo reasignado";
+        case "deduplicado_fingerprint":
+            return "Intento deduplicado por fingerprint";
+        case "deduplicado_lead":
+            return "Intento deduplicado por lead reciente";
+        case "deduplicado_evento_reciente":
+            return "Intento deduplicado por evento reciente";
+        default:
+            return "";
+    }
+}
+
 function readCachedLeads(cacheKey) {
     if (typeof window === "undefined") return [];
     try {
@@ -220,6 +238,11 @@ function NuevosLeads() {
                                 Solicitado {lead?.data?.codigo_solicitado || "-"} {"->"} asignado {lead?.data?.codigo_final || lead?.cliente_codigo || "-"}
                             </div>
                         ) : null}
+                        {lead?.data?.deduplicado ? (
+                            <div className="mt-2 rounded-xl border border-sky-400/40 bg-sky-500/10 px-2.5 py-1.5 text-[11px] text-sky-200">
+                                {formatLeadResult(lead) || "Intento deduplicado"}
+                            </div>
+                        ) : null}
                     </button>
                 ))}
             </div>
@@ -236,6 +259,12 @@ function NuevosLeads() {
                     <>
                         <p><strong>Nombre:</strong> {clienteDetalle?.nombre || selectedLead?.cliente_nombre || "-"}</p>
                         <p><strong>ID:</strong> {clienteDetalle?.codigo || selectedLead?.cliente_codigo || "-"}</p>
+                        {formatLeadResult(selectedLead) ? (
+                            <p><strong>Resultado:</strong> {formatLeadResult(selectedLead)}</p>
+                        ) : null}
+                        {selectedLead?.data?.motivo ? (
+                            <p><strong>Motivo:</strong> {selectedLead.data.motivo}</p>
+                        ) : null}
                         {selectedLeadCodes.hasCodigoMismatch ? (
                             <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
                                 <strong>Codigo reasignado:</strong> se solicito {selectedLeadCodes.requestedCodigo || "-"} y se asigno {selectedLeadCodes.finalCodigo || "-"}.

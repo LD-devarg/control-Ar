@@ -59,8 +59,12 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(response_1.status_code, 201)
         self.assertEqual(response_2.status_code, 200)
         self.assertEqual(Cliente.objects.count(), 1)
-        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
+        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 2)
         self.assertEqual(response_1.data["id"], response_2.data["id"])
+        evento_dedup = EventosMeta.objects.filter(tipo="lead").order_by("-id").first()
+        self.assertEqual(evento_dedup.data.get("resultado"), "deduplicado_lead")
+        self.assertEqual(evento_dedup.data.get("codigo_solicitado"), "654321")
+        self.assertEqual(evento_dedup.data.get("codigo_final"), "123456")
 
     @override_settings(
         LANDING_LEAD_DEDUP_MINUTES=0,
@@ -112,7 +116,7 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(response_1.status_code, 201)
         self.assertEqual(response_2.status_code, 200)
         self.assertEqual(Cliente.objects.count(), 1)
-        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
+        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 2)
         self.assertEqual(response_1.data["id"], response_2.data["id"])
 
         cliente = Cliente.objects.get(id=response_1.data["id"])
@@ -124,6 +128,10 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(cliente.utm_source, "ig")
         self.assertEqual(cliente.utm_medium, "paid")
         self.assertEqual(cliente.ip_address, "181.9.213.220")
+        evento_dedup = EventosMeta.objects.filter(tipo="lead").order_by("-id").first()
+        self.assertEqual(evento_dedup.data.get("resultado"), "deduplicado_fingerprint")
+        self.assertEqual(evento_dedup.data.get("codigo_solicitado"), "876543")
+        self.assertEqual(evento_dedup.data.get("codigo_final"), "345678")
 
     @override_settings(
         LANDING_LEAD_DEDUP_MINUTES=0,
@@ -215,7 +223,7 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(response_1.status_code, 201)
         self.assertEqual(response_2.status_code, 200)
         self.assertEqual(Cliente.objects.count(), 1)
-        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
+        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 2)
         self.assertEqual(response_1.data["id"], response_2.data["id"])
 
     @patch("apps.operativo.views.publish_empresa_event", side_effect=RuntimeError("redis caido"))
@@ -289,7 +297,7 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(response_1.status_code, 201)
         self.assertEqual(response_2.status_code, 200)
         self.assertEqual(Cliente.objects.count(), 1)
-        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
+        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 2)
         self.assertEqual(response_1.data["id"], response_2.data["id"])
 
     @patch("apps.operativo.views.publish_empresa_event")
@@ -321,5 +329,5 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(response_1.status_code, 201)
         self.assertEqual(response_2.status_code, 200)
         self.assertEqual(Cliente.objects.count(), 1)
-        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
+        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 2)
         self.assertEqual(response_1.data["id"], response_2.data["id"])

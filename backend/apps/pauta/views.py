@@ -3,7 +3,7 @@ import re
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Sum, OuterRef, Subquery
+from django.db.models import Sum, OuterRef, Subquery, Q
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated

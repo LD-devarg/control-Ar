@@ -331,3 +331,60 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(Cliente.objects.count(), 1)
         self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 2)
         self.assertEqual(response_1.data["id"], response_2.data["id"])
+
+    @override_settings(
+        LANDING_LEAD_DEDUP_MINUTES=0,
+        LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS=7,
+    )
+    @patch("apps.operativo.views.publish_empresa_event")
+    @patch("apps.operativo.views.enviar_evento_meta")
+    def test_no_duplica_eventos_deduplicados_identicos_en_ventana_corta(
+        self,
+        mock_enviar_evento_meta,
+        mock_publish_empresa_event,
+    ):
+        response_1 = self.client.post(
+            "/clientes/",
+            {
+                "landing_token": str(self.landing.token),
+                "idempotency_key": str(uuid.uuid4()),
+                "fbp": "fb.1.meta.shared",
+                "event_source_url": "https://app.control-ar.com/landing",
+                "codigo": "345678",
+            },
+            format="json",
+            HTTP_USER_AGENT="Instagram-UA-1",
+            REMOTE_ADDR="181.9.213.220",
+        )
+        duplicate_payload = {
+            "landing_token": str(self.landing.token),
+            "fbp": "fb.1.meta.shared",
+            "event_source_url": "https://app.control-ar.com/landing",
+            "codigo": "876543",
+        }
+        response_2 = self.client.post(
+            "/clientes/",
+            {
+                **duplicate_payload,
+                "idempotency_key": str(uuid.uuid4()),
+            },
+            format="json",
+            HTTP_USER_AGENT="Instagram-UA-1",
+            REMOTE_ADDR="181.9.213.220",
+        )
+        response_3 = self.client.post(
+            "/clientes/",
+            {
+                **duplicate_payload,
+                "idempotency_key": str(uuid.uuid4()),
+            },
+            format="json",
+            HTTP_USER_AGENT="Instagram-UA-1",
+            REMOTE_ADDR="181.9.213.220",
+        )
+
+        self.assertEqual(response_1.status_code, 201)
+        self.assertEqual(response_2.status_code, 200)
+        self.assertEqual(response_3.status_code, 200)
+        self.assertEqual(Cliente.objects.count(), 1)
+        self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 2)

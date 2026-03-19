@@ -438,6 +438,45 @@ def _build_lead_event_payload(*, cliente, request, requested_codigo: str = "", r
     }
 
 
+def _find_recent_duplicate_lead_event(
+    *,
+    landing_id: int,
+    cliente_id: int,
+    resultado: str,
+    requested_codigo: str = "",
+    fbp: str = "",
+    fbc: str = "",
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+    seconds: int = 10,
+):
+    if not resultado.startswith("deduplicado"):
+        return None
+    window_start = timezone.now() - timedelta(seconds=seconds)
+    base_qs = EventosMeta.objects.filter(
+        landing_id=landing_id,
+        cliente_id=cliente_id,
+        tipo="lead",
+        creado_en__gte=window_start,
+    ).order_by("-creado_en")
+    for evento in base_qs:
+        payload = evento.data if isinstance(evento.data, dict) else {}
+        if payload.get("resultado") != resultado:
+            continue
+        if str(payload.get("codigo_solicitado") or "").strip() != str(requested_codigo or "").strip():
+            continue
+        if str(evento.fbp or "").strip() != str(fbp or "").strip():
+            continue
+        if str(evento.fbc or "").strip() != str(fbc or "").strip():
+            continue
+        if str(evento.ip_address or "").strip() != str(ip_address or "").strip():
+            continue
+        if str(evento.user_agent or "").strip() != str(user_agent or "").strip():
+            continue
+        return evento
+    return None
+
+
 def _create_lead_event(*, landing, cliente, request, requested_codigo: str = "", resultado: str, motivo: str):
     payload = _build_lead_event_payload(
         cliente=cliente,
@@ -446,6 +485,18 @@ def _create_lead_event(*, landing, cliente, request, requested_codigo: str = "",
         resultado=resultado,
         motivo=motivo,
     )
+    existing_duplicate = _find_recent_duplicate_lead_event(
+        landing_id=landing.id,
+        cliente_id=cliente.id,
+        resultado=resultado,
+        requested_codigo=requested_codigo,
+        fbp=request.data.get("fbp"),
+        fbc=request.data.get("fbc"),
+        ip_address=_client_first_ip(request, cliente),
+        user_agent=_client_first_user_agent(request, cliente),
+    )
+    if existing_duplicate:
+        return existing_duplicate
     evento = EventosMeta.objects.create(
         id_evento=uuid.uuid4(),
         cliente=cliente,

@@ -132,6 +132,8 @@ function getTextStyle(colorValue, baseStyle = {}) {
 export default function Landing() {
     const [landing, setLanding] = useState(null);
     const [whatsappNumber, setWhatsappNumber] = useState("");
+    const [reservedCode, setReservedCode] = useState("");
+    const [reservationToken, setReservationToken] = useState("");
     const [visitSent, setVisitSent] = useState(false);
     const [bgReady, setBgReady] = useState(false);
     const [bgUrl, setBgUrl] = useState("");
@@ -199,6 +201,19 @@ export default function Landing() {
         return normalizeWhatsappNumber(response.data?.numero);
     }, [token, isPreviewMode]);
 
+    const fetchReservedCode = useCallback(async () => {
+        if (isPreviewMode || isTestMode) return "";
+        if (!token) return "";
+        const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+        const response = await axios.post(`${baseUrl}/clientes/reservar-codigo/`, {
+            landing_token: token,
+        });
+        return {
+            codigo: String(response.data?.codigo || "").trim(),
+            reservationToken: String(response.data?.reservation_token || "").trim(),
+        };
+    }, [token, isPreviewMode, isTestMode]);
+
     useEffect(() => {
         if (!isPreviewMode) return undefined;
 
@@ -234,6 +249,29 @@ export default function Landing() {
         }
         return () => window.removeEventListener("message", handlePreviewMessage);
     }, [isPreviewMode]);
+
+    useEffect(() => {
+        if (isPreviewMode || isTestMode) return undefined;
+        let mounted = true;
+        const loadReservedCode = async () => {
+            try {
+                const reservation = await fetchReservedCode();
+                if (mounted) {
+                    setReservedCode(reservation?.codigo || "");
+                    setReservationToken(reservation?.reservationToken || "");
+                }
+            } catch {
+                if (mounted) {
+                    setReservedCode("");
+                    setReservationToken("");
+                }
+            }
+        };
+        loadReservedCode();
+        return () => {
+            mounted = false;
+        };
+    }, [fetchReservedCode, isPreviewMode, isTestMode]);
 
     useEffect(() => {
         if (isPreviewMode) return undefined;
@@ -717,6 +755,8 @@ export default function Landing() {
                         <Suspense fallback={<div className="landing-form-fallback" />}>
                             <NuevoLead
                                 landingToken={isPreviewMode ? "preview" : token}
+                                reservedCode={reservedCode}
+                                reservationToken={reservationToken}
                                 bonusText={bonusText}
                                 whatsappNumber={whatsappNumber}
                                 onWhatsappOpened={handleWhatsappOpened}

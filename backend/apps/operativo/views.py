@@ -27,7 +27,8 @@ from apps.empresas.scope import filter_queryset_by_empresa, resolve_request_empr
 from apps.empresas.models import Empresa
 from apps.recursos.models import TipoCambio
 from apps.recursos.servicios.whatsapp_rotacion import seleccionar_numero_whatsapp
-from .models import Cliente, EventosMeta, Landing, Compra, LandingVisit, Retiro
+from .codigo_reservas import consume_reservation, reserve_code, is_code_reserved
+from .models import Cliente, EventosMeta, Landing, Compra, LandingVisit, Retiro, generar_codigo_corto
 from .serializers import (
     ClienteCreateSerializer,
     ClienteSerializer,
@@ -404,6 +405,18 @@ def _client_first_user_agent(request, cliente):
     return (getattr(cliente, "user_agent", None) if cliente else None) or get_request_user_agent(request)
 
 
+def _resolve_unique_cliente_codigo(*, requested_codigo: str = "") -> str:
+    candidate = str(requested_codigo or "").strip()
+    if candidate and len(candidate) == 6 and candidate.isdigit():
+        if not Cliente.objects.filter(codigo=candidate).exists() and not is_code_reserved(candidate):
+            return candidate
+    for _ in range(20):
+        generated = generar_codigo_corto()
+        if not Cliente.objects.filter(codigo=generated).exists() and not is_code_reserved(generated):
+            return generated
+    raise ValidationError("No se pudo generar un codigo unico. Reintenta.")
+
+
 def _build_lead_event_payload(*, cliente, request, requested_codigo: str = "", resultado: str, motivo: str):
     requested_codigo = str(requested_codigo or "").strip()
     final_codigo = str(getattr(cliente, "codigo", "") or "").strip()
@@ -463,7 +476,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
     EDITABLE_FIELDS = {"nombre", "contacto", "username"}
 
     def get_permissions(self):
-        if self.action == "create":
+        if self.action in {"create", "reservar_codigo"}:
             return [AllowAny()]
         return [IsAuthenticated(), RoleBasedPermission()]
 
@@ -517,7 +530,11 @@ class ClienteViewSet(viewsets.ModelViewSet):
         return ClienteSerializer
 
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        reservation_token = str(request.data.get("reservation_token") or "").strip()
+        serializer = self.get_serializer(
+            data=request.data,
+            context={**self.get_serializer_context(), "reservation_token": reservation_token},
+        )
         serializer.is_valid(raise_exception=True)
         requested_codigo = str(request.data.get("codigo") or "").strip()
 
@@ -525,6 +542,8 @@ class ClienteViewSet(viewsets.ModelViewSet):
         if idempotency_key:
             existing = Cliente.objects.filter(idempotency_key=idempotency_key).first()
             if existing:
+                if reservation_token:
+                    consume_reservation(reservation_token)
                 output = ClienteSerializer(existing)
                 return Response(output.data, status=status.HTTP_200_OK)
 
@@ -557,6 +576,8 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 resultado="deduplicado_fingerprint",
                 motivo="cliente_existente_por_fingerprint",
             )
+            if reservation_token:
+                consume_reservation(reservation_token)
             output = ClienteSerializer(cliente)
             return Response(output.data, status=status.HTTP_200_OK)
 
@@ -582,6 +603,8 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 resultado="deduplicado_lead",
                 motivo="lead_reciente_duplicado",
             )
+            if reservation_token:
+                consume_reservation(reservation_token)
             output = ClienteSerializer(cliente)
             return Response(output.data, status=status.HTTP_200_OK)
 
@@ -596,6 +619,8 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 resultado="deduplicado_evento_reciente",
                 motivo="lead_reciente_existente",
             )
+            if reservation_token:
+                consume_reservation(reservation_token)
             output = ClienteSerializer(cliente)
             return Response(output.data, status=status.HTTP_200_OK)
 
@@ -629,6 +654,8 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 "creado_en": evento.creado_en.isoformat(),
             },
         )
+        if reservation_token:
+            consume_reservation(reservation_token)
 
         output = ClienteSerializer(cliente)
         return Response(output.data, status=status.HTTP_201_CREATED)
@@ -652,6 +679,24 @@ class ClienteViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], url_path="reservar-codigo")
+    def reservar_codigo(self, request, *args, **kwargs):
+        landing_token = request.data.get("landing_token")
+        if not landing_token:
+            raise ValidationError("landing_token requerido.")
+        landing = get_object_or_404(Landing, token=landing_token, activo=True)
+        codigo = _resolve_unique_cliente_codigo()
+        reservation = reserve_code(code=codigo, landing_token=str(landing.token))
+        return Response(
+            {
+                "codigo": reservation["code"],
+                "reservation_token": reservation["token"],
+                "landing_token": str(landing.token),
+                "empresa_id": landing.empresa_id,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class KommoWebhookViewSet(viewsets.ViewSet):
@@ -1320,7 +1365,7 @@ class LandingVisitViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post"]
 
     def get_permissions(self):
-        if self.action == "create":
+        if self.action in {"create", "reservar_codigo"}:
             return [AllowAny()]
         return [IsAuthenticated(), RoleBasedPermission()]
 

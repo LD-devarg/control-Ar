@@ -135,11 +135,15 @@ export default function NuevoLead({
     isTestMode = false,
     pasosNode = null,
     mediosPagoNode = null,
+    reservedCode = "",
+    reservationToken = "",
 }) {
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
     const [error, setError] = useState("");
     const [isRedirecting, setIsRedirecting] = useState(false);
+    const [prefetchedCode, setPrefetchedCode] = useState(() => String(reservedCode || "").trim());
+    const [activeReservationToken, setActiveReservationToken] = useState(() => String(reservationToken || "").trim());
     const sendingRef = useRef(false);
     const submittingLeadRef = useRef(false);
     const retryIndexRef = useRef(0);
@@ -151,6 +155,14 @@ export default function NuevoLead({
     const normalizedPhone = useMemo(() => trimmedPhone.replace(/\D/g, "").slice(0, 15), [trimmedPhone]);
     const showNameField = mostrarFormulario && mostrarCampoNombre !== false;
     const showPhoneField = mostrarFormulario && mostrarCampoTelefono === true;
+
+    useEffect(() => {
+        setPrefetchedCode(String(reservedCode || "").trim());
+    }, [reservedCode]);
+
+    useEffect(() => {
+        setActiveReservationToken(String(reservationToken || "").trim());
+    }, [reservationToken]);
 
     const finalButtonText = buttonText || "JUGÁ AHORA";
     const finalInfoText = infoText || "Atencion personalizada las 24hs.";
@@ -429,6 +441,34 @@ export default function NuevoLead({
         };
     }, [isPreview, isTestMode]);
 
+    useEffect(() => {
+        if (isPreview || isTestMode) return undefined;
+        if (!landingToken || prefetchedCode) return undefined;
+        let cancelled = false;
+
+        const reserveCode = async () => {
+            try {
+                const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+                const { data } = await axios.post(
+                    `${baseUrl}/clientes/reservar-codigo/`,
+                    { landing_token: landingToken },
+                    { timeout: 5000 }
+                );
+                if (!cancelled) {
+                    setPrefetchedCode(String(data?.codigo || "").trim());
+                    setActiveReservationToken(String(data?.reservation_token || "").trim());
+                }
+            } catch {
+                // fallback to frontend-generated code on submit
+            }
+        };
+
+        reserveCode();
+        return () => {
+            cancelled = true;
+        };
+    }, [isPreview, isTestMode, landingToken, prefetchedCode]);
+
     const enqueueClient = (payload) => {
         const queue = loadQueue();
         queue.push(payload);
@@ -531,7 +571,7 @@ export default function NuevoLead({
                     ? `${window.location.origin}${window.location.pathname}`
                     : undefined;
 
-            const generatedCodigo = generateLeadCode();
+            const generatedCodigo = prefetchedCode || generateLeadCode();
             const generatedUsername = buildUsername(trimmedName, generatedCodigo);
             if (isTestMode) {
                 const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
@@ -550,6 +590,7 @@ export default function NuevoLead({
                 idempotency_key: generateIdempotencyKey(),
                 queued_at: new Date().toISOString(),
                 landing_token: landingToken,
+                ...(activeReservationToken ? { reservation_token: activeReservationToken } : {}),
                 nombre: trimmedName,
                 contacto: normalizedPhone,
                 username: generatedUsername,
@@ -565,10 +606,12 @@ export default function NuevoLead({
             let finalNombre = trimmedName;
 
             try {
-                const { data } = await axios.post(`${baseUrl}/clientes/`, payload, { timeout: 4000 });
+                const { data } = await axios.post(`${baseUrl}/clientes/`, payload, { timeout: 8000 });
                 finalCodigo = String(data?.codigo || generatedCodigo);
                 finalUsername = String(data?.username || generatedUsername);
                 finalNombre = String(data?.nombre || trimmedName);
+                setPrefetchedCode("");
+                setActiveReservationToken("");
                 markClientesDirty();
                 if (typeof window !== "undefined") {
                     window.dispatchEvent(new CustomEvent("leads:refresh"));
@@ -580,13 +623,8 @@ export default function NuevoLead({
                     }
                 }
             } catch {
-                enqueueClient(payload);
-                sendWithBeacon(baseUrl, payload);
-                sendWithKeepalive(baseUrl, payload).catch(() => {
-                    // keepalive is best-effort only
-                });
-                tryFlushQueue();
-                checkQueueHealth();
+                setError("No pudimos generar tu acceso en este momento. Reintenta en unos segundos.");
+                return;
             }
 
             const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {

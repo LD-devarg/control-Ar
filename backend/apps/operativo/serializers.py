@@ -1,6 +1,7 @@
 from rest_framework import serializers
 import re
 from django.db import IntegrityError, transaction
+from .codigo_reservas import get_reservation_by_token, is_code_reserved
 from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit, Retiro, generar_codigo_corto
 from apps.pauta.models import CredencialesMeta
 from apps.empresas.scope import get_user_empresa_ids
@@ -113,6 +114,7 @@ class ClienteSerializer(serializers.ModelSerializer):
 class ClienteCreateSerializer(serializers.Serializer):
     landing_token = serializers.UUIDField(write_only=True)
     idempotency_key = serializers.UUIDField(required=False, write_only=True)
+    reservation_token = serializers.CharField(required=False, allow_blank=True, write_only=True)
     nombre = serializers.CharField(max_length=100, required=False, allow_blank=True)
     contacto = serializers.CharField(max_length=15, required=False, allow_blank=True)
     username = serializers.CharField(max_length=50, required=False, allow_blank=True)
@@ -132,6 +134,20 @@ class ClienteCreateSerializer(serializers.Serializer):
             landing = Landing.objects.get(token=data["landing_token"], activo=True)
         except Landing.DoesNotExist:
             raise serializers.ValidationError("Landing invalida o inactiva.")
+        reservation_token = str(data.get("reservation_token") or "").strip()
+        if reservation_token:
+            reservation = get_reservation_by_token(reservation_token)
+            if not reservation:
+                raise serializers.ValidationError("La reserva del codigo vencio. Reintenta.")
+            if reservation.get("landing_token") and str(reservation.get("landing_token")) != str(data["landing_token"]):
+                raise serializers.ValidationError("La reserva del codigo no corresponde a esta landing.")
+            reserved_code = str(reservation.get("code") or "").strip()
+            requested_codigo = str(data.get("codigo") or "").strip()
+            if reserved_code:
+                if requested_codigo and requested_codigo != reserved_code:
+                    raise serializers.ValidationError("El codigo solicitado no coincide con la reserva activa.")
+                data["codigo"] = reserved_code
+            data["reservation_token"] = reservation_token
         data["landing"] = landing
         return data
 
@@ -149,17 +165,24 @@ class ClienteCreateSerializer(serializers.Serializer):
             suffix += 1
 
     def _resolve_unique_codigo(self, requested_codigo=None):
+        reservation_token = str(self.context.get("reservation_token") or "").strip()
         candidate = (requested_codigo or "").strip()
         if candidate:
             if not re.fullmatch(r"\d{6}", candidate):
                 raise serializers.ValidationError("El codigo debe tener exactamente 6 digitos.")
-            if not Cliente.objects.filter(codigo=candidate).exists():
+            if (
+                not Cliente.objects.filter(codigo=candidate).exists()
+                and not is_code_reserved(candidate, reservation_token=reservation_token)
+            ):
                 return candidate
         if candidate:
             candidate = ""
         for _ in range(20):
             generated = generar_codigo_corto()
-            if not Cliente.objects.filter(codigo=generated).exists():
+            if (
+                not Cliente.objects.filter(codigo=generated).exists()
+                and not is_code_reserved(generated, reservation_token=reservation_token)
+            ):
                 return generated
         raise serializers.ValidationError("No se pudo generar un codigo unico. Reintenta.")
 
@@ -167,6 +190,7 @@ class ClienteCreateSerializer(serializers.Serializer):
         landing = validated_data.pop("landing")
         validated_data.pop("landing_token", None)
         idempotency_key = validated_data.pop("idempotency_key", None)
+        validated_data.pop("reservation_token", None)
         if idempotency_key:
             existing = Cliente.objects.filter(idempotency_key=idempotency_key).first()
             if existing:

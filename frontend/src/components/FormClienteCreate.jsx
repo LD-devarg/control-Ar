@@ -2,11 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Autocomplete from "@mui/material/Autocomplete";
 import Button from "@mui/material/Button";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import { useTheme } from "@mui/material/styles";
 import { apiClient } from "../services/auth";
 import { markClientesDirty } from "../services/operativo/clientes";
+import { buildClienteDisplayLabel } from "../utils/clientDisplay";
 
 export default function FormClienteCreate({ empresaId, onCreated }) {
   const theme = useTheme();
@@ -21,6 +26,8 @@ export default function FormClienteCreate({ empresaId, onCreated }) {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState({ severity: "info", text: "" });
+  const [confirmExistingOpen, setConfirmExistingOpen] = useState(false);
+  const [existingCliente, setExistingCliente] = useState(null);
 
   const fieldSx = {
     "& .MuiInputBase-input": { color },
@@ -65,27 +72,41 @@ export default function FormClienteCreate({ empresaId, onCreated }) {
     [empresaId, selectedLanding, codigo]
   );
 
-  const handleSubmit = async () => {
+  const resetForm = () => {
+    setCodigo("");
+    setNombre("");
+    setContacto("");
+    setUsername("");
+    setSelectedLanding(null);
+  };
+
+  const handleSubmit = async (options = {}) => {
     if (!canSubmit) return;
     setSubmitting(true);
     setMessage({ severity: "info", text: "" });
     try {
       await apiClient.post("/clientes/", {
         landing_token: selectedLanding.token,
+        manual_create: true,
+        confirm_existing_code: Boolean(options.confirmExistingCode),
         codigo: codigo.trim(),
         ...(nombre.trim() ? { nombre: nombre.trim() } : {}),
         ...(contacto.trim() ? { contacto: contacto.trim() } : {}),
         ...(username.trim() ? { username: username.trim() } : {}),
       });
       markClientesDirty();
-      setCodigo("");
-      setNombre("");
-      setContacto("");
-      setUsername("");
-      setSelectedLanding(null);
+      resetForm();
+      setConfirmExistingOpen(false);
+      setExistingCliente(null);
       setMessage({ severity: "success", text: "Cliente creado." });
       onCreated?.();
     } catch (err) {
+      if (err?.response?.status === 409 && err?.response?.data?.code_conflict) {
+        setExistingCliente(err.response.data.existing_cliente || null);
+        setConfirmExistingOpen(true);
+        setMessage({ severity: "warning", text: err.response.data.detail || "Cliente existente, desea crear igualmente?" });
+        return;
+      }
       const detail =
         err?.response?.data?.detail ||
         err?.response?.data?.non_field_errors?.[0] ||
@@ -131,6 +152,29 @@ export default function FormClienteCreate({ empresaId, onCreated }) {
       <Button variant="outlined" onClick={handleSubmit} disabled={!canSubmit || submitting}>
         {submitting ? "Creando..." : "Crear cliente"}
       </Button>
+      <Dialog open={confirmExistingOpen} onClose={() => setConfirmExistingOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Cliente existente</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.25} sx={{ pt: 1 }}>
+            <Alert severity="warning" variant="outlined">
+              Cliente existente, desea crear igualmente?
+            </Alert>
+            {existingCliente ? (
+              <Alert severity="info" variant="outlined">
+                {buildClienteDisplayLabel(existingCliente)}
+              </Alert>
+            ) : null}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmExistingOpen(false)} variant="outlined" disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button onClick={() => handleSubmit({ confirmExistingCode: true })} variant="contained" disabled={submitting}>
+            Crear igualmente
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

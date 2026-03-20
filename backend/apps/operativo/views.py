@@ -572,7 +572,16 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 Value(0),
                 output_field=DecimalField(max_digits=12, decimal_places=2),
             ),
+            contactado=Exists(
+                EventosMeta.objects.filter(
+                    cliente_id=OuterRef("pk"),
+                    tipo="contact",
+                )
+            ),
         )
+        solo_contactados = self.request.query_params.get("solo_contactados")
+        if solo_contactados in {"1", "true", "True"}:
+            qs = qs.filter(contactado=True)
         return qs
 
     def get_serializer_class(self):
@@ -599,6 +608,29 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 return Response(output.data, status=status.HTTP_200_OK)
 
         landing = serializer.validated_data["landing"]
+        manual_create = bool(serializer.validated_data.get("manual_create"))
+        confirm_existing_code = bool(serializer.validated_data.get("confirm_existing_code"))
+        if manual_create and requested_codigo and not confirm_existing_code:
+            existing_cliente = (
+                Cliente.objects.filter(empresa_id=landing.empresa_id, codigo=requested_codigo)
+                .only("id", "codigo", "nombre", "username", "contacto")
+                .first()
+            )
+            if existing_cliente:
+                return Response(
+                    {
+                        "detail": "Cliente existente, desea crear igualmente?",
+                        "code_conflict": True,
+                        "existing_cliente": {
+                            "id": existing_cliente.id,
+                            "codigo": existing_cliente.codigo,
+                            "nombre": existing_cliente.nombre,
+                            "username": existing_cliente.username,
+                            "contacto": existing_cliente.contacto,
+                        },
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
         normalized_contacto = normalize_contacto(serializer.validated_data.get("contacto"))
         normalized_fbp = str(serializer.validated_data.get("fbp") or "").strip()
         normalized_fbc = str(serializer.validated_data.get("fbc") or "").strip()

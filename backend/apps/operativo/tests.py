@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from datetime import timedelta
 
@@ -22,6 +23,65 @@ class ClienteCreateTests(TestCase):
             activo=True,
             mostrar_formulario=True,
         )
+        self.user = get_user_model().objects.create_user(username="operadortest", password="secret123")
+
+    @patch("apps.operativo.views.publish_empresa_event")
+    @patch("apps.operativo.views.enviar_evento_meta")
+    def test_alta_manual_avisa_si_codigo_ya_existe(self, mock_enviar_evento_meta, mock_publish_empresa_event):
+        Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Cliente Existente",
+            username="clienteexistente",
+            contacto="5491111111111",
+            codigo="123456",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            "/clientes/",
+            {
+                "landing_token": str(self.landing.token),
+                "manual_create": True,
+                "codigo": "123456",
+                "nombre": "Cliente Nuevo",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["detail"], "Cliente existente, desea crear igualmente?")
+        self.assertTrue(response.data["code_conflict"])
+        self.assertEqual(response.data["existing_cliente"]["codigo"], "123456")
+        self.assertEqual(Cliente.objects.count(), 1)
+
+    @patch("apps.operativo.views.publish_empresa_event")
+    @patch("apps.operativo.views.enviar_evento_meta")
+    def test_alta_manual_confirmada_crea_con_codigo_reasignado(self, mock_enviar_evento_meta, mock_publish_empresa_event):
+        Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Cliente Existente",
+            username="clienteexistente",
+            contacto="5491111111111",
+            codigo="123456",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            "/clientes/",
+            {
+                "landing_token": str(self.landing.token),
+                "manual_create": True,
+                "confirm_existing_code": True,
+                "codigo": "123456",
+                "nombre": "Cliente Nuevo",
+                "username": "clientenuevo",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Cliente.objects.count(), 2)
+        self.assertNotEqual(response.data["codigo"], "123456")
 
     @patch("apps.operativo.views.publish_empresa_event")
     @patch("apps.operativo.views.enviar_evento_meta")

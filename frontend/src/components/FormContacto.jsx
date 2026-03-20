@@ -11,6 +11,7 @@ import { useTheme } from '@mui/material/styles';
 import { apiClient } from '../services/auth';
 import { useTenant } from '../context/TenantContext';
 import { subscribeRealtimeEvents } from '../services/realtime';
+import { markClientesDirty } from '../services/operativo/clientes';
 import { buildClienteDisplayLabel } from '../utils/clientDisplay';
 
 export default function FormContacto() {
@@ -185,6 +186,7 @@ export default function FormContacto() {
         tipo: "contact",
         empresa_id: empresaId,
       });
+      markClientesDirty();
       markLeadsDirty();
       window.dispatchEvent(new CustomEvent("leads:refresh"));
       setSelectedCliente(null);

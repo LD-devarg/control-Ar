@@ -115,6 +115,8 @@ class ClienteCreateSerializer(serializers.Serializer):
     landing_token = serializers.UUIDField(write_only=True)
     idempotency_key = serializers.UUIDField(required=False, write_only=True)
     reservation_token = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    manual_create = serializers.BooleanField(required=False, write_only=True, default=False)
+    confirm_existing_code = serializers.BooleanField(required=False, write_only=True, default=False)
     nombre = serializers.CharField(max_length=100, required=False, allow_blank=True)
     contacto = serializers.CharField(max_length=15, required=False, allow_blank=True)
     username = serializers.CharField(max_length=50, required=False, allow_blank=True)
@@ -191,6 +193,8 @@ class ClienteCreateSerializer(serializers.Serializer):
         validated_data.pop("landing_token", None)
         idempotency_key = validated_data.pop("idempotency_key", None)
         validated_data.pop("reservation_token", None)
+        validated_data.pop("manual_create", None)
+        validated_data.pop("confirm_existing_code", None)
         if idempotency_key:
             existing = Cliente.objects.filter(idempotency_key=idempotency_key).first()
             if existing:

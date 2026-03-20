@@ -18,6 +18,7 @@ import { fetchClientes } from '../services/operativo/clientes';
 import { apiClient } from '../services/auth';
 import { useTenant } from '../context/TenantContext';
 import { buildClienteDisplayLabel } from "../utils/clientDisplay";
+import { subscribeRealtimeEvents } from "../services/realtime";
 
 export default function FormCompra() {
   const theme = useTheme();
@@ -49,7 +50,7 @@ export default function FormCompra() {
     const load = async () => {
       setLoading(true);
       try {
-        const data = await fetchClientes();
+        const data = await fetchClientes({ onlyWithContact: true });
         if (mounted) {
           const options = (data || []).map((cliente) => ({
             ...cliente,
@@ -62,8 +63,26 @@ export default function FormCompra() {
       }
     };
     load();
+    const handleRefresh = () => {
+      load();
+    };
+    const handleStorage = (event) => {
+      if (String(event.key || "").includes("clientes_cache_ts_")) {
+        load();
+      }
+    };
+    const unsubscribeRealtime = subscribeRealtimeEvents((message) => {
+      if (message?.type === "contact_created") {
+        load();
+      }
+    });
+    window.addEventListener("clientes:refresh", handleRefresh);
+    window.addEventListener("storage", handleStorage);
     return () => {
       mounted = false;
+      unsubscribeRealtime();
+      window.removeEventListener("clientes:refresh", handleRefresh);
+      window.removeEventListener("storage", handleStorage);
     };
   }, [empresaId]);
 
@@ -161,6 +180,9 @@ export default function FormCompra() {
 
         }} />}
       />
+      <Alert severity="info" variant="outlined">
+        Si no encuentra el cliente, asegurece de haber cargado el contacto correspondiente.
+      </Alert>
         <TextField id="outlined-basic" label="Monto" variant="outlined" fullWidth type='number'
         value={monto}
         onChange={(e) => setMonto(e.target.value)}

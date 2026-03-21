@@ -1606,8 +1606,6 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 tipo="lead",
                 contactado=False,
             ).filter(
-                models.Q(cliente__contacto__isnull=True) | models.Q(cliente__contacto=""),
-            ).filter(
                 models.Q(data__lead_discarded=False) | models.Q(data__lead_discarded__isnull=True)
             )
         qs = qs.order_by("-creado_en")

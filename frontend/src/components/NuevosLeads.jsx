@@ -408,31 +408,59 @@ function NuevosLeads() {
                     <p>Cargando datos...</p>
                 ) : (
                     <>
-                        <p><strong>Nombre:</strong> {clienteDetalle?.nombre || selectedLead?.cliente_nombre || "-"}</p>
-                        <p><strong>ID:</strong> {clienteDetalle?.codigo || selectedLead?.cliente_codigo || "-"}</p>
-                        {formatLeadResult(selectedLead) ? (
-                            <p><strong>Resultado:</strong> {formatLeadResult(selectedLead)}</p>
-                        ) : null}
-                        {selectedLead?.data?.motivo ? (
-                            <p><strong>Motivo:</strong> {selectedLead.data.motivo}</p>
-                        ) : null}
-                        {selectedLeadCodes.hasCodigoMismatch ? (
-                            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
-                                <strong>Codigo reasignado:</strong> se solicito {selectedLeadCodes.requestedCodigo || "-"} y se asigno {selectedLeadCodes.finalCodigo || "-"}.
+                        <div className="lead-detail-grid">
+                            <div className="lead-detail-item">
+                                <strong>Nombre</strong>
+                                <span>{clienteDetalle?.nombre || selectedLead?.cliente_nombre || "-"}</span>
                             </div>
-                        ) : null}
-                        <p><strong>Codigo solicitado:</strong> {selectedLeadCodes.requestedCodigo || "-"}</p>
-                        <p><strong>Codigo final:</strong> {selectedLeadCodes.finalCodigo || "-"}</p>
-                        <p><strong>Contacto:</strong> {clienteDetalle?.contacto || "-"}</p>
-                        <p><strong>Username:</strong> {clienteDetalle?.username || selectedLead?.cliente_username || "-"}</p>
-                        <p><strong>Fecha de Lead:</strong> {formatDateTime(selectedLead?.creado_en)}</p>
-                        <div style={{ marginTop: 16 }}>
-                            <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Motivo de descarte</label>
+                            <div className="lead-detail-item">
+                                <strong>ID</strong>
+                                <span>{clienteDetalle?.codigo || selectedLead?.cliente_codigo || "-"}</span>
+                            </div>
+                            <div className="lead-detail-item">
+                                <strong>Resultado</strong>
+                                <span>{formatLeadResult(selectedLead) || "-"}</span>
+                            </div>
+                            <div className="lead-detail-item">
+                                <strong>Motivo</strong>
+                                <span>{selectedLead?.data?.motivo || "-"}</span>
+                            </div>
+                            <div className="lead-detail-item">
+                                <strong>Codigo solicitado</strong>
+                                <span>{selectedLeadCodes.requestedCodigo || "-"}</span>
+                            </div>
+                            <div className="lead-detail-item">
+                                <strong>Codigo final</strong>
+                                <span>{selectedLeadCodes.finalCodigo || "-"}</span>
+                            </div>
+                            <div className="lead-detail-item">
+                                <strong>Contacto</strong>
+                                <span>{clienteDetalle?.contacto || "-"}</span>
+                            </div>
+                            <div className="lead-detail-item">
+                                <strong>Username</strong>
+                                <span>{clienteDetalle?.username || selectedLead?.cliente_username || "-"}</span>
+                            </div>
+                            <div className="lead-detail-item lead-detail-full">
+                                <strong>Fecha de Lead</strong>
+                                <span>{formatDateTime(selectedLead?.creado_en)}</span>
+                            </div>
+                            {selectedLeadCodes.hasCodigoMismatch ? (
+                                <div className="lead-detail-item lead-detail-full" style={{ borderColor: "rgba(251, 191, 36, 0.4)", background: "rgba(245, 158, 11, 0.1)", color: "#fde68a" }}>
+                                    <strong>Codigo reasignado</strong>
+                                    <span>Se solicito {selectedLeadCodes.requestedCodigo || "-"} y se asigno {selectedLeadCodes.finalCodigo || "-"}.</span>
+                                </div>
+                            ) : null}
+                        </div>
+
+                        <p className="lead-section-title">Descarte</p>
+
+                        <div className="lead-field">
+                            <label>Motivo de descarte</label>
                             <select
                                 value={discardReason}
                                 onChange={(event) => setDiscardReason(event.target.value)}
                                 disabled={discarding}
-                                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.35)", background: "transparent", color: "inherit" }}
                             >
                                 {DISCARD_REASONS.map((option) => (
                                     <option key={option.value} value={option.value} style={{ color: "#111827" }}>
@@ -441,46 +469,45 @@ function NuevosLeads() {
                                 ))}
                             </select>
                         </div>
-                        <div style={{ marginTop: 12 }}>
-                            <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Detalle opcional</label>
+
+                        <div className="lead-field">
+                            <label>Detalle opcional</label>
                             <textarea
                                 value={discardDetail}
                                 onChange={(event) => setDiscardDetail(event.target.value)}
                                 disabled={discarding}
                                 rows={3}
-                                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.35)", background: "transparent", color: "inherit", resize: "vertical" }}
                             />
                         </div>
                         {discardReason === "duplicado" ? (
-                            <div style={{ marginTop: 12 }}>
-                                <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Cliente real</label>
+                            <div className="lead-field lead-autocomplete">
+                                <label>Cliente real</label>
                                 <input
                                     type="text"
                                     value={duplicateSearch}
                                     onChange={(event) => setDuplicateSearch(event.target.value)}
                                     disabled={discarding}
                                     placeholder="Buscar por codigo, nombre, username o contacto"
-                                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.35)", background: "transparent", color: "inherit" }}
                                 />
                                 {duplicateLoading ? (
-                                    <p style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>Buscando clientes...</p>
+                                    <p style={{ marginTop: 2, fontSize: 12, opacity: 0.75 }}>Buscando clientes...</p>
                                 ) : null}
                                 {selectedDuplicate ? (
-                                    <div style={{ marginTop: 8, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(34,197,94,0.4)", background: "rgba(34,197,94,0.08)" }}>
+                                    <div className="lead-selected-duplicate">
                                         <strong>{selectedDuplicate.codigo || `Cliente #${selectedDuplicate.id}`}</strong>
                                         {" · "}
                                         {selectedDuplicate.nombre || selectedDuplicate.username || selectedDuplicate.contacto || "-"}
                                     </div>
                                 ) : null}
                                 {!selectedDuplicate && duplicateOptions.length ? (
-                                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                                    <div className="lead-autocomplete-list">
                                         {duplicateOptions.map((option) => (
                                             <button
                                                 key={option.id}
                                                 type="button"
                                                 onClick={() => setSelectedDuplicate(option)}
                                                 disabled={discarding}
-                                                style={{ textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.25)", background: "rgba(15,23,42,0.35)", color: "inherit", cursor: "pointer" }}
+                                                className="lead-autocomplete-option"
                                             >
                                                 <strong>{option.codigo || `Cliente #${option.id}`}</strong>
                                                 {" · "}
@@ -498,7 +525,7 @@ function NuevosLeads() {
                                             setDuplicateOptions([]);
                                         }}
                                         disabled={discarding}
-                                        style={{ marginTop: 8, border: 0, background: "transparent", color: "#93c5fd", cursor: "pointer", padding: 0 }}
+                                        className="lead-link-button"
                                     >
                                         Cambiar cliente seleccionado
                                     </button>

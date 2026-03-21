@@ -43,6 +43,7 @@ class ClienteSerializer(serializers.ModelSerializer):
     cant_retiros = serializers.SerializerMethodField()
     total_retiros_ars = serializers.SerializerMethodField()
     total_retiros_usd = serializers.SerializerMethodField()
+    contactado = serializers.BooleanField(read_only=True)
 
     def _decimal_or_zero(self, obj, attr_name):
         value = getattr(obj, attr_name, None)
@@ -81,6 +82,7 @@ class ClienteSerializer(serializers.ModelSerializer):
             "cant_retiros",
             "total_retiros_ars",
             "total_retiros_usd",
+            "contactado",
             "first_touch_at",
             "fbc",
             "fbp",

@@ -25,8 +25,8 @@ const baseColumns = [
   },
   {
     width: 130,
-    label: 'Contacto OK',
-    dataKey: 'contacto_estado',
+    label: 'Contactado',
+    dataKey: 'contactado_estado',
   },
   {
     width: 180,
@@ -195,8 +195,8 @@ export default function TablaContactos() {
 
   const formatValue = (column, value) => {
     if (value == null) return '';
-    if (column.dataKey === 'contacto_estado') {
-      return value ? 'Cargado' : 'Pendiente';
+    if (column.dataKey === 'contactado_estado') {
+      return value ? 'Si' : 'No';
     }
     if (column.dataKey === 'cant_compras' || column.dataKey === 'cant_retiros') {
       const num = Number(value);
@@ -317,12 +317,12 @@ export default function TablaContactos() {
   const renderCellContent = (row, column) => {
     const isEditable = editableKeys.has(column.dataKey);
     const isEditing = editingCell?.rowId === row.id && editingCell?.key === column.dataKey;
-    const rawValue = column.dataKey === 'contacto_estado'
-      ? Boolean(String(row?.contacto || '').trim())
+    const rawValue = column.dataKey === 'contactado_estado'
+      ? Boolean(row?.contactado)
       : row[column.dataKey];
     const value = formatValue(column, rawValue);
 
-    if (column.dataKey === 'contacto_estado') {
+    if (column.dataKey === 'contactado_estado') {
       return (
         <span className={`tabla-contactos-status ${rawValue ? 'is-complete' : 'is-missing'}`}>
           {value}

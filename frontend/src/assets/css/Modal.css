@@ -44,6 +44,40 @@
     gap: 10px;
 }
 
+.modal-close-button,
+.modal-confirm-button {
+    border: 0;
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.modal-close-button {
+    background: rgba(148, 163, 184, 0.18);
+    color: #e5e7eb;
+}
+
+.modal-confirm-button {
+    background: #dc2626;
+    color: #ffffff;
+}
+
+.modal-close-button:hover,
+.modal-confirm-button:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+}
+
+.modal-close-button:disabled,
+.modal-confirm-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .modal-field {
     display: flex;
     align-items: center;

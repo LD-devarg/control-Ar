@@ -9,6 +9,12 @@ import "../assets/css/RecentPurchasesTable.css";
 const REFRESH_DEBOUNCE_MS = 500;
 const REFRESH_COOLDOWN_MS = 5000;
 const POLL_INTERVAL_MS = 60000;
+const DISCARD_REASONS = [
+    { value: "duplicado", label: "Duplicado" },
+    { value: "no_contactado", label: "No contactado" },
+    { value: "invalido", label: "Invalido" },
+    { value: "otro", label: "Otro" },
+];
 
 function formatDateTime(value) {
     if (!value) return "-";
@@ -126,6 +132,9 @@ function NuevosLeads() {
     const [selectedLead, setSelectedLead] = useState(null);
     const [clienteDetalle, setClienteDetalle] = useState(null);
     const [detalleLoading, setDetalleLoading] = useState(false);
+    const [discardReason, setDiscardReason] = useState("duplicado");
+    const [discardDetail, setDiscardDetail] = useState("");
+    const [discarding, setDiscarding] = useState(false);
     const detalleCacheRef = useRef(new Map());
     const refreshTimerRef = useRef(null);
     const lastRefreshAtRef = useRef(0);
@@ -195,7 +204,7 @@ function NuevosLeads() {
 
     useEffect(() => {
         const unsubscribe = subscribeRealtimeEvents((message) => {
-            if (message?.type === "lead_created") {
+            if (message?.type === "lead_created" || message?.type === "lead_discarded") {
                 triggerRefresh();
             }
         });
@@ -205,6 +214,8 @@ function NuevosLeads() {
     const handleOpen = async (lead) => {
         setSelectedLead(lead);
         setClienteDetalle(null);
+        setDiscardReason("duplicado");
+        setDiscardDetail("");
         if (!lead?.cliente) return;
         const cached = detalleCacheRef.current.get(lead.cliente);
         if (cached) {
@@ -225,6 +236,35 @@ function NuevosLeads() {
         setSelectedLead(null);
         setClienteDetalle(null);
         setDetalleLoading(false);
+        setDiscardReason("duplicado");
+        setDiscardDetail("");
+        setDiscarding(false);
+    };
+
+    const handleDiscard = async () => {
+        if (!selectedLead?.id || discarding) return;
+        setDiscarding(true);
+        try {
+            await apiClient.post(`/eventos-meta/${selectedLead.id}/discard-lead/`, {
+                reason: discardReason,
+                detail: discardDetail.trim(),
+            });
+            setLeads((prev) => prev.filter((item) => item.id !== selectedLead.id));
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("leads:refresh"));
+                try {
+                    localStorage.setItem("leads_dirty", "1");
+                    localStorage.setItem("leads_refresh_ts", String(Date.now()));
+                } catch {
+                    // ignore storage errors
+                }
+            }
+            handleClose();
+        } catch {
+            setError("No se pudo descartar el lead.");
+        } finally {
+            setDiscarding(false);
+        }
     };
 
     const leadRows = useMemo(() => leads.map((lead) => ({
@@ -293,7 +333,16 @@ function NuevosLeads() {
                 open={Boolean(selectedLead)}
                 onClose={handleClose}
                 title="Detalle del lead"
-                actions={null}
+                actions={(
+                    <>
+                        <button type="button" className="modal-close-button" onClick={handleClose} disabled={discarding}>
+                            Cerrar
+                        </button>
+                        <button type="button" className="modal-confirm-button" onClick={handleDiscard} disabled={discarding}>
+                            {discarding ? "Descartando..." : "Descartar lead"}
+                        </button>
+                    </>
+                )}
             >
                 {detalleLoading ? (
                     <p>Cargando datos...</p>
@@ -317,6 +366,31 @@ function NuevosLeads() {
                         <p><strong>Contacto:</strong> {clienteDetalle?.contacto || "-"}</p>
                         <p><strong>Username:</strong> {clienteDetalle?.username || selectedLead?.cliente_username || "-"}</p>
                         <p><strong>Fecha de Lead:</strong> {formatDateTime(selectedLead?.creado_en)}</p>
+                        <div style={{ marginTop: 16 }}>
+                            <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Motivo de descarte</label>
+                            <select
+                                value={discardReason}
+                                onChange={(event) => setDiscardReason(event.target.value)}
+                                disabled={discarding}
+                                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.35)", background: "transparent", color: "inherit" }}
+                            >
+                                {DISCARD_REASONS.map((option) => (
+                                    <option key={option.value} value={option.value} style={{ color: "#111827" }}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div style={{ marginTop: 12 }}>
+                            <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Detalle opcional</label>
+                            <textarea
+                                value={discardDetail}
+                                onChange={(event) => setDiscardDetail(event.target.value)}
+                                disabled={discarding}
+                                rows={3}
+                                style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.35)", background: "transparent", color: "inherit", resize: "vertical" }}
+                            />
+                        </div>
                     </>
                 )}
             </ModalBase>

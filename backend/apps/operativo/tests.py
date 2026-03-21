@@ -23,7 +23,11 @@ class ClienteCreateTests(TestCase):
             activo=True,
             mostrar_formulario=True,
         )
-        self.user = get_user_model().objects.create_user(username="operadortest", password="secret123")
+        self.user = get_user_model().objects.create_superuser(
+            username="operadortest",
+            password="secret123",
+            email="operadortest@example.com",
+        )
 
     @patch("apps.operativo.views.publish_empresa_event")
     @patch("apps.operativo.views.enviar_evento_meta")
@@ -125,6 +129,10 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(evento_dedup.data.get("resultado"), "deduplicado_lead")
         self.assertEqual(evento_dedup.data.get("codigo_solicitado"), "654321")
         self.assertEqual(evento_dedup.data.get("codigo_final"), "123456")
+        self.assertEqual(evento_dedup.data.get("request_fbp"), "fb.1.123456789.shared")
+        self.assertEqual(evento_dedup.data.get("request_fbc"), "fb.1.123456789.sharedclick")
+        self.assertEqual(evento_dedup.data.get("dedup_matched_by"), "lead_fbp")
+        self.assertEqual(evento_dedup.data.get("dedup_matched_value"), "fb.1.123456789.shared")
 
     @override_settings(
         LANDING_LEAD_DEDUP_MINUTES=0,
@@ -192,6 +200,13 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(evento_dedup.data.get("resultado"), "deduplicado_fingerprint")
         self.assertEqual(evento_dedup.data.get("codigo_solicitado"), "876543")
         self.assertEqual(evento_dedup.data.get("codigo_final"), "345678")
+        self.assertEqual(evento_dedup.data.get("request_fbp"), "fb.1.meta.shared")
+        self.assertEqual(evento_dedup.data.get("request_fbc"), "fb.1.meta.click")
+        self.assertEqual(evento_dedup.data.get("request_event_source_url"), "https://app.control-ar.com/landing")
+        self.assertEqual(evento_dedup.data.get("request_ip"), "181.9.213.220")
+        self.assertEqual(evento_dedup.data.get("request_user_agent"), "Instagram-UA-1")
+        self.assertEqual(evento_dedup.data.get("dedup_matched_by"), "fingerprint_fbp")
+        self.assertEqual(evento_dedup.data.get("dedup_matched_value"), "fb.1.meta.shared")
 
     @override_settings(
         LANDING_LEAD_DEDUP_MINUTES=0,
@@ -238,6 +253,70 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Cliente.objects.count(), 2)
         self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 1)
+
+
+class EventosMetaDiscardTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.empresa = Empresa.objects.create(nombre="Empresa Test")
+        self.landing = Landing.objects.create(
+            empresa=self.empresa,
+            nombre="Landing Test",
+            url="https://example.com/landing",
+            activo=True,
+            mostrar_formulario=True,
+        )
+        self.user = get_user_model().objects.create_superuser(
+            username="operadortest2",
+            password="secret123",
+            email="operadortest2@example.com",
+        )
+        self.cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Lead Test",
+            username="leadtest",
+            codigo="112244",
+        )
+        self.evento = EventosMeta.objects.create(
+            cliente=self.cliente,
+            empresa=self.empresa,
+            landing=self.landing,
+            operador=None,
+            tipo="lead",
+            data={"resultado": "creado"},
+        )
+
+    @patch("apps.operativo.views.publish_empresa_event")
+    def test_descartar_lead_guarda_motivo_y_auditoria(self, mock_publish_empresa_event):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            f"/eventos-meta/{self.evento.id}/discard-lead/",
+            {"reason": "duplicado", "detail": "Detectado manualmente"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.evento.refresh_from_db()
+        self.assertTrue(self.evento.data.get("lead_discarded"))
+        self.assertEqual(self.evento.data.get("lead_discard_reason"), "duplicado")
+        self.assertEqual(self.evento.data.get("lead_discard_detail"), "Detectado manualmente")
+        self.assertEqual(self.evento.data.get("lead_discarded_by_username"), "operadortest")
+
+    def test_sin_contacto_excluye_leads_descartados(self):
+        self.evento.data = {
+            "resultado": "creado",
+            "lead_discarded": True,
+            "lead_discard_reason": "duplicado",
+        }
+        self.evento.save(update_fields=["data"])
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/eventos-meta/?tipo=lead&sin_contacto=1")
+
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.data]
+        self.assertNotIn(self.evento.id, ids)
 
     @override_settings(
         LANDING_LEAD_DEDUP_MINUTES=0,

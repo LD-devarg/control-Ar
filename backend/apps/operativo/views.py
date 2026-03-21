@@ -248,11 +248,11 @@ def _find_recent_fingerprint_cliente(
     ip_address: str | None = None,
 ):
     if not (empresa_id and event_source_url and user_agent):
-        return None
+        return None, {}
 
     window_days = _landing_client_fingerprint_dedup_days()
     if window_days <= 0:
-        return None
+        return None, {}
 
     window_start = timezone.now() - timedelta(days=window_days)
     base_qs = (
@@ -289,14 +289,14 @@ def _find_recent_fingerprint_cliente(
     if fbp:
         by_fbp = base_qs.filter(fbp=fbp).first()
         if by_fbp:
-            return by_fbp
+            return by_fbp, {"matched_by": "fingerprint_fbp", "matched_value": fbp}
 
     if ip_address:
         by_device = base_qs.filter(ip_address=ip_address).first()
         if by_device:
-            return by_device
+            return by_device, {"matched_by": "fingerprint_ip", "matched_value": ip_address}
 
-    return None
+    return None, {}
 
 
 def _find_recent_duplicate_lead_cliente(
@@ -310,7 +310,7 @@ def _find_recent_duplicate_lead_cliente(
 ):
     window_minutes = _lead_dedup_window_minutes()
     if window_minutes <= 0:
-        return None
+        return None, {}
 
     window_start = timezone.now() - timedelta(minutes=window_minutes)
     base_qs = (
@@ -326,7 +326,7 @@ def _find_recent_duplicate_lead_cliente(
     if contacto:
         by_phone = base_qs.filter(cliente__contacto=contacto).first()
         if by_phone:
-            return by_phone.cliente
+            return by_phone.cliente, {"matched_by": "lead_contacto", "matched_value": contacto}
 
     tracking_q = Q()
     if fbp:
@@ -336,14 +336,20 @@ def _find_recent_duplicate_lead_cliente(
     if tracking_q:
         by_tracking = base_qs.filter(tracking_q).first()
         if by_tracking:
-            return by_tracking.cliente
+            matched_by = "lead_fbp" if fbp and str(by_tracking.fbp or "").strip() == str(fbp).strip() else "lead_fbc"
+            matched_value = fbp if matched_by == "lead_fbp" else fbc
+            return by_tracking.cliente, {"matched_by": matched_by, "matched_value": matched_value}
 
     if ip_address and user_agent:
         by_device = base_qs.filter(ip_address=ip_address, user_agent=user_agent).first()
         if by_device:
-            return by_device.cliente
+            return by_device.cliente, {
+                "matched_by": "lead_device",
+                "matched_value": ip_address,
+                "matched_user_agent": user_agent,
+            }
 
-    return None
+    return None, {}
 
 
 def _merge_cliente_missing_fields(*, cliente: Cliente, validated_data: dict, request) -> Cliente:
@@ -417,10 +423,20 @@ def _resolve_unique_cliente_codigo(*, requested_codigo: str = "") -> str:
     raise ValidationError("No se pudo generar un codigo unico. Reintenta.")
 
 
-def _build_lead_event_payload(*, cliente, request, requested_codigo: str = "", resultado: str, motivo: str):
+def _build_lead_event_payload(
+    *,
+    cliente,
+    request,
+    requested_codigo: str = "",
+    resultado: str,
+    motivo: str,
+    dedup_details: dict | None = None,
+):
     requested_codigo = str(requested_codigo or "").strip()
     final_codigo = str(getattr(cliente, "codigo", "") or "").strip()
     skipped_meta = resultado.startswith("deduplicado")
+    dedup_details = dedup_details or {}
+    reservation_token = str(request.data.get("reservation_token") or "").strip()
     return {
         "phone": cliente.contacto,
         "external_id": str(cliente.uuid),
@@ -435,6 +451,16 @@ def _build_lead_event_payload(*, cliente, request, requested_codigo: str = "", r
         "cliente_nuevo": resultado in {"creado", "creado_reasignado"},
         "deduplicado": resultado.startswith("deduplicado"),
         "meta_skipped": skipped_meta,
+        "request_contacto": str(request.data.get("contacto") or "").strip() or None,
+        "request_fbp": str(request.data.get("fbp") or "").strip() or None,
+        "request_fbc": str(request.data.get("fbc") or "").strip() or None,
+        "request_event_source_url": str(request.data.get("event_source_url") or "").strip() or None,
+        "request_ip": _client_first_ip(request, None),
+        "request_user_agent": _client_first_user_agent(request, None) or None,
+        "request_reservation_token_present": bool(reservation_token),
+        "dedup_matched_by": dedup_details.get("matched_by"),
+        "dedup_matched_value": dedup_details.get("matched_value"),
+        "dedup_matched_user_agent": dedup_details.get("matched_user_agent"),
     }
 
 
@@ -477,13 +503,23 @@ def _find_recent_duplicate_lead_event(
     return None
 
 
-def _create_lead_event(*, landing, cliente, request, requested_codigo: str = "", resultado: str, motivo: str):
+def _create_lead_event(
+    *,
+    landing,
+    cliente,
+    request,
+    requested_codigo: str = "",
+    resultado: str,
+    motivo: str,
+    dedup_details: dict | None = None,
+):
     payload = _build_lead_event_payload(
         cliente=cliente,
         request=request,
         requested_codigo=requested_codigo,
         resultado=resultado,
         motivo=motivo,
+        dedup_details=dedup_details,
     )
     existing_duplicate = _find_recent_duplicate_lead_event(
         landing_id=landing.id,
@@ -638,7 +674,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
         request_ip = get_request_ip(request)
         request_user_agent = get_request_user_agent(request)
 
-        fingerprint_cliente = _find_recent_fingerprint_cliente(
+        fingerprint_cliente, fingerprint_dedup_details = _find_recent_fingerprint_cliente(
             empresa_id=landing.empresa_id,
             fbp=normalized_fbp,
             event_source_url=normalized_event_source_url,
@@ -658,13 +694,14 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 requested_codigo=requested_codigo,
                 resultado="deduplicado_fingerprint",
                 motivo="cliente_existente_por_fingerprint",
+                dedup_details=fingerprint_dedup_details,
             )
             if reservation_token:
                 consume_reservation(reservation_token)
             output = ClienteSerializer(cliente)
             return Response(output.data, status=status.HTTP_200_OK)
 
-        duplicate_cliente = _find_recent_duplicate_lead_cliente(
+        duplicate_cliente, duplicate_dedup_details = _find_recent_duplicate_lead_cliente(
             landing_id=landing.id,
             contacto=normalized_contacto,
             fbp=normalized_fbp,
@@ -685,6 +722,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 requested_codigo=requested_codigo,
                 resultado="deduplicado_lead",
                 motivo="lead_reciente_duplicado",
+                dedup_details=duplicate_dedup_details,
             )
             if reservation_token:
                 consume_reservation(reservation_token)
@@ -1498,6 +1536,8 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             return is_admin(request.user) or is_pauta(request.user)
         if self.action == "retry":
             return False
+        if self.action == "discard_lead":
+            return is_admin(request.user) or is_operador(request.user)
         if is_admin(request.user) or is_operador(request.user) or is_pauta(request.user):
             return self.action in {"list", "retrieve"}
         return False
@@ -1554,7 +1594,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         )
         sin_contacto = self.request.query_params.get("sin_contacto")
         if sin_contacto in {"1", "true", "True"}:
-            qs = qs.filter(tipo="lead", contactado=False)
+            qs = qs.filter(tipo="lead", contactado=False).exclude(data__lead_discarded=True)
         qs = qs.order_by("-creado_en")
 
         if self.action == "list":
@@ -1627,6 +1667,43 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
 
         output = EventosMetaReadSerializer(evento)
         return Response(output.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="discard-lead")
+    def discard_lead(self, request, pk=None):
+        evento = self.get_object()
+        if evento.tipo != "lead":
+            raise ValidationError("Solo se pueden descartar eventos de tipo lead.")
+
+        motivo = str(request.data.get("reason") or "").strip()
+        detalle = str(request.data.get("detail") or "").strip()
+        if not motivo:
+            raise ValidationError({"reason": "El motivo es obligatorio."})
+
+        payload = dict(evento.data or {})
+        payload["lead_discarded"] = True
+        payload["lead_discard_reason"] = motivo
+        payload["lead_discard_detail"] = detalle or None
+        payload["lead_discarded_at"] = timezone.now().isoformat()
+        if request.user.is_authenticated:
+            payload["lead_discarded_by_id"] = request.user.id
+            payload["lead_discarded_by_username"] = request.user.username
+
+        evento.data = payload
+        evento.save(update_fields=["data"])
+
+        _safe_publish_empresa_event(
+            empresa_id=evento.empresa_id,
+            event_type="lead_discarded",
+            payload={
+                "id": evento.id,
+                "cliente": evento.cliente_id,
+                "motivo": motivo,
+                "descartado_en": payload["lead_discarded_at"],
+            },
+        )
+
+        output = EventosMetaReadSerializer(evento)
+        return Response(output.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated], url_path="test-event")
     def test_event(self, request):

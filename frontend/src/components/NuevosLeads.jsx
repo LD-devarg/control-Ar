@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dayjs from "dayjs";
 import { apiClient } from "../services/auth";
 import { subscribeRealtimeEvents } from "../services/realtime";
 import ModalBase from "./ModalBase.jsx";
 import { useTenant } from "../context/TenantContext";
 import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
+import AutorenewOutlinedIcon from "@mui/icons-material/AutorenewOutlined";
 import "../assets/css/RecentPurchasesTable.css";
 
 const REFRESH_DEBOUNCE_MS = 500;
@@ -111,6 +114,23 @@ function buildEffectiveLeads(rows) {
     });
 }
 
+function buildDayGroups(items) {
+    const now = dayjs();
+    const grouped = new Map();
+
+    items.forEach((item) => {
+        const date = dayjs(item?.creado_en);
+        let label = date.format("DD/MM/YYYY");
+        if (date.isSame(now, "day")) label = "Hoy";
+        else if (date.isSame(now.subtract(1, "day"), "day")) label = "Ayer";
+
+        if (!grouped.has(label)) grouped.set(label, []);
+        grouped.get(label).push(item);
+    });
+
+    return Array.from(grouped.entries()).map(([label, rows]) => ({ label, rows }));
+}
+
 function readCachedLeads(cacheKey) {
     if (typeof window === "undefined") return [];
     try {
@@ -139,10 +159,12 @@ function NuevosLeads() {
     const [duplicateOptions, setDuplicateOptions] = useState([]);
     const [duplicateLoading, setDuplicateLoading] = useState(false);
     const [selectedDuplicate, setSelectedDuplicate] = useState(null);
+    const [copiedCode, setCopiedCode] = useState("");
     const detalleCacheRef = useRef(new Map());
     const duplicateSearchTimerRef = useRef(null);
     const refreshTimerRef = useRef(null);
     const lastRefreshAtRef = useRef(0);
+    const copiedTimerRef = useRef(null);
 
     const loadLeads = useCallback(async (opts = {}) => {
         const { silent } = opts;
@@ -336,57 +358,183 @@ function NuevosLeads() {
         () => resolveLeadCodes(selectedLead, clienteDetalle),
         [selectedLead, clienteDetalle]
     );
+    const groupedLeads = useMemo(() => buildDayGroups(leadRows), [leadRows]);
+    const todayMetrics = useMemo(() => {
+        const today = dayjs();
+        return leadRows.reduce(
+            (acc, lead) => {
+                const createdAt = dayjs(lead?.creado_en);
+                if (!createdAt.isSame(today, "day")) return acc;
+                acc.total += 1;
+                if (lead?.data?.deduplicado) acc.deduplicados += 1;
+                if (lead?.data?.codigo_provisorio_distinto) acc.reasignados += 1;
+                return acc;
+            },
+            { total: 0, deduplicados: 0, reasignados: 0 }
+        );
+    }, [leadRows]);
+    const formatClock = (value) => (value ? dayjs(value).format("HH:mm") : "--:--");
+    const handleCopyCodigo = useCallback(async (event, codigo) => {
+        event.stopPropagation();
+        event.preventDefault();
+        const normalized = String(codigo || "").trim();
+        if (!normalized) return;
+
+        const markCopied = () => {
+            setCopiedCode(normalized);
+            if (copiedTimerRef.current) {
+                clearTimeout(copiedTimerRef.current);
+            }
+            copiedTimerRef.current = setTimeout(() => setCopiedCode(""), 1400);
+        };
+
+        try {
+            if (navigator?.clipboard?.writeText) {
+                await navigator.clipboard.writeText(normalized);
+                markCopied();
+                return;
+            }
+        } catch {
+            // fallback below
+        }
+
+        try {
+            const textarea = document.createElement("textarea");
+            textarea.value = normalized;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.top = "-9999px";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            textarea.setSelectionRange(0, textarea.value.length);
+            const copied = document.execCommand("copy");
+            document.body.removeChild(textarea);
+            if (copied) {
+                markCopied();
+            }
+        } catch {
+            // ignore clipboard errors
+        }
+    }, []);
+
+    useEffect(() => () => {
+        if (copiedTimerRef.current) {
+            clearTimeout(copiedTimerRef.current);
+        }
+    }, []);
 
     return (
-        <aside className="w-full rounded-2xl shadow-xl shadow-black bg-white dark:bg-neutral-900 p-4 text-white h-full flex flex-col">
-            <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-base text-black dark:text-white font-semibold">Nuevos Leads</h3>
-                <span className="text-xs text-black/80 dark:text-white/60">{loading ? "Actualizando..." : "Tiempo real"}</span>
+        <aside className="w-full rounded-[28px] border border-white/10 bg-[#121214] p-4 text-white shadow-xl shadow-black h-full flex flex-col">
+            <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-base font-semibold text-white">Nuevos Leads</h3>
+                <span className="text-xs text-white/55">{loading ? "Actualizando..." : "Tiempo real"}</span>
             </div>
 
-            {error ? <p className="mb-2 text-sm text-red-500">{error}</p> : null}
+            {error ? <p className="mb-3 text-sm text-rose-300">{error}</p> : null}
 
-            <div className="recent-compras-scroll space-y-2 overflow-y-auto pr-1 flex-1 min-h-0">
+            <div className="mb-5 rounded-2xl border border-white/6 bg-white/[0.03] px-2 py-3">
+                <div className="mb-1 pl-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/40">Hoy</div>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
+                    <div className="inline-flex items-center gap-1 text-sky-200">
+                        <PendingActionsOutlinedIcon sx={{ fontSize: 14 }} />
+                        <span className="text-[14px] font-semibold">{todayMetrics.total} leads</span>
+                    </div>
+                    <span className="text-white/20">|</span>
+                    <div className="inline-flex items-center gap-1 text-cyan-200">
+                        <ContentCopyOutlinedIcon sx={{ fontSize: 14 }} />
+                        <span className="text-[14px] font-semibold">{todayMetrics.deduplicados} dedup</span>
+                    </div>
+                    <span className="text-white/20">|</span>
+                    <div className="inline-flex items-center gap-1 text-amber-200">
+                        <AutorenewOutlinedIcon sx={{ fontSize: 14 }} />
+                        <span className="text-[14px] font-semibold">{todayMetrics.reasignados} reasignados</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="recent-compras-scroll overflow-y-auto pr-1 flex-1 min-h-0">
                 {!loading && !error && leadRows.length === 0 ? (
-                    <div className="rounded-xl bg-white dark:bg-neutral-900 px-3 py-4 text-sm text-black/60 dark:text-white/60">
+                    <div className="rounded-xl bg-white/[0.03] px-3 py-4 text-sm text-white/55">
                         No hay leads sin contactar.
                     </div>
                 ) : null}
 
-                {leadRows.map((lead) => (
-                    <button
-                        key={lead.id}
-                        type="button"
-                        onClick={() => handleOpen(lead)}
-                        className="w-full rounded-[18px] cursor-pointer border border-white/10 bg-gradient-to-r from-black to-black/80 dark:bg-black/20 px-4 py-2 text-left transition-all duration-200 hover:border-white/30 hover:bg-gradient-to-r hover:from-black/80 hover:to-black/60"
-                    >
-                        <div className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-white/65">
-                            <div className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] leading-none bg-sky-500/10 text-sky-300 border-sky-400/60">
-                                <PendingActionsOutlinedIcon sx={{ fontSize: 14 }} />
-                                <span>Lead</span>
+                <div className="space-y-5">
+                    {groupedLeads.map((group) => (
+                        <section key={group.label}>
+                            <div className="mb-2 flex items-center gap-3">
+                                <span className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/45">
+                                    {group.label}
+                                </span>
+                                <div className="h-px flex-1 bg-white/8" />
                             </div>
-                            <span>{lead.fecha}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm xl:text-lg font-semibold text-white">
-                                {lead.title}
-                            </span>
-                            <span className="shrink-0 text-base font-semibold text-cyan-300">
-                                {lead.cliente_codigo ? `ID ${lead.cliente_codigo}` : (lead.cliente_contacto || "-")}
-                            </span>
-                        </div>
-                        {lead?.data?.codigo_provisorio_distinto ? (
-                            <div className="mt-2 rounded-xl border border-amber-400/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-200">
-                                Solicitado {lead?.data?.codigo_solicitado || "-"} {"->"} asignado {lead?.data?.codigo_final || lead?.cliente_codigo || "-"}
+
+                            <div>
+                                {group.rows.map((lead) => (
+                                    <div
+                                        key={lead.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => handleOpen(lead)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault();
+                                                handleOpen(lead);
+                                            }
+                                        }}
+                                        className="group grid w-full grid-cols-[44px_minmax(0,1fr)_88px] items-start gap-2 border-b border-white/7 py-3 text-left transition-colors hover:bg-white/[0.03] cursor-pointer"
+                                    >
+                                        <div className="pt-1 text-[13px] font-medium tabular-nums text-white/45">
+                                            {formatClock(lead.creado_en)}
+                                        </div>
+
+                                        <div className="min-w-0 pr-2">
+                                            <div className="flex items-center gap-2">
+                                                <PendingActionsOutlinedIcon className="text-sky-300" sx={{ fontSize: 14 }} />
+                                                <span className="truncate text-[14px] font-semibold text-white">
+                                                    {lead.title}
+                                                </span>
+                                            </div>
+                                            <div className="mt-1 pl-6 text-[12px] text-white/52">
+                                                {lead?.data?.deduplicado
+                                                    ? (formatLeadResult(lead) || "Lead deduplicado")
+                                                    : "Lead"}{" "}
+                                                • {formatClock(lead.creado_en)}
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-0.5 text-right">
+                                            {lead.cliente_codigo ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => handleCopyCodigo(event, lead.cliente_codigo)}
+                                                    className="block whitespace-nowrap text-[16px] font-semibold tracking-[0.01em] text-sky-200 transition-colors hover:text-sky-100"
+                                                    title={copiedCode === String(lead.cliente_codigo) ? "Copiado" : `Copiar ${lead.cliente_codigo}`}
+                                                >
+                                                    {copiedCode === String(lead.cliente_codigo)
+                                                        ? "Copiado"
+                                                        : `ID ${lead.cliente_codigo}`}
+                                                </button>
+                                            ) : (
+                                                <span className="block whitespace-nowrap text-[16px] font-semibold tracking-[0.01em] text-sky-200">
+                                                    -
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {lead?.data?.codigo_provisorio_distinto ? (
+                                            <div className="col-[2/4] ml-6 mt-1 rounded-xl border border-amber-400/25 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-200">
+                                                Solicitado {lead?.data?.codigo_solicitado || "-"} {"->"} asignado {lead?.data?.codigo_final || lead?.cliente_codigo || "-"}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ))}
                             </div>
-                        ) : null}
-                        {lead?.data?.deduplicado ? (
-                            <div className="mt-2 rounded-xl border border-sky-400/40 bg-sky-500/10 px-2.5 py-1.5 text-[11px] text-sky-200">
-                                {formatLeadResult(lead) || "Intento deduplicado"}
-                            </div>
-                        ) : null}
-                    </button>
-                ))}
+                        </section>
+                    ))}
+                </div>
             </div>
 
             <ModalBase

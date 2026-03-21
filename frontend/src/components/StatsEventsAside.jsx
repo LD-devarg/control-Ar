@@ -9,6 +9,9 @@ import "../assets/css/RecentPurchasesTable.css";
 import PendingActionsOutlinedIcon from '@mui/icons-material/PendingActionsOutlined';
 import ChatBubbleOutlineOutlinedIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
+import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined';
+import MailOutlineOutlinedIcon from '@mui/icons-material/MailOutlineOutlined';
+import WhatshotOutlinedIcon from '@mui/icons-material/WhatshotOutlined';
 
 const REFRESH_DEBOUNCE_MS = 500;
 const REFRESH_COOLDOWN_MS = 5000;
@@ -29,9 +32,9 @@ function getEventBadgeTheme(rawType) {
   }
   if (type === "contacto" || type === "contact") {
     return {
-      text: "text-amber-300",
-      border: "border-amber-400/60",
-      bg: "bg-amber-500/10",
+      text: "text-yellow-300",
+      border: "border-yellow-400/60",
+      bg: "bg-yellow-500/10",
     };
   }
   return {
@@ -41,6 +44,34 @@ function getEventBadgeTheme(rawType) {
   };
 }
 
+function getEventAccent(rawType) {
+  const type = normalizeEventType(rawType);
+  if (type === "compra" || type === "purchase") return "text-emerald-300";
+  if (type === "contacto" || type === "contact") return "text-yellow-300";
+  return "text-sky-300";
+}
+
+function getEventLabel(rawType) {
+  const type = normalizeEventType(rawType);
+  if (type === "compra" || type === "purchase") return "Compra";
+  if (type === "contacto" || type === "contact") return "Contacto";
+  return "Lead";
+}
+
+function getEventFilter(rawType) {
+  const type = normalizeEventType(rawType);
+  if (type === "compra" || type === "purchase") return "compra";
+  if (type === "contacto" || type === "contact") return "contacto";
+  return "lead";
+}
+
+function getEventIcon(rawType) {
+  const type = normalizeEventType(rawType);
+  if (type === "compra" || type === "purchase") return ShoppingCartOutlinedIcon;
+  if (type === "contacto" || type === "contact") return ChatBubbleOutlineOutlinedIcon;
+  return PendingActionsOutlinedIcon;
+}
+
 function buildEventDisplayName(item) {
   const codigo = String(item?.cliente_codigo || "").trim();
   const nombre = String(item?.nombre || "").trim();
@@ -48,8 +79,9 @@ function buildEventDisplayName(item) {
   const clienteId = String(item?.cliente || item?.cliente_id || "").trim();
 
   if (nombre) return nombre;
-  if (username) return username;
-  if (codigo) return `ID ${codigo}`;
+  if (username && !/^lead\d+$/i.test(username)) return username;
+  if (codigo) return `Lead #${codigo}`;
+  if (username) return username.replace(/^lead/i, "Lead #");
   if (clienteId) return `Cliente #${clienteId}`;
   return "Evento";
 }
@@ -99,6 +131,23 @@ function readCachedEvents(cacheKey) {
   }
 }
 
+function buildDayGroups(items) {
+  const now = dayjs();
+  const grouped = new Map();
+
+  items.forEach((item) => {
+    const date = dayjs(item?.fecha_hora);
+    let label = date.format("DD/MM/YYYY");
+    if (date.isSame(now, "day")) label = "Hoy";
+    else if (date.isSame(now.subtract(1, "day"), "day")) label = "Ayer";
+
+    if (!grouped.has(label)) grouped.set(label, []);
+    grouped.get(label).push(item);
+  });
+
+  return Array.from(grouped.entries()).map(([label, rows]) => ({ label, rows }));
+}
+
 function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight = false }) {
   const { tenantId } = useTenant();
   const [searchParams] = useSearchParams();
@@ -136,6 +185,7 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
   const [loading, setLoading] = useState(() => readCachedEvents(cacheKey).length === 0);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [highlightedIds, setHighlightedIds] = useState([]);
+  const [activeFilter, setActiveFilter] = useState("todos");
   const removeHighlightTimersRef = useRef([]);
   const activeRequestRef = useRef(null);
   const abortTimerRef = useRef(null);
@@ -155,6 +205,7 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
   );
 
   const formatDateTime = (value) => (value ? dayjs(value).format("DD/MM/YYYY HH:mm") : "-");
+  const formatClock = (value) => (value ? dayjs(value).format("HH:mm") : "--:--");
   const formatUsd = (value) =>
     new Intl.NumberFormat("es-AR", {
       style: "currency",
@@ -288,71 +339,153 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
     return unsubscribe;
   }, [triggerRefresh]);
 
+  const filteredEvents = useMemo(() => {
+    if (activeFilter === "todos") return events;
+    return events.filter((item) => getEventFilter(item.evento) === activeFilter);
+  }, [activeFilter, events]);
+
+  const groupedEvents = useMemo(() => buildDayGroups(filteredEvents), [filteredEvents]);
+
+  const todayMetrics = useMemo(() => {
+    const today = dayjs();
+    return events.reduce(
+      (acc, item) => {
+        const itemDate = dayjs(item?.fecha_hora);
+        if (!itemDate.isSame(today, "day")) return acc;
+        const type = getEventFilter(item?.evento);
+        if (type === "compra") {
+          acc.totalUsd += Number(item?.monto_usd || 0);
+        } else if (type === "contacto") {
+          acc.contactos += 1;
+        } else if (type === "lead") {
+          acc.leads += 1;
+        }
+        return acc;
+      },
+      { totalUsd: 0, contactos: 0, leads: 0 }
+    );
+  }, [events]);
+
   return (
     <aside
-      className={`w-full rounded-2xl shadow-xl shadow-black bg-white dark:bg-neutral-900 p-4 text-white ${
+      className={`w-full rounded-[28px] border border-white/10 shadow-xl shadow-black bg-[#121214] p-4 text-white ${
         fullHeight ? "h-full flex flex-col" : ""
       }`}
     >
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-base text-black dark:text-white font-semibold">Eventos</h3>
-        <span className="text-xs text-black/80 dark:text-white/60">{loading ? "Actualizando..." : "Tiempo real"}</span>
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-base font-semibold text-white">Eventos</h3>
+        <span className="text-xs text-white/55">{loading ? "Actualizando..." : "Tiempo real"}</span>
+      </div>
+
+      <div className="mb-4 grid grid-cols-4 gap-2">
+        {[
+          { key: "todos", label: "Todos" },
+          { key: "compra", label: "Compras" },
+          { key: "contacto", label: "Contactos" },
+          { key: "lead", label: "Leads" },
+        ].map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => setActiveFilter(item.key)}
+            className={`rounded-xl px-3 py-2 text-[10px] font-semibold transition-colors ${
+              activeFilter === item.key
+                ? "bg-sky-500/12 text-sky-300 ring-1 ring-sky-400/30"
+                : "bg-white/5 text-white/65 hover:bg-white/8 hover:text-white"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mb-5 rounded-2xl border border-white/6 bg-white/[0.03] px-2 py-3">
+        <div className="mb-1 pl-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/40">Hoy</div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
+          <div className="inline-flex items-center gap-1 text-emerald-200">
+            <PaidOutlinedIcon sx={{ fontSize: 14 }} />
+            <span className="text-[14px] font-semibold">{formatUsd(todayMetrics.totalUsd)}</span>
+          </div>
+          <span className="text-white/20">|</span>
+          <div className="inline-flex items-center gap-1 text-yellow-200">
+            <MailOutlineOutlinedIcon sx={{ fontSize: 14 }} />
+            <span className="text-[14px] font-semibold">{todayMetrics.contactos} contactos</span>
+          </div>
+          <span className="text-white/20">|</span>
+          <div className="inline-flex items-center gap-1 text-sky-200">
+            <WhatshotOutlinedIcon sx={{ fontSize: 14 }} />
+            <span className="text-[14px] font-semibold">{todayMetrics.leads} leads</span>
+          </div>
+        </div>
       </div>
 
       <div
-        className={`recent-compras-scroll space-y-2 overflow-y-auto pr-1 ${
+        className={`recent-compras-scroll overflow-y-auto pr-1 ${
           fullHeight ? "flex-1 min-h-0" : "max-h-[46vh] sm:max-h-[52vh]"
         }`}
       >
-        {!loading && events.length === 0 ? (
-          <div className="rounded-xl bg-white dark:bg-neutral-900 px-3 py-4 text-sm text-black/60 dark:text-white/60">
+        {!loading && filteredEvents.length === 0 ? (
+          <div className="rounded-xl bg-white/[0.03] px-3 py-4 text-sm text-white/55">
             Sin eventos para este rango.
           </div>
         ) : null}
 
-        {events.map((item) => {
-          const isCompra = item.evento === "compra";
-          const badgeTheme = getEventBadgeTheme(item.evento);
-          const eventType = normalizeEventType(item.evento);
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setSelectedEvent(item)}
-              className={`w-full rounded-[18px] cursor-pointer px-4 py-2 text-left transition-all duration-200 ${
-                highlightedIds.includes(item.id)
-                  ? "border-cyan-400/70 bg-green-200/20"
-                  : "border-white/10 bg-gradient-to-r from-black to-black/80 hover:border-white/30 hover:bg-gradient-to-r hover:from-black/80 hover:to-black/60"
-              }`}
-            >
-              <div className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-white/65">
-                <div className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] leading-none ${badgeTheme.bg} ${badgeTheme.text} ${badgeTheme.border}`}>
-                  <div>
-                    {eventType === "compra" || eventType === "purchase" ? (
-                      <ShoppingCartOutlinedIcon sx={{ fontSize: 14 }} />
-                    ) : eventType === "lead" || eventType === "lead_creado" ? (
-                      <PendingActionsOutlinedIcon sx={{ fontSize: 14 }} />
-                    ) : (
-                      <ChatBubbleOutlineOutlinedIcon sx={{ fontSize: 14 }} />
-                    )}
-                  </div>
-                  <span>{item.evento_label}</span>
-                </div>
-                <span>{formatDateTime(item.fecha_hora)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-sm xl:text-lg font-semibold text-white">
-                  {buildEventDisplayName(item)}
+        <div className="space-y-5">
+          {groupedEvents.map((group) => (
+            <section key={group.label}>
+              <div className="mb-2 flex items-center gap-3">
+                <span className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/45">
+                  {group.label}
                 </span>
-                {isCompra ? (
-                  <span className="shrink-0 text-base font-semibold text-cyan-300">
-                    {formatUsd(item.monto_usd)}
-                  </span>
-                ) : null}
+                <div className="h-px flex-1 bg-white/8" />
               </div>
-            </button>
-          );
-        })}
+
+              <div>
+                {group.rows.map((item) => {
+                  const isCompra = getEventFilter(item.evento) === "compra";
+                  const accentClass = getEventAccent(item.evento);
+                  const Icon = getEventIcon(item.evento);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedEvent(item)}
+                      className={`group grid w-full grid-cols-[44px_minmax(0,1fr)_96px] items-start gap-2 border-b border-white/7 py-3 text-left transition-colors ${
+                        highlightedIds.includes(item.id)
+                          ? "bg-emerald-400/6"
+                          : "hover:bg-white/[0.03]"
+                      }`}
+                    >
+                      <div className="pt-1 text-[13px] font-medium tabular-nums text-white/45">
+                        {formatClock(item.fecha_hora)}
+                      </div>
+
+                      <div className="min-w-0 pr-2">
+                        <div className="flex items-center gap-2">
+                          <Icon className={accentClass} sx={{ fontSize: 14 }} />
+                          <span className="truncate text-[14px] font-semibold text-white">
+                            {buildEventDisplayName(item)}
+                          </span>
+                        </div>
+                        <div className="mt-1 pl-6 text-[12px] text-white/52">
+                          {getEventLabel(item.evento)} {" • "} {formatClock(item.fecha_hora)}
+                        </div>
+                      </div>
+
+                      <div className="pt-0.5 text-right">
+                        {isCompra ? (
+                          <span className="block whitespace-nowrap text-[16px] font-semibold tracking-[0.01em] text-emerald-200">
+                            {formatUsd(item.monto_usd)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
 
       <ModalBase

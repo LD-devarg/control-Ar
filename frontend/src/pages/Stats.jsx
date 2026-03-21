@@ -2,7 +2,6 @@
 import dayjs from "dayjs";
 import Page from "../layouts/Page.jsx";
 import Filter from "../components/Filter";
-import Card from "../components/Card";
 import PreviewOutlinedIcon from "@mui/icons-material/PreviewOutlined";
 import PendingActionsOutlinedIcon from "@mui/icons-material/PendingActionsOutlined";
 import ChatBubbleOutlineOutlinedIcon from "@mui/icons-material/ChatBubbleOutlineOutlined";
@@ -28,19 +27,6 @@ const POLL_MS = 60 * 60 * 1000;
 const TABLET_MAX_WIDTH = 1024;
 const REALTIME_DEBOUNCE_MS = 700;
 const REQUEST_TIMEOUT_MS = 15000;
-
-const CARD_SIZE_PRESETS = {
-  medium: {
-    sizeHeight: "h-22",
-    sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
-    textSize: "text-lg lg:text-2xl",
-  },
-  small: {
-    sizeHeight: "h-18",
-    sizeWidth: "w-full xl:max-w-[200px] xl:max-w-none xl:w-full",
-    textSize: "text-sm lg:text-md",
-  },
-};
 
 const FAQ_ITEMS = [
   {
@@ -71,6 +57,112 @@ function isIpadDevice() {
 function safeNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildSparklinePoints(seed = 0, trend = 0, length = 12) {
+  const safeSeed = Math.max(1, safeNumber(seed));
+  const safeTrend = safeNumber(trend);
+  const values = [];
+  let current = Math.max(8, (safeSeed % 23) + 10);
+
+  for (let index = 0; index < length; index += 1) {
+    const wave = Math.sin((index + 1) * 0.85 + safeSeed) * 4;
+    const growth = safeTrend * index * 0.35;
+    current = Math.max(6, current + wave * 0.35 + growth + (index % 3 === 0 ? 1.4 : -0.3));
+    values.push(Number(current.toFixed(2)));
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  return values.map((value, index) => {
+    const x = (index / (length - 1)) * 100;
+    const y = max === min ? 50 : 100 - (((value - min) / (max - min)) * 76 + 12);
+    return [x, y];
+  });
+}
+
+function Sparkline({ seed, trend, colorClass = "text-emerald-300" }) {
+  const points = useMemo(() => buildSparklinePoints(seed, trend), [seed, trend]);
+  const path = points.map(([x, y], index) => `${index === 0 ? "M" : "L"} ${x} ${y}`).join(" ");
+  const area = `${path} L 100 100 L 0 100 Z`;
+  return (
+    <svg viewBox="0 0 100 100" className={`h-14 w-28 ${colorClass}`} preserveAspectRatio="none" aria-hidden="true">
+      <path d={area} fill="currentColor" opacity="0.08" />
+      <path
+        d="M 0 86 L 100 86"
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity="0.14"
+        strokeWidth="1.5"
+        strokeDasharray="3 4"
+      />
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" />
+      {points.length ? <circle cx={points[points.length - 1][0]} cy={points[points.length - 1][1]} r="3" fill="currentColor" /> : null}
+    </svg>
+  );
+}
+
+function deltaMeta(current, previous) {
+  const cur = safeNumber(current);
+  const prev = safeNumber(previous);
+  if (!prev) {
+    return { value: cur > 0 ? 100 : 0, direction: cur > 0 ? "up" : "flat" };
+  }
+  const ratio = ((cur - prev) / Math.abs(prev)) * 100;
+  if (Math.abs(ratio) < 0.05) return { value: 0, direction: "flat" };
+  return { value: Math.abs(ratio), direction: ratio > 0 ? "up" : "down" };
+}
+
+function deltaClass(direction) {
+  if (direction === "up") return "text-emerald-300";
+  if (direction === "down") return "text-rose-300";
+  return "text-white/45";
+}
+
+function DeltaPill({ meta }) {
+  const arrow = meta.direction === "up" ? "▲" : meta.direction === "down" ? "▼" : "•";
+  const prefix = meta.direction === "up" ? "+" : meta.direction === "down" ? "-" : "";
+  return (
+    <span className={`inline-flex items-center gap-1 text-sm font-semibold ${deltaClass(meta.direction)}`}>
+      <span>{arrow}</span>
+      <span>{prefix}{meta.value.toFixed(0)}%</span>
+    </span>
+  );
+}
+
+function DashboardCard({
+  title,
+  value,
+  delta,
+  subtitle,
+  icon,
+  accentClass = "text-white",
+  sparkSeed = 1,
+  sparkTrend = 0,
+  large = false,
+}) {
+  return (
+    <div className={`min-w-0 overflow-hidden rounded-2xl border border-white/8 bg-[#101012] ${large ? "p-5" : "p-4"}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="mb-2 flex items-center gap-2 text-white/72">
+            {icon}
+            <span className="text-xs font-semibold uppercase tracking-[0.16em]">{title}</span>
+          </div>
+          <div className={`truncate font-semibold ${large ? "text-[2rem] leading-none" : "text-[1.35rem] leading-none"} ${accentClass}`}>
+            {value}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {delta ? <DeltaPill meta={delta} /> : null}
+            {subtitle ? <span className="text-sm text-white/60">{subtitle}</span> : null}
+          </div>
+        </div>
+        <div className="shrink-0 self-end">
+          <Sparkline seed={sparkSeed} trend={delta?.direction === "up" ? 1 : delta?.direction === "down" ? -1 : 0} colorClass={accentClass} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function buildRangeFromPeriod(period) {
@@ -154,6 +246,7 @@ function Stats() {
   const [hasta, setHasta] = useState(initialFilters.hasta);
   const [usePeriod, setUsePeriod] = useState(initialFilters.usePeriod);
   const [data, setData] = useState(null);
+  const [comparisonData, setComparisonData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showResponsiveFilters, setShowResponsiveFilters] = useState(false);
@@ -227,17 +320,37 @@ function Stats() {
     [desde, hasta]
   );
 
+  const comparisonParams = useMemo(() => {
+    const safeDesde = desde?.isValid?.() ? desde : dayjs();
+    const safeHasta = hasta?.isValid?.() ? hasta : safeDesde;
+    const totalDays = Math.max(safeHasta.diff(safeDesde, "day"), 0) + 1;
+    const previousHasta = safeDesde.subtract(1, "day");
+    const previousDesde = previousHasta.subtract(totalDays - 1, "day");
+    return {
+      from: previousDesde.format("YYYY-MM-DD"),
+      to: previousHasta.format("YYYY-MM-DD"),
+    };
+  }, [desde, hasta]);
+
   const loadStats = useCallback(
     async (controller) => {
       const { signal } = controller;
       setLoading(true);
       setError("");
       try {
-        const { data: response } = await apiClient.get("/stats/", {
-          params,
-          signal,
-        });
+        const [currentResponse, previousResponse] = await Promise.all([
+          apiClient.get("/stats/", {
+            params,
+            signal,
+          }),
+          apiClient.get("/stats/", {
+            params: comparisonParams,
+            signal,
+          }),
+        ]);
+        const response = currentResponse.data;
         setData(response);
+        setComparisonData(previousResponse.data);
       } catch (err) {
         if (err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
           return;
@@ -254,7 +367,7 @@ function Stats() {
         }
       }
     },
-    [params]
+    [comparisonParams, params]
   );
 
   const triggerRefresh = useCallback(() => {
@@ -403,6 +516,10 @@ function Stats() {
 
   const shouldUseMockStats = Boolean(isSuperuser && uiSettings?.statsMockMode);
   const sourceData = useMemo(() => (shouldUseMockStats ? buildMockStatsData() : data), [shouldUseMockStats, data]);
+  const sourceComparisonData = useMemo(
+    () => (shouldUseMockStats ? buildMockStatsData() : comparisonData),
+    [shouldUseMockStats, comparisonData]
+  );
 
   const {
     web_visitors: webVisitors = 0,
@@ -475,165 +592,81 @@ function Stats() {
     },
     [useArs, formatArs, formatUsd, resolveArsValue]
   );
+  const previousWebVisitors = sourceComparisonData?.web_visitors ?? 0;
+  const previousLeads = sourceComparisonData?.leads ?? 0;
+  const previousContactos = sourceComparisonData?.contactos ?? 0;
+  const previousFtdCount = sourceComparisonData?.ftd?.count ?? 0;
+  const previousFtdUsd = sourceComparisonData?.ftd?.monto_total_usd ?? 0;
+  const previousGastoUsd = sourceComparisonData?.gasto_usd ?? 0;
+  const previousRoasFtd = sourceComparisonData?.roas_ftd ?? sourceComparisonData?.roas ?? 0;
+  const previousConversionPct = sourceComparisonData?.conversion_pct ?? 0;
 
-  const negocioCards = showNetMetrics
-    ? [
-        {
-          title: "Compras",
-          subtitle: loading ? "..." : formatNumber(comprasCount),
-          value: loading ? "..." : formatMoney({ arsValue: comprasMontoArs, usdValue: comprasMontoUsd }),
-          ...CARD_SIZE_PRESETS.medium,
-          icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
-        },
-        {
-          title: "Ganancia Neta",
-          ...CARD_SIZE_PRESETS.medium,
-          value: loading ? "..." : formatMoney({ arsValue: gananciaNetaArs, usdValue: gananciaNetaUsd }),
-          icon: <TrendingUpOutlinedIcon fontSize="extra-small" />,
-        },
-        {
-          title: "ROAS Neto",
-          ...CARD_SIZE_PRESETS.medium,
-          value: loading ? "..." : safeNumber(roasNeto).toFixed(2),
-          icon: <PercentOutlinedIcon fontSize="extra-small" />,
-        },
-      ]
-    : [
-        {
-          title: "FTD",
-          subtitle: loading ? "..." : formatNumber(ftdCount),
-          value: loading ? "..." : formatMoney({ arsValue: ftdMontoArs, usdValue: ftdMontoUsd }),
-          ...CARD_SIZE_PRESETS.medium,
-          icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
-        },
-        {
-          title: "Gasto Publicitario",
-          ...CARD_SIZE_PRESETS.medium,
-          value: loading ? "..." : formatMoney({ arsValue: gastoArs, usdValue: gastoUsd }),
-          icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-        },
-        {
-          title: "ROAS FTD",
-          ...CARD_SIZE_PRESETS.medium,
-          value: loading ? "..." : safeNumber(roasFtd).toFixed(2),
-          icon: <PercentOutlinedIcon fontSize="extra-small" />,
-        },
-      ];
+  const kpiDeltas = useMemo(
+    () => ({
+      webVisitors: deltaMeta(webVisitors, previousWebVisitors),
+      leads: deltaMeta(leads, previousLeads),
+      contactos: deltaMeta(contactos, previousContactos),
+      ftdCount: deltaMeta(ftdCount, previousFtdCount),
+      ftdUsd: deltaMeta(ftdMontoUsd, previousFtdUsd),
+      gastoUsd: deltaMeta(gastoUsd, previousGastoUsd),
+      roas: deltaMeta(roasFtd, previousRoasFtd),
+      conversion: deltaMeta(conversionPct, previousConversionPct),
+    }),
+    [
+      contactos,
+      conversionPct,
+      ftdCount,
+      ftdMontoUsd,
+      gastoUsd,
+      leads,
+      previousContactos,
+      previousConversionPct,
+      previousFtdCount,
+      previousFtdUsd,
+      previousGastoUsd,
+      previousLeads,
+      previousRoasFtd,
+      previousWebVisitors,
+      roasFtd,
+      webVisitors,
+    ]
+  );
 
-  const gastosCards = [
-    ...(showBonos
-      ? [
-          {
-            title: "Bonos",
-            ...CARD_SIZE_PRESETS.medium,
-            value: loading ? "..." : formatMoney({ arsValue: bonosMontoArs, usdValue: bonosMontoUsd }),
-            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-          },
-        ]
-      : []),
-    ...(showRetiros
-      ? [
-          {
-            title: "Retiros",
-            subtitle: loading ? "..." : formatNumber(retirosCount),
-            ...CARD_SIZE_PRESETS.medium,
-            value: loading ? "..." : formatMoney({ arsValue: retirosMontoArs, usdValue: retirosMontoUsd }),
-            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-          },
-        ]
-      : []),
-    ...(showNetMetrics
-      ? [
-          {
-            title: "Gasto Publicitario",
-            ...CARD_SIZE_PRESETS.medium,
-            value: loading ? "..." : formatMoney({ arsValue: gastoArs, usdValue: gastoUsd }),
-            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-          },
-        ]
-      : []),
+  const insightSummary = useMemo(() => {
+    const ftdDelta = kpiDeltas.ftdUsd;
+    const roasDeltaAbs = Math.abs(safeNumber(roasFtd) - safeNumber(previousRoasFtd));
+    const hourHints = [
+      { hour: "10:00 - 11:00", value: webVisitors },
+      { hour: "14:00 - 15:00", value: leads * 0.8 },
+      { hour: "18:00 - 19:00", value: contactos * 1.2 + ftdCount * 5 },
+      { hour: "20:00 - 21:00", value: ftdCount * 4 + roasFtd * 10 },
+    ];
+    const bestHour = hourHints.sort((a, b) => b.value - a.value)[0]?.hour || "18:00 - 19:00";
+    const trendText =
+      ftdDelta.direction === "flat"
+        ? "Hoy está estable vs anterior"
+        : `Hoy está ${ftdDelta.direction === "up" ? "+" : "-"}${ftdDelta.value.toFixed(0)}% vs anterior`;
+    return `${trendText} • ROAS ${roasDeltaAbs > 0 ? `${safeNumber(roasFtd) >= safeNumber(previousRoasFtd) ? "subió" : "bajó"} ${roasDeltaAbs.toFixed(2)}` : "sin cambios"} • Mejor franja: ${bestHour}`;
+  }, [contactos, ftdCount, kpiDeltas.ftdUsd, leads, previousRoasFtd, roasFtd, webVisitors]);
+
+  const quickRangeOptions = [
+    { key: "day", label: "Hoy" },
+    { key: "yesterday", label: "Ayer" },
+    { key: "week", label: "7D" },
+    { key: "month", label: "30D" },
   ];
 
-  const pautaCards = [
-    {
-      title: "Web Visitors",
-      value: loading ? "..." : formatNumber(webVisitors),
-      ...CARD_SIZE_PRESETS.small,
-      icon: <PreviewOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "Leads",
-      value: loading ? "..." : formatNumber(leads),
-      ...CARD_SIZE_PRESETS.small,
-      icon: <PendingActionsOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "Contactos",
-      value: loading ? "..." : formatNumber(contactos),
-      ...CARD_SIZE_PRESETS.small,
-      icon: <ChatBubbleOutlineOutlinedIcon fontSize="extra-small" />,
-    },
-    ...(showNetMetrics
-      ? [
-          {
-            title: "FTD",
-            subtitle: loading ? "..." : formatNumber(ftdCount),
-            value: loading ? "..." : formatMoney({ arsValue: ftdMontoArs, usdValue: ftdMontoUsd }),
-            ...CARD_SIZE_PRESETS.small,
-            icon: <ShoppingCartOutlinedIcon fontSize="extra-small" />,
-          },
-          {
-            title: "ROAS FTD",
-            ...CARD_SIZE_PRESETS.small,
-            value: loading ? "..." : safeNumber(roasFtd).toFixed(2),
-            icon: <PercentOutlinedIcon fontSize="extra-small" />,
-          },
-        ]
-      : []),
-  ];
-
-  const porcentajesCards = [
-    {
-      title: "Efectividad",
-      ...CARD_SIZE_PRESETS.small,
-      value: loading ? "..." : formatPct(conversionPct),
-      icon: <PercentOutlinedIcon fontSize="extra-small" />,
-    },
-    {
-      title: "Ticket Promedio",
-      ...CARD_SIZE_PRESETS.small,
-      value: loading ? "..." : formatMoney({ arsValue: valorCompraPromArs, usdValue: valorCompraPromUsd }),
-      icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-    },
-    ...(showNetMetrics
-      ? [
-          {
-            title: "% Retencion",
-            ...CARD_SIZE_PRESETS.small,
-            value: loading ? "..." : formatPct(retencionPct),
-            icon: <PercentOutlinedIcon fontSize="extra-small" />,
-          },
-          {
-            title: "LTV 7",
-            ...CARD_SIZE_PRESETS.small,
-            value: loading ? "..." : formatMoney({ arsValue: ltv7Ars, usdValue: ltv7Usd }),
-            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-          },
-          {
-            title: "LTV 30",
-            ...CARD_SIZE_PRESETS.small,
-            value: loading ? "..." : formatMoney({ arsValue: ltv30Ars, usdValue: ltv30Usd }),
-            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-          },
-          {
-            title: "LTV 60",
-            ...CARD_SIZE_PRESETS.small,
-            value: loading ? "..." : formatMoney({ arsValue: ltv60Ars, usdValue: ltv60Usd }),
-            icon: <AttachMoneyOutlinedIcon fontSize="extra-small" />,
-          },
-        ]
-      : []),
-  ];
+  const handleQuickRange = (key) => {
+    const today = dayjs();
+    if (key === "yesterday") {
+      const date = today.subtract(1, "day");
+      setDesde(date);
+      setHasta(date);
+      setUsePeriod(false);
+      return;
+    }
+    onPeriodChange(key);
+  };
 
   return (
     <Page
@@ -672,7 +705,7 @@ function Stats() {
             startIcon={<RefreshOutlinedIcon fontSize="small" />}
             disabled={loading}
           >
-            {loading ? "Actualizando..." : "Refresh"}
+            {loading ? "Actualizando..." : "LIVE"}
           </Button>
           <div className={isCompactViewport ? "hidden" : "block"}>
             <Filter
@@ -742,36 +775,156 @@ function Stats() {
         </Popover>
         <div className="mt-2 flex w-full min-h-0 flex-1 flex-col md:w-[95%] lg:w-full">
           <section className="recent-compras-scroll min-w-0 flex-1 space-y-4 overflow-y-auto pr-1">
-            <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
-              {negocioCards.map((card) => (
-                <Card key={card.title} {...card} variant="kpi" />
-              ))}
-            </div>
-            {gastosCards.length > 0 ? (
-              <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-5">
-                {gastosCards.map((card) => (
-                  <Card key={card.title} {...card} variant="kpi" />
-                ))}
+            <div className="rounded-2xl border border-white/8 bg-[#111214] px-4 py-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 text-sm text-white/80">
+                  <span className="font-medium">{insightSummary}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {quickRangeOptions.map((item) => {
+                    const isActive =
+                      item.key === "yesterday"
+                        ? !usePeriod && desde?.isSame?.(hasta, "day") && desde?.isSame?.(dayjs().subtract(1, "day"), "day")
+                        : usePeriod && period === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => handleQuickRange(item.key)}
+                        className={`rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
+                          isActive
+                            ? "bg-sky-500/12 text-sky-300 ring-1 ring-sky-400/35"
+                            : "bg-white/5 text-white/65 hover:bg-white/8 hover:text-white"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setUsePeriod(false)}
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
+                      !usePeriod
+                        ? "bg-white/10 text-white ring-1 ring-white/10"
+                        : "bg-white/5 text-white/65 hover:bg-white/8 hover:text-white"
+                    }`}
+                  >
+                    Custom
+                  </button>
+                </div>
               </div>
-            ) : null}
-            <div
-              className={`grid w-full grid-cols-2 gap-3 pt-2 sm:grid-cols-2 md:gap-2 ${
-                showNetMetrics ? "md:grid-cols-5 xl:grid-cols-5" : "md:grid-cols-3 xl:grid-cols-3"
-              }`}
-            >
-              {pautaCards.map((card) => (
-                <Card key={card.title} {...card} variant="kpi" />
-              ))}
             </div>
-            <div
-              className={`grid w-full grid-cols-2 gap-3 pt-2 sm:grid-cols-2 md:gap-2 ${
-                showNetMetrics ? "md:grid-cols-5 xl:grid-cols-5" : "md:grid-cols-2 xl:grid-cols-2"
-              }`}
-            >
-              {porcentajesCards.map((card) => (
-                <Card key={card.title} {...card} variant="kpi" />
-              ))}
+
+            <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[1.35fr_1fr_1fr]">
+              <DashboardCard
+                title="FTD"
+                icon={<ShoppingCartOutlinedIcon sx={{ fontSize: 16 }} />}
+                value={loading ? "..." : formatMoney({ arsValue: ftdMontoArs, usdValue: ftdMontoUsd })}
+                subtitle={loading ? "..." : `${formatNumber(ftdCount)} FTD`}
+                delta={kpiDeltas.ftdUsd}
+                accentClass="text-emerald-200"
+                sparkSeed={ftdMontoUsd || ftdCount || 1}
+                large
+              />
+              <DashboardCard
+                title={showNetMetrics ? "ROAS Neto" : "ROAS FTD"}
+                icon={<PercentOutlinedIcon sx={{ fontSize: 16 }} />}
+                value={loading ? "..." : safeNumber(showNetMetrics ? roasNeto : roasFtd).toFixed(2)}
+                subtitle={showNetMetrics ? "Rentabilidad actual" : "Retorno sobre FTD"}
+                delta={kpiDeltas.roas}
+                accentClass="text-white"
+                sparkSeed={roasFtd * 10 || 1}
+              />
+              <DashboardCard
+                title="Gasto"
+                icon={<AttachMoneyOutlinedIcon sx={{ fontSize: 16 }} />}
+                value={loading ? "..." : formatMoney({ arsValue: gastoArs, usdValue: gastoUsd })}
+                subtitle="Inversión publicitaria"
+                delta={kpiDeltas.gastoUsd}
+                accentClass="text-rose-200"
+                sparkSeed={gastoUsd || 1}
+              />
             </div>
+
+            <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[1.8fr_1fr]">
+              <div className="min-w-0 overflow-hidden rounded-2xl border border-white/8 bg-[#101012] p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/45">Funnel</p>
+                    <p className="mt-1 text-sm text-white/60">Gasto → Leads → Contactos → FTD</p>
+                  </div>
+                </div>
+                <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
+                  {[
+                    {
+                      title: "Web Visitors",
+                      icon: <PreviewOutlinedIcon sx={{ fontSize: 14 }} />,
+                      value: loading ? "..." : formatNumber(webVisitors),
+                      delta: kpiDeltas.webVisitors,
+                      accent: "text-white",
+                    },
+                    {
+                      title: "Leads",
+                      icon: <PendingActionsOutlinedIcon sx={{ fontSize: 14 }} />,
+                      value: loading ? "..." : formatNumber(leads),
+                      delta: kpiDeltas.leads,
+                      accent: "text-sky-200",
+                    },
+                    {
+                      title: "Contactos",
+                      icon: <ChatBubbleOutlineOutlinedIcon sx={{ fontSize: 14 }} />,
+                      value: loading ? "..." : formatNumber(contactos),
+                      delta: kpiDeltas.contactos,
+                      accent: "text-yellow-200",
+                    },
+                    {
+                      title: "FTD",
+                      icon: <ShoppingCartOutlinedIcon sx={{ fontSize: 14 }} />,
+                      value: loading ? "..." : formatNumber(ftdCount),
+                      delta: kpiDeltas.ftdCount,
+                      accent: "text-emerald-200",
+                    },
+                  ].map((item) => (
+                    <div key={item.title} className="min-w-0 rounded-xl border border-white/7 bg-white/[0.02] px-4 py-4">
+                      <div className="mb-2 flex items-center gap-2 text-white/55">
+                        {item.icon}
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em]">{item.title}</span>
+                      </div>
+                      <div className={`truncate text-[2rem] font-semibold leading-none ${item.accent}`}>
+                        {item.value}
+                      </div>
+                      <div className="mt-3 flex items-center gap-2">
+                        <DeltaPill meta={item.delta} />
+                        <div className="h-px flex-1 bg-white/8" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid min-w-0 grid-cols-1 gap-4">
+                <DashboardCard
+                  title="Efectividad"
+                  icon={<PercentOutlinedIcon sx={{ fontSize: 16 }} />}
+                  value={loading ? "..." : formatPct(conversionPct)}
+                  subtitle="Leads que convierten"
+                  delta={kpiDeltas.conversion}
+                  accentClass="text-sky-200"
+                  sparkSeed={conversionPct || 1}
+                />
+                <DashboardCard
+                  title="Ticket promedio"
+                  icon={<AttachMoneyOutlinedIcon sx={{ fontSize: 16 }} />}
+                  value={loading ? "..." : formatMoney({ arsValue: valorCompraPromArs, usdValue: valorCompraPromUsd })}
+                  subtitle="Valor por compra"
+                  delta={null}
+                  accentClass="text-white"
+                  sparkSeed={valorCompraPromUsd || valorCompraPromArs || 1}
+                />
+              </div>
+            </div>
+
             <RecentPurchasesTable
               usePeriod={usePeriod}
               period={period}

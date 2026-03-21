@@ -48,8 +48,15 @@ function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
   );
 
   const formatDateTime = (value) => (value ? dayjs(value).format("DD/MM/YYYY HH:mm") : "-");
+  const formatHour = (value) => (value ? dayjs(value).format("HH:mm") : "-");
   const formatArs = (value) => arsFormatter.format(Number(value || 0));
   const formatUsd = (value) => usdFormatter.format(Number(value || 0));
+  const getUsdToneClass = (value) => {
+    const amount = Number(value || 0);
+    if (amount < 5) return "text-rose-200 drop-shadow-[0_0_10px_rgba(251,113,133,0.45)]";
+    if (amount < 10) return "text-amber-200 drop-shadow-[0_0_10px_rgba(251,191,36,0.42)]";
+    return "text-emerald-200 drop-shadow-[0_0_10px_rgba(52,211,153,0.42)]";
+  };
 
   const loadRecent = useCallback(
     async (signal) => {
@@ -59,7 +66,11 @@ function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
           params: queryParams,
           signal,
         });
-        const nextRows = Array.isArray(data) ? data : [];
+        const nextRows = (Array.isArray(data) ? data : []).sort((a, b) => {
+          const usdDiff = Number(b?.monto_usd || 0) - Number(a?.monto_usd || 0);
+          if (usdDiff !== 0) return usdDiff;
+          return dayjs(b?.hora).valueOf() - dayjs(a?.hora).valueOf();
+        });
         setRows((prevRows) => {
           const prevIds = new Set(prevRows.map((item) => item.id));
           const newIds = nextRows
@@ -152,44 +163,48 @@ function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
   }, [triggerRefresh]);
 
   return (
-    <div className="w-full min-w-0 rounded-xl border border-white/10 bg-black/80 text-white p-4 overflow-hidden flex flex-col h-[300px]">
+    <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-white/8 bg-[#101012] p-4 text-white">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-base font-semibold">Nuevas compras (tiempo real)</h3>
-        <span className="text-xs text-white/60">
-          {loading ? "Actualizando..." : "Actualiza al guardar compra"}
-        </span>
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-semibold">Nuevas compras</h3>
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-300">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            LIVE
+          </span>
+        </div>
+        <span className="text-xs text-white/50">{loading ? "Actualizando..." : "Tiempo real"}</span>
       </div>
-      <div className="recent-compras-scroll flex-1 min-h-0 overflow-x-auto overflow-y-auto rounded-lg border border-white/5">
-        <table className="w-full min-w-[780px] text-sm">
+      <div className="recent-compras-scroll overflow-x-auto overflow-y-auto rounded-xl border border-white/6">
+        <table className="w-full min-w-[680px] text-sm">
           <thead>
-            <tr className="border-b border-white/10 text-white/70 bg-black sticky top-0 z-10">
+            <tr className="border-b border-white/10 bg-[#111214] text-white/55 sticky top-0 z-10">
               <th className="text-left py-2 pl-2 pr-3">Codigo</th>
               <th className="text-left py-2 pr-3">Contacto</th>
               <th className="text-left py-2 pr-3">Hora</th>
               <th className="text-left py-2 pr-3">Monto ARS</th>
               <th className="text-left py-2 pr-3">Monto USD</th>
-              <th className="text-left py-2 pr-3">Operador</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((compra) => (
               <tr
                 key={compra.id}
-                className={`border-b border-white/5 transition-colors duration-700 ${
+                className={`border-b border-white/5 transition-colors duration-700 hover:bg-white/[0.03] ${
                   highlightedIds.includes(compra.id) ? "bg-emerald-500/10" : ""
                 }`}
               >
-                <td className="py-2 pl-2 pr-3">{compra.cliente_codigo || compra.username || "-"}</td>
+                <td className="py-3 pl-3 pr-3 font-medium text-white">{compra.cliente_codigo || compra.username || "-"}</td>
                 <td className="py-2 pr-3">{compra.contacto || "-"}</td>
-                <td className="py-2 pr-3">{formatDateTime(compra.hora)}</td>
-                <td className="py-2 pr-3">{formatArs(compra.monto_ars)}</td>
-                <td className="py-2 pr-3">{formatUsd(compra.monto_usd)}</td>
-                <td className="py-2 pr-3">{compra.operador || "-"}</td>
+                <td className="py-2 pr-3 text-white/65">{formatHour(compra.hora)}</td>
+                <td className="py-2 pr-3 text-[13px] text-white/52">{formatArs(compra.monto_ars)}</td>
+                <td className={`py-2 pr-3 text-[18px] font-semibold ${getUsdToneClass(compra?.monto_usd)}`}>
+                  {formatUsd(compra.monto_usd)}
+                </td>
               </tr>
             ))}
             {!loading && rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-4 text-center text-white/60">
+                <td colSpan={5} className="py-4 text-center text-white/60">
                   Sin compras recientes.
                 </td>
               </tr>

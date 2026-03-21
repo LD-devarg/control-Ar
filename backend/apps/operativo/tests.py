@@ -360,6 +360,17 @@ class EventosMetaDiscardTests(TestCase):
         ids = [item["id"] for item in response.data]
         self.assertIn(self.evento.id, ids)
 
+    def test_sin_contacto_excluye_leads_con_contacto_cargado_en_cliente(self):
+        self.cliente.contacto = "5493764397265"
+        self.cliente.save(update_fields=["contacto"])
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/eventos-meta/?tipo=lead&sin_contacto=1")
+
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.data]
+        self.assertNotIn(self.evento.id, ids)
+
     @override_settings(
         LANDING_LEAD_DEDUP_MINUTES=0,
         LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS=7,

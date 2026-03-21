@@ -618,6 +618,14 @@ class ClienteViewSet(viewsets.ModelViewSet):
         solo_contactados = self.request.query_params.get("solo_contactados")
         if solo_contactados in {"1", "true", "True"}:
             qs = qs.filter(contactado=True)
+        search = str(self.request.query_params.get("search") or "").strip()
+        if search:
+            qs = qs.filter(
+                models.Q(codigo__icontains=search)
+                | models.Q(nombre__icontains=search)
+                | models.Q(username__icontains=search)
+                | models.Q(contacto__icontains=search)
+            )
         return qs
 
     def get_serializer_class(self):
@@ -1680,6 +1688,32 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         detalle = str(request.data.get("detail") or "").strip()
         if not motivo:
             raise ValidationError({"reason": "El motivo es obligatorio."})
+        duplicate_of_cliente_id = request.data.get("duplicate_of_cliente_id")
+        duplicate_of_codigo = str(request.data.get("duplicate_of_codigo") or "").strip()
+        duplicate_cliente = None
+        if motivo == "duplicado":
+            if not duplicate_of_cliente_id and not duplicate_of_codigo:
+                raise ValidationError(
+                    {"duplicate_of_cliente_id": "Selecciona el cliente real para marcarlo como duplicado."}
+                )
+            if duplicate_of_cliente_id:
+                duplicate_cliente = (
+                    filter_queryset_by_empresa(Cliente.objects.all(), request, field_name="empresa_id")
+                    .filter(id=duplicate_of_cliente_id)
+                    .only("id", "codigo")
+                    .first()
+                )
+            elif duplicate_of_codigo:
+                duplicate_cliente = (
+                    filter_queryset_by_empresa(Cliente.objects.all(), request, field_name="empresa_id")
+                    .filter(codigo=duplicate_of_codigo)
+                    .only("id", "codigo")
+                    .first()
+                )
+            if not duplicate_cliente:
+                raise ValidationError({"duplicate_of_cliente_id": "No se encontro el cliente duplicado seleccionado."})
+            if duplicate_cliente.id == evento.cliente_id:
+                raise ValidationError({"duplicate_of_cliente_id": "No puedes marcar el lead como duplicado de si mismo."})
 
         payload = dict(evento.data or {})
         payload["lead_discarded"] = True
@@ -1689,6 +1723,9 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         if request.user.is_authenticated:
             payload["lead_discarded_by_id"] = request.user.id
             payload["lead_discarded_by_username"] = request.user.username
+        if duplicate_cliente:
+            payload["lead_duplicate_of_cliente_id"] = duplicate_cliente.id
+            payload["lead_duplicate_of_codigo"] = duplicate_cliente.codigo
 
         evento.data = payload
         evento.save(update_fields=["data"])
@@ -1701,6 +1738,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 "cliente": evento.cliente_id,
                 "motivo": motivo,
                 "descartado_en": payload["lead_discarded_at"],
+                "duplicate_of_cliente_id": duplicate_cliente.id if duplicate_cliente else None,
             },
         )
 

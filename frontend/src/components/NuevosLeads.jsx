@@ -135,7 +135,12 @@ function NuevosLeads() {
     const [discardReason, setDiscardReason] = useState("duplicado");
     const [discardDetail, setDiscardDetail] = useState("");
     const [discarding, setDiscarding] = useState(false);
+    const [duplicateSearch, setDuplicateSearch] = useState("");
+    const [duplicateOptions, setDuplicateOptions] = useState([]);
+    const [duplicateLoading, setDuplicateLoading] = useState(false);
+    const [selectedDuplicate, setSelectedDuplicate] = useState(null);
     const detalleCacheRef = useRef(new Map());
+    const duplicateSearchTimerRef = useRef(null);
     const refreshTimerRef = useRef(null);
     const lastRefreshAtRef = useRef(0);
 
@@ -216,6 +221,9 @@ function NuevosLeads() {
         setClienteDetalle(null);
         setDiscardReason("duplicado");
         setDiscardDetail("");
+        setDuplicateSearch("");
+        setDuplicateOptions([]);
+        setSelectedDuplicate(null);
         if (!lead?.cliente) return;
         const cached = detalleCacheRef.current.get(lead.cliente);
         if (cached) {
@@ -239,15 +247,29 @@ function NuevosLeads() {
         setDiscardReason("duplicado");
         setDiscardDetail("");
         setDiscarding(false);
+        setDuplicateSearch("");
+        setDuplicateOptions([]);
+        setDuplicateLoading(false);
+        setSelectedDuplicate(null);
     };
 
     const handleDiscard = async () => {
         if (!selectedLead?.id || discarding) return;
+        if (discardReason === "duplicado" && !selectedDuplicate?.id) {
+            setError("Selecciona el cliente real antes de descartar como duplicado.");
+            return;
+        }
         setDiscarding(true);
         try {
             await apiClient.post(`/eventos-meta/${selectedLead.id}/discard-lead/`, {
                 reason: discardReason,
                 detail: discardDetail.trim(),
+                ...(discardReason === "duplicado" && selectedDuplicate?.id
+                    ? {
+                        duplicate_of_cliente_id: selectedDuplicate.id,
+                        duplicate_of_codigo: selectedDuplicate.codigo,
+                    }
+                    : {}),
             });
             setLeads((prev) => prev.filter((item) => item.id !== selectedLead.id));
             if (typeof window !== "undefined") {
@@ -266,6 +288,44 @@ function NuevosLeads() {
             setDiscarding(false);
         }
     };
+
+    useEffect(() => {
+        if (discardReason !== "duplicado") {
+            setDuplicateOptions([]);
+            setDuplicateLoading(false);
+            setSelectedDuplicate(null);
+            return;
+        }
+        const term = duplicateSearch.trim();
+        if (duplicateSearchTimerRef.current) {
+            clearTimeout(duplicateSearchTimerRef.current);
+        }
+        if (term.length < 2) {
+            setDuplicateOptions([]);
+            setDuplicateLoading(false);
+            return;
+        }
+        duplicateSearchTimerRef.current = setTimeout(async () => {
+            setDuplicateLoading(true);
+            try {
+                const { data } = await apiClient.get("/clientes/", {
+                    params: { search: term },
+                });
+                const items = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
+                setDuplicateOptions(items.filter((item) => item?.id !== selectedLead?.cliente).slice(0, 8));
+            } catch {
+                setDuplicateOptions([]);
+            } finally {
+                setDuplicateLoading(false);
+            }
+        }, 250);
+
+        return () => {
+            if (duplicateSearchTimerRef.current) {
+                clearTimeout(duplicateSearchTimerRef.current);
+            }
+        };
+    }, [discardReason, duplicateSearch, selectedLead]);
 
     const leadRows = useMemo(() => leads.map((lead) => ({
         ...lead,
@@ -391,6 +451,60 @@ function NuevosLeads() {
                                 style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.35)", background: "transparent", color: "inherit", resize: "vertical" }}
                             />
                         </div>
+                        {discardReason === "duplicado" ? (
+                            <div style={{ marginTop: 12 }}>
+                                <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Cliente real</label>
+                                <input
+                                    type="text"
+                                    value={duplicateSearch}
+                                    onChange={(event) => setDuplicateSearch(event.target.value)}
+                                    disabled={discarding}
+                                    placeholder="Buscar por codigo, nombre, username o contacto"
+                                    style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.35)", background: "transparent", color: "inherit" }}
+                                />
+                                {duplicateLoading ? (
+                                    <p style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>Buscando clientes...</p>
+                                ) : null}
+                                {selectedDuplicate ? (
+                                    <div style={{ marginTop: 8, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(34,197,94,0.4)", background: "rgba(34,197,94,0.08)" }}>
+                                        <strong>{selectedDuplicate.codigo || `Cliente #${selectedDuplicate.id}`}</strong>
+                                        {" · "}
+                                        {selectedDuplicate.nombre || selectedDuplicate.username || selectedDuplicate.contacto || "-"}
+                                    </div>
+                                ) : null}
+                                {!selectedDuplicate && duplicateOptions.length ? (
+                                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                                        {duplicateOptions.map((option) => (
+                                            <button
+                                                key={option.id}
+                                                type="button"
+                                                onClick={() => setSelectedDuplicate(option)}
+                                                disabled={discarding}
+                                                style={{ textAlign: "left", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.25)", background: "rgba(15,23,42,0.35)", color: "inherit", cursor: "pointer" }}
+                                            >
+                                                <strong>{option.codigo || `Cliente #${option.id}`}</strong>
+                                                {" · "}
+                                                {option.nombre || option.username || option.contacto || "-"}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : null}
+                                {selectedDuplicate ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedDuplicate(null);
+                                            setDuplicateSearch("");
+                                            setDuplicateOptions([]);
+                                        }}
+                                        disabled={discarding}
+                                        style={{ marginTop: 8, border: 0, background: "transparent", color: "#93c5fd", cursor: "pointer", padding: 0 }}
+                                    >
+                                        Cambiar cliente seleccionado
+                                    </button>
+                                ) : null}
+                            </div>
+                        ) : null}
                     </>
                 )}
             </ModalBase>

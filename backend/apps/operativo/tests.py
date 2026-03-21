@@ -303,6 +303,39 @@ class EventosMetaDiscardTests(TestCase):
         self.assertEqual(self.evento.data.get("lead_discard_detail"), "Detectado manualmente")
         self.assertEqual(self.evento.data.get("lead_discarded_by_username"), "operadortest")
 
+    def test_descartar_duplicado_exige_cliente_destino(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            f"/eventos-meta/{self.evento.id}/discard-lead/",
+            {"reason": "duplicado"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("duplicate_of_cliente_id", response.data)
+
+    @patch("apps.operativo.views.publish_empresa_event")
+    def test_descartar_duplicado_guarda_cliente_relacionado(self, mock_publish_empresa_event):
+        duplicate_cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Cliente Real",
+            username="clientereal",
+            codigo="665544",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            f"/eventos-meta/{self.evento.id}/discard-lead/",
+            {"reason": "duplicado", "duplicate_of_cliente_id": duplicate_cliente.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.evento.refresh_from_db()
+        self.assertEqual(self.evento.data.get("lead_duplicate_of_cliente_id"), duplicate_cliente.id)
+        self.assertEqual(self.evento.data.get("lead_duplicate_of_codigo"), "665544")
+
     def test_sin_contacto_excluye_leads_descartados(self):
         self.evento.data = {
             "resultado": "creado",

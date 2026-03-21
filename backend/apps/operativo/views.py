@@ -1594,7 +1594,9 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         )
         sin_contacto = self.request.query_params.get("sin_contacto")
         if sin_contacto in {"1", "true", "True"}:
-            qs = qs.filter(tipo="lead", contactado=False).exclude(data__lead_discarded=True)
+            qs = qs.filter(tipo="lead", contactado=False).filter(
+                models.Q(data__lead_discarded=False) | models.Q(data__lead_discarded__isnull=True)
+            )
         qs = qs.order_by("-creado_en")
 
         if self.action == "list":

@@ -66,9 +66,11 @@ function Home() {
           </Stack>
         </div>
         <div className="mt-8 w-full flex justify-center">
-          {activeForm === "compra" && <FormCompra />}
-          {activeForm === "contacto" && <FormContacto />}
-          {showRetiros && activeForm === "retiro" && <FormRetiro />}
+          <div className="mx-auto w-full max-w-[420px] max-h-[calc(100vh-240px)] overflow-y-auto px-1 flex justify-center">
+            {activeForm === "compra" && <FormCompra />}
+            {activeForm === "contacto" && <FormContacto />}
+            {showRetiros && activeForm === "retiro" && <FormRetiro />}
+          </div>
         </div>
       </Page>
   );

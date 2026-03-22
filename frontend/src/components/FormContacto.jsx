@@ -29,7 +29,9 @@ export default function FormContacto() {
   const { tenantId: empresaId, kommoEnabled } = useTenant();
   const fieldSx = {
     '& .MuiInputBase-input': { color },
-    '& .MuiInputLabel-root': { color },
+    '& .MuiInputLabel-root': {
+      color,
+    },
     '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: color },
     '&:hover .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: color },
     '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: color },
@@ -224,7 +226,13 @@ export default function FormContacto() {
             {option.label || buildClienteDisplayLabel(option)}
           </li>
         )}
-        renderInput={(params) => <TextField {...params} label="Seleccione el cliente" sx={fieldSx} />}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Seleccione el cliente"
+            sx={fieldSx}
+          />
+        )}
       />
       {needsMissingDataDecision ? (
         <Stack spacing={1.25}>

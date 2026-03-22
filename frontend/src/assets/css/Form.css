@@ -1,8 +1,33 @@
 .form-stack {
-  width: 300px;
+  padding-top: 6px;
+  width: 100%;
+  max-width: 360px;
+  min-width: 0;
 }
 
 .form-autocomplete .MuiInputBase-root,
 .form-stack .MuiInputBase-root {
   min-height: 40px;
+}
+
+.form-stack .MuiAutocomplete-root,
+.form-stack .MuiFormControl-root,
+.form-stack .MuiTextField-root,
+.form-stack .MuiButton-root {
+  width: 100%;
+  min-width: 0;
+}
+
+.form-stack .MuiFormControlLabel-root {
+  margin-right: 0;
+}
+
+.form-stack .MuiAlert-root {
+  width: 100%;
+  min-width: 0;
+}
+
+.form-stack .MuiAlert-message,
+.form-stack .MuiFormControlLabel-label {
+  overflow-wrap: anywhere;
 }

@@ -23,18 +23,18 @@ function TabletLayout() {
                 <User />
             </header>
             <main className="flex grow overflow-hidden flex-row p-5 min-w-0">
-                <div className="flex-[3] min-w-0 h-full min-h-0">
+                <div className={`${showNuevosLeads || showEventos ? "flex-[2.35]" : "flex-[3]"} min-w-0 h-full min-h-0`}>
                     <Outlet />
                 </div>
                 <div>
                 </div>
                 {showNuevosLeads && (
-                  <div className="flex-[1] min-w-0 ml-4">
+                  <div className="flex-[1.35] min-w-0 ml-4">
                     <NuevosLeads />
                   </div>
                 )}
                 {showEventos && (
-                  <div className="flex-[1] min-w-0 ml-4 h-[82vh] self-start">
+                  <div className="flex-[1.35] min-w-0 ml-4 h-[82vh] self-start">
                     <StatsEventsAside fullHeight />
                   </div>
                 )}

@@ -47,6 +47,33 @@ function buildWhatsappUrl(number, text) {
     return `https://wa.me/${normalizedNumber}?text=${encoded}`;
 }
 
+function openReservedWindow() {
+    if (typeof window === "undefined" || typeof window.open !== "function") return null;
+    const popup = window.open("", "_blank");
+    if (!popup) return null;
+    try {
+        popup.opener = null;
+    } catch {
+        // ignore opener hardening failures
+    }
+    return popup;
+}
+
+function navigateToWhatsapp(url, reservedWindow = null) {
+    if (!url || typeof window === "undefined") return;
+    if (reservedWindow && !reservedWindow.closed) {
+        try {
+            reservedWindow.location.replace(url);
+            reservedWindow.focus?.();
+            return true;
+        } catch {
+            // fall back to current tab navigation
+        }
+    }
+    window.location.assign(url);
+    return false;
+}
+
 function generateLeadCode() {
     return String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
 }
@@ -515,9 +542,10 @@ export default function NuevoLead({
             codigo: generatedCodigo,
         });
         const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
+        const reservedWindow = openReservedWindow();
 
         if (isTestMode) {
-            window.open(currentWhatsappUrl, "_blank", "noopener,noreferrer");
+            navigateToWhatsapp(currentWhatsappUrl, reservedWindow);
             return;
         }
 
@@ -543,7 +571,7 @@ export default function NuevoLead({
         tryFlushQueue();
         checkQueueHealth();
 
-        window.open(currentWhatsappUrl, "_blank", "noopener,noreferrer");
+        navigateToWhatsapp(currentWhatsappUrl, reservedWindow);
         if (typeof onWhatsappOpened === "function") {
             onWhatsappOpened();
         }
@@ -562,6 +590,8 @@ export default function NuevoLead({
 
         submittingLeadRef.current = true;
         setIsRedirecting(true);
+        const reservedWindow = openReservedWindow();
+        let usedReservedWindow = false;
         try {
             const fbp = getCookieValue("_fbp") || undefined;
             const fbc = getCookieValue("_fbc") || undefined;
@@ -582,7 +612,7 @@ export default function NuevoLead({
                     codigo: generatedCodigo,
                 });
                 const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
-                window.open(currentWhatsappUrl, "_blank", "noopener,noreferrer");
+                usedReservedWindow = navigateToWhatsapp(currentWhatsappUrl, reservedWindow);
                 return;
             }
 
@@ -636,11 +666,18 @@ export default function NuevoLead({
             });
             const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
 
-            window.open(currentWhatsappUrl, "_blank", "noopener,noreferrer");
+            usedReservedWindow = navigateToWhatsapp(currentWhatsappUrl, reservedWindow);
             if (typeof onWhatsappOpened === "function") {
                 onWhatsappOpened();
             }
         } finally {
+            if (!usedReservedWindow && reservedWindow && !reservedWindow.closed) {
+                try {
+                    reservedWindow.close();
+                } catch {
+                    // ignore close failures
+                }
+            }
             submittingLeadRef.current = false;
             window.setTimeout(() => {
                 setIsRedirecting(false);

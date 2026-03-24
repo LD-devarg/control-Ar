@@ -1815,12 +1815,20 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             if not cliente_id:
                 raise ValidationError("cliente_id requerido para contact/purchase.")
             cliente = get_object_or_404(Cliente, id=cliente_id)
+            landing_token = request.data.get("landing_token")
 
             _resolve_target_empresa_for_write(
                 request,
                 cliente_empresa_id=cliente.empresa_id,
                 empresa_input=request.data.get("empresa") or request.data.get("empresa_id"),
             )
+
+            if landing_token:
+                landing = get_object_or_404(Landing, token=landing_token, activo=True)
+                if landing.empresa_id != cliente.empresa_id:
+                    raise ValidationError("La landing indicada no pertenece a la misma empresa del cliente.")
+            else:
+                landing = _resolve_latest_lead_landing(cliente_id=cliente.id)
 
             payload = {
                 "email": request.data.get("email"),
@@ -1837,7 +1845,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 cliente=cliente,
                 empresa=cliente.empresa,
                 operador=request.user,
-                landing=None,
+                landing=landing,
                 fbp=request.data.get("fbp"),
                 fbc=request.data.get("fbc"),
                 ip_address=_client_first_ip(request, cliente),

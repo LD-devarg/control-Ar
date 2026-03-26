@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from django.db import connection
 from django.utils import timezone
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 

@@ -360,6 +360,30 @@ class EventosMetaDiscardTests(TestCase):
         ids = [item["id"] for item in response.data]
         self.assertIn(self.evento.id, ids)
 
+    @patch("apps.operativo.views.publish_empresa_event")
+    def test_clientes_lista_expone_codigo_duplicado(self, mock_publish_empresa_event):
+        duplicate_cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Cliente Real",
+            username="clienterealagenda",
+            codigo="665544",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        discard_response = self.client.post(
+            f"/eventos-meta/{self.evento.id}/discard-lead/",
+            {"reason": "duplicado", "duplicate_of_cliente_id": duplicate_cliente.id},
+            format="json",
+        )
+        self.assertEqual(discard_response.status_code, 200)
+
+        response = self.client.get("/clientes/")
+
+        self.assertEqual(response.status_code, 200)
+        rows = response.data if isinstance(response.data, list) else response.data.get("results", [])
+        row = next(item for item in rows if item["id"] == self.cliente.id)
+        self.assertEqual(row["duplicado_codigo"], "665544")
+
     @override_settings(
         LANDING_LEAD_DEDUP_MINUTES=0,
         LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS=7,

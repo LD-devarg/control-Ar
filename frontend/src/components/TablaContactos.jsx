@@ -24,6 +24,11 @@ const baseColumns = [
     dataKey: 'codigo',
   },
   {
+    width: 120,
+    label: 'Duplicado',
+    dataKey: 'duplicado_codigo',
+  },
+  {
     width: 130,
     label: 'Contactado',
     dataKey: 'contactado_estado',

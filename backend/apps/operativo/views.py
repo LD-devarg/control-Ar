@@ -581,16 +581,6 @@ class ClienteViewSet(viewsets.ModelViewSet):
 
         compras_base = Compra.objects.filter(cliente_id=OuterRef("pk")).values("cliente_id")
         retiros_base = Retiro.objects.filter(cliente_id=OuterRef("pk")).values("cliente_id")
-        duplicate_leads_base = (
-            EventosMeta.objects.filter(
-                cliente_id=OuterRef("pk"),
-                tipo="lead",
-                data__lead_discarded=True,
-                data__lead_discard_reason="duplicado",
-            )
-            .order_by("-creado_en")
-        )
-
         qs = qs.annotate(
             total_bonos_ars=Coalesce(
                 Subquery(compras_base.annotate(v=Sum("bono_ars")).values("v")[:1]),
@@ -622,10 +612,6 @@ class ClienteViewSet(viewsets.ModelViewSet):
                     cliente_id=OuterRef("pk"),
                     tipo="contact",
                 )
-            ),
-            duplicado_codigo=Coalesce(
-                Subquery(duplicate_leads_base.values("data__lead_duplicate_of_codigo")[:1]),
-                Value(""),
             ),
         )
         solo_contactados = self.request.query_params.get("solo_contactados")

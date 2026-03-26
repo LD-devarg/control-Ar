@@ -102,10 +102,6 @@ export default function FormContacto() {
         writeCache(normalized);
         if (mounted) {
           setUsuarios(normalized);
-          setSelectedCliente((current) => {
-            if (!current?.id) return current;
-            return normalized.find((item) => item.id === current.id) || null;
-          });
         }
       } finally {
         if (!silent && mounted) setLoading(false);
@@ -127,11 +123,7 @@ export default function FormContacto() {
       }
     };
     const unsubscribeRealtime = subscribeRealtimeEvents((message) => {
-      if (
-        message?.type === "lead_created" ||
-        message?.type === "contact_created" ||
-        message?.type === "lead_discarded"
-      ) {
+      if (message?.type === "lead_created" || message?.type === "contact_created") {
         load({ silent: true });
       }
     });

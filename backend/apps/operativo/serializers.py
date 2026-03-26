@@ -44,7 +44,6 @@ class ClienteSerializer(serializers.ModelSerializer):
     total_retiros_ars = serializers.SerializerMethodField()
     total_retiros_usd = serializers.SerializerMethodField()
     contactado = serializers.BooleanField(read_only=True)
-    duplicado_codigo = serializers.SerializerMethodField()
 
     def _decimal_or_zero(self, obj, attr_name):
         value = getattr(obj, attr_name, None)
@@ -65,24 +64,6 @@ class ClienteSerializer(serializers.ModelSerializer):
     def get_total_retiros_usd(self, obj):
         return self._decimal_or_zero(obj, "total_retiros_usd")
 
-    def get_duplicado_codigo(self, obj):
-        annotated_value = getattr(obj, "duplicado_codigo", None)
-        if annotated_value not in (None, ""):
-            return annotated_value
-
-        latest_duplicate_event = (
-            EventosMeta.objects.filter(
-                cliente_id=obj.id,
-                tipo="lead",
-                data__lead_discarded=True,
-                data__lead_discard_reason="duplicado",
-            )
-            .order_by("-creado_en")
-            .values_list("data__lead_duplicate_of_codigo", flat=True)
-            .first()
-        )
-        return latest_duplicate_event or ""
-
     class Meta:
         model = Cliente
         fields = [
@@ -102,7 +83,6 @@ class ClienteSerializer(serializers.ModelSerializer):
             "total_retiros_ars",
             "total_retiros_usd",
             "contactado",
-            "duplicado_codigo",
             "first_touch_at",
             "fbc",
             "fbp",

@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from django.db import connection
 from django.utils import timezone
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -22,7 +22,7 @@ except Exception:  # pragma: no cover
 
 
 class HealthView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     HEARTBEAT_MAX_AGE_MINUTES = 15
 
     @staticmethod
@@ -92,8 +92,6 @@ class HealthView(APIView):
         return {"summary": summary, "rows": rows}
 
     def get(self, request):
-        if not getattr(request, "user", None) or not request.user.is_authenticated:
-            return Response({"ok": True, "service": "backend", "visibility": "public"})
         if not request.user.is_superuser:
             return Response({"detail": "Solo superuser."}, status=403)
         backend_ok = True

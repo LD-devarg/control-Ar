@@ -563,6 +563,8 @@ class ClienteViewSet(viewsets.ModelViewSet):
     EDITABLE_FIELDS = {"nombre", "contacto", "username"}
 
     def get_permissions(self):
+        if self.request.method == "OPTIONS":
+            return [AllowAny()]
         if self.action in {"create", "reservar_codigo"}:
             return [AllowAny()]
         return [IsAuthenticated(), RoleBasedPermission()]
@@ -1341,6 +1343,8 @@ class LandingViewSet(viewsets.ModelViewSet):
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def get_permissions(self):
+        if self.request.method == "OPTIONS":
+            return [AllowAny()]
         if self.action in {"whatsapp_rotacion", "whatsapp_rotacion_consume", "public"}:
             return [AllowAny()]
         return [IsAuthenticated(), RoleBasedPermission()]
@@ -1493,6 +1497,8 @@ class LandingVisitViewSet(viewsets.ModelViewSet):
     http_method_names = ["get", "post"]
 
     def get_permissions(self):
+        if self.request.method == "OPTIONS":
+            return [AllowAny()]
         if self.action in {"create", "reservar_codigo"}:
             return [AllowAny()]
         return [IsAuthenticated(), RoleBasedPermission()]

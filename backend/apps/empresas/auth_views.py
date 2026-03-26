@@ -1,7 +1,7 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.empresas.models import Usuario
-from apps.empresas.notificaciones import crear_notificacion_estructural
+from apps.empresas.tasks import create_login_notification
 
 
 class LoggedTokenObtainPairView(TokenObtainPairView):
@@ -18,11 +18,5 @@ class LoggedTokenObtainPairView(TokenObtainPairView):
         if not user:
             return response
 
-        crear_notificacion_estructural(
-            tipo="login",
-            actor=user,
-            empresa=user.empresa,
-            mensaje=f"El operador {user.username} se logueo.",
-            payload={},
-        )
+        create_login_notification.delay(user.id)
         return response

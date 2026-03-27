@@ -22,7 +22,7 @@ class EmpresaRealtimeConsumer(AsyncJsonWebsocketConsumer):
         if not user or not user.is_authenticated:
             await self.close(code=4403)
             return
-        if not (user.is_superuser or is_admin(user) or is_operador(user) or is_pauta(user)):
+        if not await self._user_has_realtime_access(user):
             await self.close(code=4403)
             return
 
@@ -90,3 +90,7 @@ class EmpresaRealtimeConsumer(AsyncJsonWebsocketConsumer):
         if user.empresa_id and int(user.empresa_id) in allowed_ids:
             return int(user.empresa_id)
         return int(allowed_ids[0])
+
+    @database_sync_to_async
+    def _user_has_realtime_access(self, user):
+        return user.is_superuser or is_admin(user) or is_operador(user) or is_pauta(user)

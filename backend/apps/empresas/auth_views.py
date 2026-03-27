@@ -1,8 +1,12 @@
+import logging
+
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.empresas.models import Usuario
 from apps.empresas.tasks import create_login_notification
+
+logger = logging.getLogger(__name__)
 
 
 class LoggedTokenObtainPairView(TokenObtainPairView):
@@ -21,5 +25,11 @@ class LoggedTokenObtainPairView(TokenObtainPairView):
         if not user:
             return response
 
-        create_login_notification.delay(user.id)
+        try:
+            create_login_notification.delay(user.id)
+        except Exception:
+            logger.exception(
+                "No se pudo encolar la notificacion de login para user_id=%s",
+                user.id,
+            )
         return response

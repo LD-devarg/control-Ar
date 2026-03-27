@@ -8,6 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.pauta.models import CredencialesMeta
+from apps.pauta.servicios.credenciales import credencial_aplica_a_empresa, credencial_principal_para_empresa
 from apps.pauta.servicios.crypto import decrypt_token
 from apps.empresas.models import Empresa
 
@@ -50,9 +51,9 @@ def obtener_credenciales_meta(empresa_id: int, landing=None) -> CredencialesMeta
     landing_cred_id = getattr(landing, "credencial_meta_id", None)
     if landing_cred_id:
         cred = CredencialesMeta.objects.filter(id=landing_cred_id).first()
-        if cred:
+        if cred and credencial_aplica_a_empresa(cred, empresa_id):
             return cred
-    return CredencialesMeta.objects.filter(empresa_id=empresa_id).order_by("id").first()
+    return credencial_principal_para_empresa(empresa_id=empresa_id)
 
 
 def _resolve_target_credentials(

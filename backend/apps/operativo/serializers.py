@@ -3,7 +3,7 @@ import re
 from django.db import IntegrityError, transaction
 from .codigo_reservas import get_reservation_by_token, is_code_reserved
 from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit, Retiro, generar_codigo_corto
-from apps.pauta.models import CredencialesMeta
+from apps.pauta.servicios.credenciales import credencial_aplica_a_empresa, credencial_principal_para_empresa
 from apps.empresas.scope import get_user_empresa_ids
 
 
@@ -256,7 +256,7 @@ class LandingSerializer(serializers.ModelSerializer):
         cred = obj.credencial_meta
         if cred:
             return cred.pixel_id
-        cred = CredencialesMeta.objects.filter(empresa=obj.empresa).order_by("id").first()
+        cred = credencial_principal_para_empresa(empresa_id=obj.empresa_id)
         return cred.pixel_id if cred else None
 
     def validate(self, attrs):
@@ -266,7 +266,10 @@ class LandingSerializer(serializers.ModelSerializer):
         if (
             credencial_meta
             and empresa
-            and credencial_meta.bm.organizacion_id != empresa.organizacion_id
+            and (
+                credencial_meta.bm.organizacion_id != empresa.organizacion_id
+                or not credencial_aplica_a_empresa(credencial_meta, empresa.id)
+            )
         ):
             raise serializers.ValidationError(
                 "La credencial Meta seleccionada no pertenece a la organizacion de la landing."
@@ -274,7 +277,10 @@ class LandingSerializer(serializers.ModelSerializer):
         if (
             credencial_meta_extra
             and empresa
-            and credencial_meta_extra.bm.organizacion_id != empresa.organizacion_id
+            and (
+                credencial_meta_extra.bm.organizacion_id != empresa.organizacion_id
+                or not credencial_aplica_a_empresa(credencial_meta_extra, empresa.id)
+            )
         ):
             raise serializers.ValidationError(
                 "La credencial Meta extra no pertenece a la organizacion de la landing."

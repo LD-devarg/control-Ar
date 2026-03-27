@@ -11,8 +11,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.empresas.models import Empresa
-from apps.pauta.models import CredencialesMeta, CuentaPublicitaria, RendimientoPautaDiario
-from apps.pauta.servicios.crypto import decrypt_token
+from apps.pauta.models import CuentaPublicitaria, RendimientoPautaDiario
+from apps.pauta.servicios.credenciales import tokens_para_empresa
 
 META_API_VERSION = os.getenv("META_API_VERSION", "v18.0")
 META_TIMEOUT_SECONDS = float(os.getenv("META_TIMEOUT_SECONDS", "15"))
@@ -40,31 +40,7 @@ PAUTA_SYNC_START_DATE = getattr(settings, "PAUTA_SYNC_START_DATE", None)
 
 
 def _credential_tokens_for_empresa(*, empresa_id: int, cuenta: CuentaPublicitaria | None = None) -> list[str]:
-    creds = list(CredencialesMeta.objects.filter(empresa_id=empresa_id).only("bm_id", "token_acceso_encrypted").order_by("id"))
-    if not creds:
-        return []
-
-    ordered = []
-    if cuenta is not None:
-        same_bm = [cred for cred in creds if cred.bm_id == cuenta.bm_id]
-        other = [cred for cred in creds if cred.bm_id != cuenta.bm_id]
-        ordered = same_bm + other
-    else:
-        ordered = creds
-
-    tokens: list[str] = []
-    seen = set()
-    for cred in ordered:
-        try:
-            token = decrypt_token(cred.token_acceso_encrypted)
-        except Exception:
-            continue
-        token = str(token or "").strip()
-        if not token or token in seen:
-            continue
-        seen.add(token)
-        tokens.append(token)
-    return tokens
+    return tokens_para_empresa(empresa_id=empresa_id, cuenta=cuenta)
 
 
 def _to_decimal(value, default="0") -> Decimal:

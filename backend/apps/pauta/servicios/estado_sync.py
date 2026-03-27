@@ -13,12 +13,11 @@ from apps.pauta.models import (
     Anuncio,
     Campaña,
     ConjuntoAnuncios,
-    CredencialesMeta,
     Creative,
     CuentaPublicitaria,
     PautaAsset,
 )
-from apps.pauta.servicios.crypto import decrypt_token
+from apps.pauta.servicios.credenciales import tokens_para_empresa
 from apps.pauta.servicios.telegram_alerts import send_status_change_alert
 
 META_API_VERSION = "v18.0"
@@ -28,31 +27,7 @@ PAUTA_SYNC_START_DATE = getattr(settings, "PAUTA_SYNC_START_DATE", None)
 
 
 def _credential_tokens_for_empresa(*, empresa_id: int, cuenta: CuentaPublicitaria | None = None) -> list[str]:
-    creds = list(CredencialesMeta.objects.filter(empresa_id=empresa_id).only("bm_id", "token_acceso_encrypted").order_by("id"))
-    if not creds:
-        return []
-
-    ordered = []
-    if cuenta is not None:
-        same_bm = [cred for cred in creds if cred.bm_id == cuenta.bm_id]
-        other = [cred for cred in creds if cred.bm_id != cuenta.bm_id]
-        ordered = same_bm + other
-    else:
-        ordered = creds
-
-    tokens: list[str] = []
-    seen = set()
-    for cred in ordered:
-        try:
-            token = decrypt_token(cred.token_acceso_encrypted)
-        except Exception:
-            continue
-        token = str(token or "").strip()
-        if not token or token in seen:
-            continue
-        seen.add(token)
-        tokens.append(token)
-    return tokens
+    return tokens_para_empresa(empresa_id=empresa_id, cuenta=cuenta)
 
 
 def _safe_request(path: str, token: str, fields: str, params: dict | None = None) -> dict:

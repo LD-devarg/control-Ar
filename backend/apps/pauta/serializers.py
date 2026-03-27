@@ -208,7 +208,10 @@ class CampañaSerializer(serializers.ModelSerializer):
             validated_data["fecha_inicio"] = timezone.localdate()
         if not validated_data.get("meta_id") and create_meta_draft:
             try:
-                token = get_meta_token_for_empresa(validated_data["empresa"].id)
+                token = get_meta_token_for_empresa(
+                    validated_data["empresa"].id,
+                    cuenta=validated_data["cuenta_publicitaria"],
+                )
                 meta_id = create_campaign_in_meta(
                     cuenta_publicitaria=validated_data["cuenta_publicitaria"],
                     token=token,
@@ -279,7 +282,10 @@ class ConjuntoAnunciosSerializer(serializers.ModelSerializer):
             if not campana.meta_id:
                 raise serializers.ValidationError("La campaña no tiene meta_id. No se puede crear borrador en Meta.")
             try:
-                token = get_meta_token_for_empresa(validated_data["empresa"].id)
+                token = get_meta_token_for_empresa(
+                    validated_data["empresa"].id,
+                    cuenta=campana.cuenta_publicitaria,
+                )
                 meta_id = create_adset_in_meta(
                     cuenta_publicitaria=campana.cuenta_publicitaria,
                     token=token,
@@ -354,7 +360,10 @@ class AnuncioSerializer(serializers.ModelSerializer):
             if not adset.meta_id:
                 raise serializers.ValidationError("El adset no tiene meta_id. No se puede crear borrador en Meta.")
             try:
-                token = get_meta_token_for_empresa(validated_data["empresa"].id)
+                token = get_meta_token_for_empresa(
+                    validated_data["empresa"].id,
+                    cuenta=campana.cuenta_publicitaria,
+                )
                 creative_meta_id = create_creative_in_meta(
                     cuenta_publicitaria=campana.cuenta_publicitaria,
                     token=token,
@@ -441,6 +450,11 @@ class GastoDiarioSerializer(serializers.ModelSerializer):
 
 
 class CredencialesMetaSerializer(serializers.ModelSerializer):
+    empresas = serializers.PrimaryKeyRelatedField(
+        queryset=Empresa.objects.select_related("organizacion").all(),
+        many=True,
+        required=False,
+    )
     token_acceso_encrypted = serializers.CharField(write_only=True)
     token_configurado = serializers.SerializerMethodField(read_only=True)
 
@@ -449,6 +463,7 @@ class CredencialesMetaSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "empresa",
+            "empresas",
             "bm",
             "nombre",
             "pixel_id",
@@ -470,30 +485,63 @@ class CredencialesMetaSerializer(serializers.ModelSerializer):
         instance = getattr(self, "instance", None)
 
         empresa = _resolve_empresa_for_write(attrs, instance, user)
+        empresas = list(attrs.get("empresas") or [])
         bm = attrs.get("bm") or getattr(instance, "bm", None)
 
         if empresa is None:
             raise serializers.ValidationError("Empresa requerida.")
         if not bm:
             raise serializers.ValidationError("BM requerido.")
-        if empresa.organizacion_id != bm.organizacion_id:
-            raise serializers.ValidationError("El BM no pertenece a la organizacion de la empresa seleccionada.")
-        if not bm.empresas.filter(id=empresa.id).exists():
-            raise serializers.ValidationError("El BM seleccionado no esta vinculado a la empresa.")
+        if empresa not in empresas:
+            empresas.append(empresa)
+        if not empresas and instance is not None:
+            empresas = list(instance.empresas.all())
+            if instance.empresa and instance.empresa not in empresas:
+                empresas.insert(0, instance.empresa)
+
+        allowed_ids = set(get_user_empresa_ids(user)) if user and not user.is_superuser else set()
+        normalized_empresas: list[Empresa] = []
+        seen_ids: set[int] = set()
+        for selected_empresa in empresas:
+            if selected_empresa.id in seen_ids:
+                continue
+            seen_ids.add(selected_empresa.id)
+            if selected_empresa.organizacion_id != bm.organizacion_id:
+                raise serializers.ValidationError("El BM no pertenece a la organizacion de una de las empresas seleccionadas.")
+            if not bm.empresas.filter(id=selected_empresa.id).exists():
+                raise serializers.ValidationError("El BM seleccionado no esta vinculado a una de las empresas seleccionadas.")
+            if user and not user.is_superuser and selected_empresa.id not in allowed_ids:
+                raise serializers.ValidationError("No tenes acceso a una de las empresas seleccionadas.")
+            normalized_empresas.append(selected_empresa)
 
         attrs["empresa"] = empresa
+        attrs["empresas"] = normalized_empresas
         return attrs
 
     def create(self, validated_data):
+        empresas = validated_data.pop("empresas", [])
         token = validated_data.pop("token_acceso_encrypted")
         validated_data["token_acceso_encrypted"] = encrypt_token(token)
-        return super().create(validated_data)
+        instance = super().create(validated_data)
+        if empresas:
+            instance.empresas.set(empresas)
+        elif instance.empresa_id:
+            instance.empresas.set([instance.empresa_id])
+        return instance
 
     def update(self, instance, validated_data):
+        empresas = validated_data.pop("empresas", None)
         token = validated_data.pop("token_acceso_encrypted", None)
         if token not in (None, ""):
             validated_data["token_acceso_encrypted"] = encrypt_token(token)
-        return super().update(instance, validated_data)
+        instance = super().update(instance, validated_data)
+        if empresas is not None:
+            if instance.empresa_id and all(item.id != instance.empresa_id for item in empresas):
+                empresas = [instance.empresa, *empresas]
+            instance.empresas.set(empresas)
+        elif instance.empresa_id and not instance.empresas.filter(id=instance.empresa_id).exists():
+            instance.empresas.add(instance.empresa_id)
+        return instance
 
 
 class FanPageSerializer(serializers.ModelSerializer):

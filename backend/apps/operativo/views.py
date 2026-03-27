@@ -48,6 +48,7 @@ from .serializers import (
 from .servicios.calculos import calcular_compra
 from .servicios.enviador import enviar_evento_meta
 from apps.pauta.servicios.insights import fetch_meta_page_views
+from apps.pauta.servicios.credenciales import credencial_aplica_a_empresa
 from apps.pauta.servicios.telegram_alerts import send_lead_queue_alert
 from apps.pauta.models import CredencialesMeta, RendimientoPautaDiario
 from .realtime import publish_empresa_event
@@ -1384,8 +1385,17 @@ class LandingViewSet(viewsets.ModelViewSet):
         if not empresa:
             raise ValidationError("Empresa requerida.")
         credencial_meta = serializer.validated_data.get("credencial_meta")
-        if credencial_meta and credencial_meta.bm.organizacion_id != empresa.organizacion_id:
+        credencial_meta_extra = serializer.validated_data.get("credencial_meta_extra")
+        if credencial_meta and (
+            credencial_meta.bm.organizacion_id != empresa.organizacion_id
+            or not credencial_aplica_a_empresa(credencial_meta, empresa.id)
+        ):
             raise ValidationError("La credencial Meta seleccionada no pertenece a la organizacion de la empresa.")
+        if credencial_meta_extra and (
+            credencial_meta_extra.bm.organizacion_id != empresa.organizacion_id
+            or not credencial_aplica_a_empresa(credencial_meta_extra, empresa.id)
+        ):
+            raise ValidationError("La credencial Meta extra no pertenece a la organizacion de la empresa.")
         serializer.save(empresa=empresa)
 
     @action(detail=False, methods=["get"], permission_classes=[AllowAny], url_path="whatsapp-rotacion")
@@ -1885,7 +1895,10 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 except (TypeError, ValueError):
                     raise ValidationError("credencial_ids contiene valores invalidos.")
             selected_credentials = list(
-                CredencialesMeta.objects.filter(id__in=normalized_ids, empresa_id=evento.empresa_id).order_by("id")
+                CredencialesMeta.objects.filter(id__in=normalized_ids)
+                .filter(models.Q(empresa_id=evento.empresa_id) | models.Q(empresas__id=evento.empresa_id))
+                .distinct()
+                .order_by("id")
             )
             if len(selected_credentials) != len(set(normalized_ids)):
                 raise ValidationError("Alguna credencial seleccionada no pertenece a la empresa del evento.")

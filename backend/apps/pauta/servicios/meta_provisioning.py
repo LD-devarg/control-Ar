@@ -6,7 +6,8 @@ from decimal import Decimal, InvalidOperation
 
 import requests
 
-from apps.pauta.models import Creative, CredencialesMeta, CuentaPublicitaria
+from apps.pauta.models import Creative, CuentaPublicitaria
+from apps.pauta.servicios.credenciales import credencial_principal_para_empresa
 from apps.pauta.servicios.crypto import decrypt_token
 
 META_API_VERSION = os.getenv("META_API_VERSION", "v18.0")
@@ -45,8 +46,8 @@ def _post(path: str, token: str, payload: dict) -> dict:
     return data
 
 
-def get_meta_token_for_empresa(empresa_id: int) -> str:
-    cred = CredencialesMeta.objects.filter(empresa_id=empresa_id).order_by("id").first()
+def get_meta_token_for_empresa(empresa_id: int, cuenta: CuentaPublicitaria | None = None) -> str:
+    cred = credencial_principal_para_empresa(empresa_id=empresa_id, cuenta=cuenta)
     if not cred:
         raise MetaProvisioningError("No hay credenciales Meta configuradas para esta empresa.")
     try:

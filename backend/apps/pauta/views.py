@@ -235,7 +235,33 @@ class CredencialesMetaViewSet(viewsets.ModelViewSet):
         return _has_pauta_permission(request.user, self.action)
 
     def get_queryset(self):
-        return _filter_by_empresa(super().get_queryset(), self.request.user, self.request)
+        qs = super().get_queryset().prefetch_related("empresas").distinct()
+        user = self.request.user
+        empresa_param = self.request.query_params.get("empresa")
+
+        if user.is_superuser:
+            if empresa_param:
+                try:
+                    empresa_id = int(empresa_param)
+                except (TypeError, ValueError):
+                    return qs.none()
+                return qs.filter(Q(empresa_id=empresa_id) | Q(empresas__id=empresa_id)).distinct()
+            return qs
+
+        allowed_ids = get_user_empresa_ids(user)
+        if not allowed_ids:
+            return qs.none()
+
+        if empresa_param:
+            try:
+                empresa_id = int(empresa_param)
+            except (TypeError, ValueError):
+                return qs.none()
+            if empresa_id not in allowed_ids:
+                return qs.none()
+            return qs.filter(Q(empresa_id=empresa_id) | Q(empresas__id=empresa_id)).distinct()
+
+        return qs.filter(Q(empresa_id__in=allowed_ids) | Q(empresas__id__in=allowed_ids)).distinct()
 
 
 class FanPageViewSet(viewsets.ModelViewSet):

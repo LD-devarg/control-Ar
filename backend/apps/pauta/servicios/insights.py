@@ -7,8 +7,8 @@ from typing import Iterable
 import requests
 
 from apps.empresas.models import Empresa
-from apps.pauta.models import CredencialesMeta, CuentaPublicitaria
-from apps.pauta.servicios.crypto import decrypt_token
+from apps.pauta.models import CuentaPublicitaria
+from apps.pauta.servicios.credenciales import credencial_principal_para_empresa
 
 META_API_VERSION = os.getenv("META_API_VERSION", "v18.0")
 META_TIMEOUT_SECONDS = float(os.getenv("META_TIMEOUT_SECONDS", "10"))
@@ -27,9 +27,10 @@ def _get_ad_account_id(empresa_id: int) -> str | None:
 
 
 def _get_token(empresa_id: int) -> str | None:
-    cred = CredencialesMeta.objects.filter(empresa_id=empresa_id).order_by("id").first()
+    cred = credencial_principal_para_empresa(empresa_id=empresa_id)
     if not cred:
         return None
+    from apps.pauta.servicios.crypto import decrypt_token
     return decrypt_token(cred.token_acceso_encrypted)
 
 

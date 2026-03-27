@@ -250,6 +250,11 @@ class CredencialesMeta(models.Model):
         on_delete=models.CASCADE,
         related_name="credenciales_meta",
     )
+    empresas = models.ManyToManyField(
+        "empresas.Empresa",
+        related_name="credenciales_meta_compartidas",
+        blank=True,
+    )
     bm = models.ForeignKey(
         "pauta.BM",
         on_delete=models.CASCADE,

@@ -120,7 +120,12 @@ def enviar_evento_meta(
     )
 
     payload = _merge_payload(evento)
-    data, _ = MetaEventBuilder.build(tipo=evento.tipo, payload=payload, request=request)
+    data, _ = MetaEventBuilder.build(
+        tipo=evento.tipo,
+        payload=payload,
+        request=request,
+        event_time=getattr(evento, "ocurrido_en", None) or getattr(evento, "creado_en", None),
+    )
     data["event_id"] = str(evento.id_evento)
 
     resolved_test_code = _resolve_test_event_code(evento, request=request, explicit_code=test_event_code)

@@ -19,6 +19,7 @@ import { apiClient } from '../services/auth';
 import { useTenant } from '../context/TenantContext';
 import { buildClienteDisplayLabel } from "../utils/clientDisplay";
 import { subscribeRealtimeEvents } from "../services/realtime";
+import { toDateTimeLocalInputValue } from "../utils/datetime";
 
 export default function FormCompra() {
   const theme = useTheme();
@@ -27,6 +28,7 @@ export default function FormCompra() {
   const [usuarios, setUsuarios] = useState([]);
   const [selectedCliente, setSelectedCliente] = useState(null);
   const [monto, setMonto] = useState("");
+  const [eventoOcurridoEn, setEventoOcurridoEn] = useState(() => toDateTimeLocalInputValue());
   const [comprobanteFile, setComprobanteFile] = useState(null);
   const [hasBono, setHasBono] = useState(false);
   const [bono, setBono] = useState("");
@@ -115,6 +117,7 @@ export default function FormCompra() {
       formData.append("empresa", String(empresaId));
       formData.append("cliente", selectedCliente.id);
       formData.append("monto_ars", monto);
+      formData.append("evento_ocurrido_en", eventoOcurridoEn);
       const bonoArs = enableBonos && hasBono ? Number(bono || 0) : 0;
       formData.append("bono_ars", String(bonoArs));
       if (comprobanteFile) {
@@ -142,6 +145,7 @@ export default function FormCompra() {
       setBono("");
       setHasBono(false);
       setSelectedCliente(null);
+      setEventoOcurridoEn(toDateTimeLocalInputValue());
       setComprobanteFile(null);
       setToast({ open: true, severity: "success", message: "Compra guardada." });
     } catch (err) {
@@ -187,6 +191,16 @@ export default function FormCompra() {
         value={monto}
         onChange={(e) => setMonto(e.target.value)}
         sx={fieldSx}
+        />
+        <TextField
+          id="evento-ocurrido-en"
+          label="Fecha del evento"
+          type="datetime-local"
+          fullWidth
+          value={eventoOcurridoEn}
+          onChange={(e) => setEventoOcurridoEn(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={fieldSx}
         />
         {enableBonos ? (
           <>

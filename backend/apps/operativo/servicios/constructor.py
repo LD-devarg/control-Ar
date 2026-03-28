@@ -3,6 +3,7 @@ import time
 import hashlib
 import re
 import ipaddress
+from django.utils import timezone
 
 
 EVENT_NAME_MAP = {
@@ -86,7 +87,7 @@ def _extract_request_ip(request) -> str | None:
 
 class MetaEventBuilder:
     @staticmethod
-    def build(*, tipo: str, payload: dict, request=None) -> tuple[dict, uuid.UUID]:
+    def build(*, tipo: str, payload: dict, request=None, event_time=None) -> tuple[dict, uuid.UUID]:
         """
         Devuelve:
         - data (dict) → payload final CAPI
@@ -97,7 +98,19 @@ class MetaEventBuilder:
             raise ValueError(f"Tipo de evento no soportado: {tipo}")
 
         event_id = uuid.uuid4()
-        event_time = int(time.time())
+        resolved_event_time = event_time or payload.get("event_time")
+        if resolved_event_time is None:
+            event_time_int = int(time.time())
+        else:
+            if hasattr(resolved_event_time, "timestamp"):
+                if timezone.is_naive(resolved_event_time):
+                    resolved_event_time = timezone.make_aware(
+                        resolved_event_time,
+                        timezone.get_current_timezone(),
+                    )
+                event_time_int = int(resolved_event_time.timestamp())
+            else:
+                event_time_int = int(time.time())
         first_name, last_name = _split_name(payload.get("nombre"))
 
         # -------------------------
@@ -131,7 +144,7 @@ class MetaEventBuilder:
         event_source_url = payload.get("event_source_url") or (request.build_absolute_uri() if request else None)
         data = _clean_dict({
             "event_name": EVENT_NAME_MAP[tipo],
-            "event_time": event_time,
+            "event_time": event_time_int,
             "event_id": str(event_id),
             "action_source": "website",
             "event_source_url": event_source_url,

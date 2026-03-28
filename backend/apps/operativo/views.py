@@ -14,6 +14,7 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils.dateparse import parse_datetime
 from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -153,6 +154,17 @@ def _get_datetime_range(request):
             start = now - timedelta(days=30)
 
     return start, end
+
+
+def _parse_event_datetime_input(raw_value, *, field_name: str = "ocurrido_en"):
+    if raw_value in (None, ""):
+        return timezone.now()
+    parsed = parse_datetime(str(raw_value))
+    if parsed is None:
+        raise ValidationError({field_name: "Fecha/hora invalida."})
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed
 
 
 def _get_empresa_scope_id(request):
@@ -542,6 +554,7 @@ def _create_lead_event(
         operador=None,
         tipo="lead",
         data=payload,
+        ocurrido_en=timezone.now(),
         fbp=request.data.get("fbp"),
         fbc=request.data.get("fbc"),
         ip_address=_client_first_ip(request, cliente),
@@ -1221,6 +1234,7 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             operador=None,
             tipo="contact",
             data=self._event_payload(cliente, data),
+            ocurrido_en=timezone.now(),
             fbp=data.get("fbp") or cliente.fbp,
             fbc=data.get("fbc") or cliente.fbc,
             ip_address=_client_first_ip(request, cliente),
@@ -1311,6 +1325,7 @@ class KommoWebhookViewSet(viewsets.ViewSet):
             operador=None,
             tipo="contact",
             data=self._event_payload(cliente, data),
+            ocurrido_en=timezone.now(),
             fbp=data.get("fbp") or cliente.fbp,
             fbc=data.get("fbc") or cliente.fbc,
             ip_address=_client_first_ip(request, cliente),
@@ -1680,6 +1695,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             operador=operador,
             tipo=tipo,
             data=payload,
+            ocurrido_en=serializer.validated_data["ocurrido_en"],
             fbp=serializer.validated_data.get("fbp") or (cliente.fbp if cliente else None),
             fbc=serializer.validated_data.get("fbc") or (cliente.fbc if cliente else None),
             ip_address=_client_first_ip(request, cliente),
@@ -1820,6 +1836,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 empresa=landing.empresa,
                 operador=request.user,
                 landing=landing,
+                ocurrido_en=timezone.now(),
                 fbp=request.data.get("fbp"),
                 fbc=request.data.get("fbc"),
                 ip_address=_client_first_ip(request, cliente),
@@ -1861,6 +1878,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 empresa=cliente.empresa,
                 operador=request.user,
                 landing=landing,
+                ocurrido_en=timezone.now(),
                 fbp=request.data.get("fbp"),
                 fbc=request.data.get("fbc"),
                 ip_address=_client_first_ip(request, cliente),
@@ -2001,6 +2019,10 @@ class CompraViewSet(viewsets.ModelViewSet):
                 operador=request.user,
                 tipo="purchase",
                 data=payload,
+                ocurrido_en=_parse_event_datetime_input(
+                    request.data.get("evento_ocurrido_en"),
+                    field_name="evento_ocurrido_en",
+                ),
                 fbp=cliente.fbp,
                 fbc=cliente.fbc,
                 ip_address=_client_first_ip(request, cliente),

@@ -13,6 +13,7 @@ import { useTenant } from '../context/TenantContext';
 import { subscribeRealtimeEvents } from '../services/realtime';
 import { markClientesDirty } from '../services/operativo/clientes';
 import { buildClienteDisplayLabel } from '../utils/clientDisplay';
+import { toDateTimeLocalInputValue } from '../utils/datetime';
 
 export default function FormContacto() {
   const theme = useTheme();
@@ -23,6 +24,7 @@ export default function FormContacto() {
   const [missingDataChoice, setMissingDataChoice] = useState(null);
   const [extraContacto, setExtraContacto] = useState("");
   const [extraNombre, setExtraNombre] = useState("");
+  const [ocurridoEn, setOcurridoEn] = useState(() => toDateTimeLocalInputValue());
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
@@ -187,11 +189,13 @@ export default function FormContacto() {
         cliente_id: selectedCliente.id,
         tipo: "contact",
         empresa_id: empresaId,
+        ocurrido_en: ocurridoEn,
       });
       markClientesDirty();
       markLeadsDirty();
       window.dispatchEvent(new CustomEvent("leads:refresh"));
       setSelectedCliente(null);
+      setOcurridoEn(toDateTimeLocalInputValue());
       setToast({ open: true, severity: "success", message: "Contacto guardado." });
     } catch (err) {
       const detail = err?.response?.data?.detail;
@@ -276,6 +280,14 @@ export default function FormContacto() {
           ) : null}
         </Stack>
       ) : null}
+      <TextField
+        label="Fecha del evento"
+        type="datetime-local"
+        value={ocurridoEn}
+        onChange={(event) => setOcurridoEn(event.target.value)}
+        InputLabelProps={{ shrink: true }}
+        sx={fieldSx}
+      />
         <Button variant="outlined" onClick={handleSubmit} disabled={!canSubmit || submitting}>
           {submitting ? "Guardando..." : "Guardar"}
         </Button>

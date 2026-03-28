@@ -189,6 +189,7 @@ class EventosMeta(models.Model):
     id_evento = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     tipo = models.CharField(max_length=50, choices=TIPO_EVENTO_CHOICES)
     data = models.JSONField()
+    ocurrido_en = models.DateTimeField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     enviado_en = models.DateTimeField(null=True, blank=True)
     estado_envio = models.CharField(

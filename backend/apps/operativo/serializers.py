@@ -1,6 +1,7 @@
 from rest_framework import serializers
 import re
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 from .codigo_reservas import get_reservation_by_token, is_code_reserved
 from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit, Retiro, generar_codigo_corto
 from apps.pauta.servicios.credenciales import credencial_aplica_a_empresa, credencial_principal_para_empresa
@@ -514,6 +515,7 @@ class EventosMetaReadSerializer(serializers.ModelSerializer):
             "operador_username",
             "tipo",
             "data",
+            "ocurrido_en",
             "fbp",
             "fbc",
             "ip_address",
@@ -531,6 +533,7 @@ class EventosMetaCreateSerializer(serializers.Serializer):
     cliente_id = serializers.IntegerField()
     landing_token = serializers.UUIDField(required=False)
     empresa_id = serializers.IntegerField(required=False)
+    ocurrido_en = serializers.DateTimeField(required=False)
 
     tipo = serializers.ChoiceField(choices=EventosMeta._meta.get_field("tipo").choices)
 
@@ -591,6 +594,7 @@ class EventosMetaCreateSerializer(serializers.Serializer):
                 raise serializers.ValidationError("El evento purchase solo aplica a clientes con 0 compras.")
         data["landing"] = landing
         data["empresa_id"] = empresa_id
+        data["ocurrido_en"] = data.get("ocurrido_en") or timezone.now()
         return data
 
 

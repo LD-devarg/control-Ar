@@ -16,6 +16,7 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import { apiClient } from "../services/auth";
 import { mergeEmpresaParam } from "../services/tenant";
+import { resolveErrorMessage } from "../components/pautaCreate/helpers";
 
 const META_STATUS_OPTIONS = ["ACTIVE", "PAUSED", "ARCHIVED", "DELETED"];
 const MONEDA_OPTIONS = ["USD", "ARS"];
@@ -43,6 +44,38 @@ const getAdsetCampaignId = (item) =>
       item?.campaign ??
       item?.campaign_id
   );
+
+const normalizeId = (value) => {
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const getEmpresaOrganizacionId = (empresa) => normalizeId(empresa?.organizacion);
+
+const resolveBmOrgId = (rawBm, empresas, selectedEmpresaIds = []) => {
+  const explicitOrgId = normalizeId(rawBm?.organizacion);
+  if (explicitOrgId) return explicitOrgId;
+
+  for (const empresaId of selectedEmpresaIds || []) {
+    const matched = empresas.find((item) => normalizeId(item.id) === normalizeId(empresaId));
+    const matchedOrgId = getEmpresaOrganizacionId(matched);
+    if (matchedOrgId) return matchedOrgId;
+  }
+
+  return null;
+};
+
+const filterEmpresasForBm = (empresas, rawBm, selectedEmpresaIds = []) => {
+  const selectedIds = new Set((selectedEmpresaIds || []).map((item) => normalizeId(item)).filter(Boolean));
+  const bmOrgId = resolveBmOrgId(rawBm, empresas, selectedEmpresaIds);
+  if (!bmOrgId) return empresas;
+
+  return empresas.filter((empresa) => {
+    const empresaId = normalizeId(empresa.id);
+    if (selectedIds.has(empresaId)) return true;
+    return getEmpresaOrganizacionId(empresa) === bmOrgId;
+  });
+};
 
 const ENDPOINTS_BY_VIEW = {
   Bms: "/bms/",
@@ -486,8 +519,9 @@ export default function PautaDatabase() {
       await apiClient.patch(`${endpoint}${rowId}/`, payload);
       closeEditDialog();
       await loadRows();
-    } catch {
-      setError("No se pudo actualizar el registro.");
+    } catch (err) {
+      const detail = resolveErrorMessage(err?.response?.data);
+      setError(detail || "No se pudo actualizar el registro.");
     } finally {
       setSavingEdit(false);
     }
@@ -511,8 +545,13 @@ export default function PautaDatabase() {
   };
 
   const editFields = EDITABLE_FIELDS_BY_VIEW[editState.view] || [];
-  const bmSelectedEmpresas = empresasOptions.filter((empresa) =>
-    (editState.values.empresas || []).includes(Number(empresa.id))
+  const bmEmpresaOptions = useMemo(
+    () => filterEmpresasForBm(empresasOptions, editState.row?.__raw, editState.values.empresas || []),
+    [empresasOptions, editState.row, editState.values.empresas]
+  );
+  const bmSelectedEmpresas = useMemo(
+    () => empresasOptions.filter((empresa) => (editState.values.empresas || []).includes(Number(empresa.id))),
+    [empresasOptions, editState.values.empresas]
   );
 
   return (
@@ -664,7 +703,7 @@ export default function PautaDatabase() {
                 <Autocomplete
                   key={fieldName}
                   multiple
-                  options={empresasOptions}
+                  options={bmEmpresaOptions}
                   getOptionLabel={(option) => option?.nombre || `Empresa #${option?.id}`}
                   value={bmSelectedEmpresas}
                   onChange={(_, values) =>
@@ -673,6 +712,7 @@ export default function PautaDatabase() {
                       values.map((item) => Number(item.id))
                     )
                   }
+                  isOptionEqualToValue={(option, value) => Number(option?.id) === Number(value?.id)}
                   renderInput={(params) => (
                     <TextField {...params} label={FIELD_LABELS[fieldName] || fieldName} size="small" />
                   )}

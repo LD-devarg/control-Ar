@@ -100,6 +100,15 @@ function saveQueue(queue) {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
+function removeQueuedClient(idempotencyKey) {
+    if (!idempotencyKey) return;
+    const queue = loadQueue();
+    const remaining = queue.filter((item) => item?.idempotency_key !== idempotencyKey);
+    if (remaining.length !== queue.length) {
+        saveQueue(remaining);
+    }
+}
+
 function toMillis(value) {
     if (!value) return 0;
     const dt = new Date(value);
@@ -498,9 +507,25 @@ export default function NuevoLead({
 
     const enqueueClient = (payload) => {
         const queue = loadQueue();
+        if (payload?.idempotency_key && queue.some((item) => item?.idempotency_key === payload.idempotency_key)) {
+            return;
+        }
         queue.push(payload);
         saveQueue(queue);
         scheduleRetry();
+    };
+
+    const notifyLeadAccepted = () => {
+        markClientesDirty();
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("leads:refresh"));
+            try {
+                localStorage.setItem("leads_dirty", "1");
+                localStorage.setItem("leads_refresh_ts", String(Date.now()));
+            } catch {
+                // ignore storage errors
+            }
+        }
     };
 
     const handleWhatsappClick = () => {
@@ -634,27 +659,26 @@ export default function NuevoLead({
             let finalCodigo = generatedCodigo;
             let finalUsername = generatedUsername;
             let finalNombre = trimmedName;
+            let leadCreated = false;
 
+            enqueueClient(payload);
             try {
                 const { data } = await axios.post(`${baseUrl}/clientes/`, payload, { timeout: 8000 });
                 finalCodigo = String(data?.codigo || generatedCodigo);
                 finalUsername = String(data?.username || generatedUsername);
                 finalNombre = String(data?.nombre || trimmedName);
+                leadCreated = true;
+                removeQueuedClient(payload.idempotency_key);
                 setPrefetchedCode("");
                 setActiveReservationToken("");
-                markClientesDirty();
-                if (typeof window !== "undefined") {
-                    window.dispatchEvent(new CustomEvent("leads:refresh"));
-                    try {
-                        localStorage.setItem("leads_dirty", "1");
-                        localStorage.setItem("leads_refresh_ts", String(Date.now()));
-                    } catch {
-                        // ignore storage errors
-                    }
-                }
+                notifyLeadAccepted();
             } catch {
-                setError("No pudimos generar tu acceso en este momento. Reintenta en unos segundos.");
-                return;
+                sendWithBeacon(baseUrl, payload);
+                sendWithKeepalive(baseUrl, payload).catch(() => {
+                    // keepalive is best-effort only
+                });
+                tryFlushQueue();
+                checkQueueHealth();
             }
 
             const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
@@ -669,6 +693,9 @@ export default function NuevoLead({
             usedReservedWindow = navigateToWhatsapp(currentWhatsappUrl, reservedWindow);
             if (typeof onWhatsappOpened === "function") {
                 onWhatsappOpened();
+            }
+            if (!leadCreated) {
+                setError("");
             }
         } finally {
             if (!usedReservedWindow && reservedWindow && !reservedWindow.closed) {

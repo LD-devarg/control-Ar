@@ -33,6 +33,15 @@ function createNestedRowId() {
   return `nested-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function normalizeId(value) {
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function getEmpresaOrganizacionId(empresa) {
+  return normalizeId(empresa?.organizacion);
+}
+
 function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated }) {
   const options = useMemo(() => types.map((item) => ({ key: item, label: item })), [types]);
   const whiteFieldSx = useMemo(
@@ -564,6 +573,35 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
         ? bulkFormHasRequiredMissing
         : singleFormHasRequiredMissing);
 
+  const scopedRemoteOptions = useMemo(() => {
+    if (selectedType?.key !== "Bms") return remoteOptions;
+
+    const empresas = Array.isArray(remoteOptions.empresas) ? remoteOptions.empresas : [];
+    const selectedIds = Array.isArray(formValues.empresas) ? formValues.empresas : [];
+    if (empresas.length === 0 || selectedIds.length === 0) return remoteOptions;
+
+    let selectedOrgId = null;
+    for (const empresaId of selectedIds) {
+      const matched = empresas.find((item) => normalizeId(item.id) === normalizeId(empresaId));
+      const matchedOrgId = getEmpresaOrganizacionId(matched);
+      if (matchedOrgId) {
+        selectedOrgId = matchedOrgId;
+        break;
+      }
+    }
+
+    if (!selectedOrgId) return remoteOptions;
+
+    return {
+      ...remoteOptions,
+      empresas: empresas.filter((empresa) => {
+        const empresaId = normalizeId(empresa.id);
+        if (selectedIds.some((item) => normalizeId(item) === empresaId)) return true;
+        return getEmpresaOrganizacionId(empresa) === selectedOrgId;
+      }),
+    };
+  }, [remoteOptions, selectedType, formValues.empresas]);
+
   const handleSubmitSingle = async (createMetaDraft = true) => {
     if (!selectedType) {
       setError("Selecciona un tipo de registro.");
@@ -868,7 +906,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                       field={field}
                       value={formValues[field.name]}
                       onChange={updateField}
-                      remoteOptions={remoteOptions}
+                      remoteOptions={scopedRemoteOptions}
                       showSecretByField={showSecretByField}
                       toggleShowSecret={toggleShowSecret}
                       whiteAutocompletePopperSx={whiteAutocompletePopperSx}
@@ -890,7 +928,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                         field={field}
                         value={campaignStackValues[field.name]}
                         onChange={updateCampaignStackField}
-                        remoteOptions={remoteOptions}
+                        remoteOptions={scopedRemoteOptions}
                         showSecretByField={showSecretByField}
                         toggleShowSecret={toggleShowSecret}
                         whiteAutocompletePopperSx={whiteAutocompletePopperSx}
@@ -930,7 +968,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                             field={field}
                             value={adsetRow.values[field.name]}
                             onChange={(name, value) => updateAdsetStackField(adsetRow.id, name, value)}
-                            remoteOptions={remoteOptions}
+                            remoteOptions={scopedRemoteOptions}
                             showSecretByField={showSecretByField}
                             toggleShowSecret={toggleShowSecret}
                             whiteAutocompletePopperSx={whiteAutocompletePopperSx}
@@ -971,7 +1009,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                                     field={field}
                                     value={adRow.values[field.name]}
                                     onChange={(name, value) => updateAdStackField(adsetRow.id, adRow.id, name, value)}
-                                    remoteOptions={remoteOptions}
+                                    remoteOptions={scopedRemoteOptions}
                                     showSecretByField={showSecretByField}
                                     toggleShowSecret={toggleShowSecret}
                                     whiteAutocompletePopperSx={whiteAutocompletePopperSx}
@@ -1006,7 +1044,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                         field={field}
                         value={bulkContextValues[field.name]}
                         onChange={updateBulkContextField}
-                        remoteOptions={remoteOptions}
+                        remoteOptions={scopedRemoteOptions}
                         showSecretByField={showSecretByField}
                         toggleShowSecret={toggleShowSecret}
                         whiteAutocompletePopperSx={whiteAutocompletePopperSx}
@@ -1031,7 +1069,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                           field={field}
                           value={bulkApplyValues[field.name]}
                           onChange={updateBulkApplyField}
-                          remoteOptions={remoteOptions}
+                          remoteOptions={scopedRemoteOptions}
                           showSecretByField={showSecretByField}
                           toggleShowSecret={toggleShowSecret}
                           whiteAutocompletePopperSx={whiteAutocompletePopperSx}
@@ -1077,7 +1115,7 @@ function PautaCreateModal({ open, onClose, types = [], defaultType, onCreated })
                             field={field}
                             value={row.values[field.name]}
                             onChange={(name, value) => updateBulkRowField(row.id, name, value)}
-                            remoteOptions={remoteOptions}
+                            remoteOptions={scopedRemoteOptions}
                             showSecretByField={showSecretByField}
                             toggleShowSecret={toggleShowSecret}
                             whiteAutocompletePopperSx={whiteAutocompletePopperSx}

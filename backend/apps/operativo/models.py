@@ -1,3 +1,5 @@
+import secrets
+import string
 import uuid
 from django.db import models
 from .storages import PrivateMediaStorage, PublicMediaStorage
@@ -16,13 +18,60 @@ BONO_CHOICES = [
     ("30%", "30%"),
 ]
 
-def generar_codigo_corto():
-    import random
-    return f"{random.randint(0, 999999):06d}"
+CLIENTE_CODIGO_PREFIX_LENGTH = 2
+CLIENTE_CODIGO_BODY_LENGTH = 8
+CLIENTE_CODIGO_DIGITS_IN_BODY = 6
+CLIENTE_CODIGO_LETTERS_IN_BODY = 2
+CLIENTE_CODIGO_MIN_LENGTH = 6
+CLIENTE_CODIGO_LENGTH = CLIENTE_CODIGO_PREFIX_LENGTH + CLIENTE_CODIGO_BODY_LENGTH
+CLIENTE_CODIGO_LETTERS = string.ascii_uppercase
+
+
+def normalizar_codigo_prefijo(value):
+    return "".join(ch for ch in str(value or "").upper() if ch.isalpha())[:CLIENTE_CODIGO_PREFIX_LENGTH]
+
+
+def derivar_codigo_prefijo_desde_nombre(nombre):
+    normalized = normalizar_codigo_prefijo(nombre)
+    return normalized.ljust(CLIENTE_CODIGO_PREFIX_LENGTH, "X")
+
+
+def obtener_prefijo_empresa(empresa):
+    if not empresa:
+        return "CL"
+    configured = normalizar_codigo_prefijo(getattr(empresa, "codigo_prefijo", ""))
+    if len(configured) == CLIENTE_CODIGO_PREFIX_LENGTH:
+        return configured
+    return derivar_codigo_prefijo_desde_nombre(getattr(empresa, "nombre", ""))
+
+
+def generar_codigo_corto(prefix=None):
+    codigo_prefijo = normalizar_codigo_prefijo(prefix)
+    if len(codigo_prefijo) != CLIENTE_CODIGO_PREFIX_LENGTH:
+        codigo_prefijo = "CL"
+
+    body = [str(secrets.randbelow(10)) for _ in range(CLIENTE_CODIGO_DIGITS_IN_BODY)]
+    body.extend(secrets.choice(CLIENTE_CODIGO_LETTERS) for _ in range(CLIENTE_CODIGO_LETTERS_IN_BODY))
+    secrets.SystemRandom().shuffle(body)
+    return f"{codigo_prefijo}{''.join(body)}"
+
+
+def codigo_cliente_tiene_formato_nuevo(value):
+    codigo = str(value or "").strip().upper()
+    if len(codigo) != CLIENTE_CODIGO_LENGTH:
+        return False
+    prefijo = codigo[:CLIENTE_CODIGO_PREFIX_LENGTH]
+    cuerpo = codigo[CLIENTE_CODIGO_PREFIX_LENGTH:]
+    return (
+        prefijo.isalpha()
+        and cuerpo.isalnum()
+        and sum(1 for ch in cuerpo if ch.isdigit()) == CLIENTE_CODIGO_DIGITS_IN_BODY
+        and sum(1 for ch in cuerpo if ch.isalpha()) == CLIENTE_CODIGO_LETTERS_IN_BODY
+    )
 
 class Cliente(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
-    codigo = models.CharField(max_length=6, default=generar_codigo_corto, unique=True)
+    codigo = models.CharField(max_length=CLIENTE_CODIGO_LENGTH, default=generar_codigo_corto, unique=True)
     idempotency_key = models.UUIDField(null=True, blank=True, unique=True)
     nombre = models.CharField(max_length=100, null=True, blank=True)
     contacto = models.CharField(max_length=15, null=True, blank=True)
@@ -51,6 +100,16 @@ class Cliente(models.Model):
 
     class Meta:
         db_table = "operativo_cliente"
+
+    def save(self, *args, **kwargs):
+        if not self.codigo:
+            prefijo = obtener_prefijo_empresa(self.empresa)
+            for _ in range(50):
+                candidate = generar_codigo_corto(prefijo)
+                if not self.__class__.objects.filter(codigo=candidate).exists():
+                    self.codigo = candidate
+                    break
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nombre or f"Cliente #{self.pk}"

@@ -74,8 +74,36 @@ function navigateToWhatsapp(url, reservedWindow = null) {
     return false;
 }
 
-function generateLeadCode() {
-    return String(Math.floor(Math.random() * 1000000)).padStart(6, "0");
+function randomInt(maxExclusive) {
+    const array = new Uint32Array(1);
+    const cryptoApi = globalThis.crypto;
+    if (cryptoApi?.getRandomValues) {
+        cryptoApi.getRandomValues(array);
+    } else {
+        array[0] = Math.floor(Math.random() * maxExclusive);
+    }
+    return array[0] % maxExclusive;
+}
+
+function normalizeCodePrefix(prefix) {
+    return String(prefix || "").replace(/[^a-z]/gi, "").toUpperCase().slice(0, 2);
+}
+
+function generateLeadCode(prefix = "CL") {
+    const normalizedPrefix = normalizeCodePrefix(prefix) || "CL";
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const body = [];
+    for (let i = 0; i < 6; i += 1) {
+        body.push(String(randomInt(10)));
+    }
+    for (let i = 0; i < 2; i += 1) {
+        body.push(letters[randomInt(letters.length)]);
+    }
+    for (let i = body.length - 1; i > 0; i -= 1) {
+        const j = randomInt(i + 1);
+        [body[i], body[j]] = [body[j], body[i]];
+    }
+    return `${normalizedPrefix}${body.join("")}`;
 }
 
 function renderWhatsappMessage(template, variables) {
@@ -173,6 +201,7 @@ export default function NuevoLead({
     mediosPagoNode = null,
     reservedCode = "",
     reservationToken = "",
+    codePrefix = "CL",
 }) {
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
@@ -556,7 +585,7 @@ export default function NuevoLead({
                 ? `${window.location.origin}${window.location.pathname}`
                 : undefined;
 
-        const generatedCodigo = generateLeadCode();
+        const generatedCodigo = generateLeadCode(codePrefix);
         const generatedUsername = buildUsername(trimmedName, generatedCodigo);
 
         const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
@@ -626,7 +655,7 @@ export default function NuevoLead({
                     ? `${window.location.origin}${window.location.pathname}`
                     : undefined;
 
-            const generatedCodigo = prefetchedCode || generateLeadCode();
+            const generatedCodigo = prefetchedCode || generateLeadCode(codePrefix);
             const generatedUsername = buildUsername(trimmedName, generatedCodigo);
             if (isTestMode) {
                 const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {

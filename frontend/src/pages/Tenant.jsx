@@ -48,6 +48,11 @@ function extractApiErrorMessage(err, fallback) {
     return fallback;
 }
 
+function deriveEmpresaCodePrefix(name) {
+    const letters = String(name || "").replace(/[^a-z]/gi, "").toUpperCase();
+    return (letters.slice(0, 2) || "EM").padEnd(2, "X");
+}
+
 export default function Tenant() {
     const currentUser = getCurrentUser();
     const isSuperuser = Boolean(currentUser?.is_superuser);
@@ -55,6 +60,7 @@ export default function Tenant() {
     const [organizaciones, setOrganizaciones] = useState([]);
     const [selected, setSelected] = useState(null);
     const [nombre, setNombre] = useState("");
+    const [codigoPrefijo, setCodigoPrefijo] = useState("");
     const [organizacionId, setOrganizacionId] = useState("");
     const [activo, setActivo] = useState(true);
     const [operatingMode, setOperatingMode] = useState("full");
@@ -99,6 +105,7 @@ export default function Tenant() {
     const handleSelect = (empresa) => {
         setSelected(empresa);
         setNombre(empresa?.nombre || "");
+        setCodigoPrefijo(empresa?.codigo_prefijo || deriveEmpresaCodePrefix(empresa?.nombre || ""));
         setOrganizacionId(empresa?.organizacion || "");
         setActivo(Boolean(empresa?.activo));
         setOperatingMode(empresa?.operating_mode || "full");
@@ -113,6 +120,7 @@ export default function Tenant() {
     const handleClear = () => {
         setSelected(null);
         setNombre("");
+        setCodigoPrefijo("");
         setOrganizacionId("");
         setActivo(true);
         setOperatingMode("full");
@@ -130,6 +138,11 @@ export default function Tenant() {
             setError("El nombre es obligatorio.");
             return;
         }
+        const normalizedCodigoPrefijo = String(codigoPrefijo || "").replace(/[^a-z]/gi, "").toUpperCase();
+        if (normalizedCodigoPrefijo.length !== 2) {
+            setError("El prefijo del codigo debe tener exactamente 2 letras.");
+            return;
+        }
         if (isSuperuser && !organizacionId) {
             setError("Selecciona una organizacion.");
             return;
@@ -143,6 +156,7 @@ export default function Tenant() {
         try {
             const payload = {
                 nombre: trimmedNombre,
+                codigo_prefijo: normalizedCodigoPrefijo,
                 activo,
                 operating_mode: operatingMode || "full",
                 kommo_enabled: Boolean(kommoEnabled),
@@ -389,6 +403,9 @@ export default function Tenant() {
                                             Modo: {empresa.operating_mode === "ftd_only" ? "Solo FTD" : "Full"}
                                         </div>
                                         <div className="text-[11px] text-white/50">
+                                            Prefijo codigo: {empresa.codigo_prefijo || deriveEmpresaCodePrefix(empresa.nombre)}
+                                        </div>
+                                        <div className="text-[11px] text-white/50">
                                             Kommo: {empresa.kommo_enabled ? "Integrado" : "No integrado"}
                                         </div>
                                         <div className="mt-1 text-[11px] text-white/50">
@@ -430,6 +447,7 @@ export default function Tenant() {
                     <EmpresaForm
                         selected={selected}
                         nombre={nombre}
+                        codigoPrefijo={codigoPrefijo}
                         organizacionId={organizacionId}
                         organizaciones={organizaciones}
                         showOrganizacionField={isSuperuser}
@@ -443,6 +461,7 @@ export default function Tenant() {
                         error={error}
                         saving={saving}
                         onNombreChange={setNombre}
+                        onCodigoPrefijoChange={setCodigoPrefijo}
                         onOrganizacionIdChange={setOrganizacionId}
                         onActivoChange={setActivo}
                         onOperatingModeChange={setOperatingMode}

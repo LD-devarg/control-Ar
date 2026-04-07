@@ -3,7 +3,20 @@ import re
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from .codigo_reservas import get_reservation_by_token, is_code_reserved
-from .models import Cliente, EventosMeta, Compra, Landing, LandingVisit, Retiro, generar_codigo_corto
+from .models import (
+    CLIENTE_CODIGO_BODY_LENGTH,
+    CLIENTE_CODIGO_LENGTH,
+    CLIENTE_CODIGO_MIN_LENGTH,
+    codigo_cliente_tiene_formato_nuevo,
+    Cliente,
+    EventosMeta,
+    Compra,
+    Landing,
+    LandingVisit,
+    Retiro,
+    generar_codigo_corto,
+    obtener_prefijo_empresa,
+)
 from apps.pauta.servicios.credenciales import credencial_aplica_a_empresa, credencial_principal_para_empresa
 from apps.empresas.scope import get_user_empresa_ids
 
@@ -123,7 +136,7 @@ class ClienteCreateSerializer(serializers.Serializer):
     nombre = serializers.CharField(max_length=100, required=False, allow_blank=True)
     contacto = serializers.CharField(max_length=15, required=False, allow_blank=True)
     username = serializers.CharField(max_length=50, required=False, allow_blank=True)
-    codigo = serializers.CharField(max_length=6, required=False, allow_blank=True)
+    codigo = serializers.CharField(max_length=CLIENTE_CODIGO_LENGTH, required=False, allow_blank=True)
     fbp = serializers.CharField(max_length=255, required=False, allow_blank=True)
     fbc = serializers.CharField(max_length=255, required=False, allow_blank=True)
     fbclid = serializers.CharField(max_length=255, required=False, allow_blank=True)
@@ -169,12 +182,18 @@ class ClienteCreateSerializer(serializers.Serializer):
                 return candidate
             suffix += 1
 
-    def _resolve_unique_codigo(self, requested_codigo=None):
+    def _resolve_unique_codigo(self, requested_codigo=None, *, empresa=None):
         reservation_token = str(self.context.get("reservation_token") or "").strip()
-        candidate = (requested_codigo or "").strip()
+        candidate = (requested_codigo or "").strip().upper()
         if candidate:
-            if not re.fullmatch(r"\d{6}", candidate):
-                raise serializers.ValidationError("El codigo debe tener exactamente 6 digitos.")
+            codigo_pattern = rf"\d{{{CLIENTE_CODIGO_MIN_LENGTH},8}}"
+            if not (
+                re.fullmatch(codigo_pattern, candidate)
+                or codigo_cliente_tiene_formato_nuevo(candidate)
+            ):
+                raise serializers.ValidationError(
+                    f"El codigo debe tener entre {CLIENTE_CODIGO_MIN_LENGTH} y 8 digitos o formato AA + {CLIENTE_CODIGO_BODY_LENGTH} caracteres."
+                )
             if (
                 not Cliente.objects.filter(codigo=candidate).exists()
                 and not is_code_reserved(candidate, reservation_token=reservation_token)
@@ -182,8 +201,9 @@ class ClienteCreateSerializer(serializers.Serializer):
                 return candidate
         if candidate:
             candidate = ""
+        prefijo = obtener_prefijo_empresa(empresa)
         for _ in range(20):
-            generated = generar_codigo_corto()
+            generated = generar_codigo_corto(prefijo)
             if (
                 not Cliente.objects.filter(codigo=generated).exists()
                 and not is_code_reserved(generated, reservation_token=reservation_token)
@@ -230,7 +250,7 @@ class ClienteCreateSerializer(serializers.Serializer):
         validated_data["nombre"] = nombre or None
         validated_data["contacto"] = contacto or None
         validated_data["username"] = self._unique_username(username) if username else None
-        validated_data["codigo"] = self._resolve_unique_codigo(requested_codigo)
+        validated_data["codigo"] = self._resolve_unique_codigo(requested_codigo, empresa=landing.empresa)
         validated_data["ip_address"] = get_request_ip(request)
         validated_data["user_agent"] = get_request_user_agent(request)
 
@@ -243,7 +263,7 @@ class ClienteCreateSerializer(serializers.Serializer):
                         **validated_data,
                     )
             except IntegrityError:
-                validated_data["codigo"] = self._resolve_unique_codigo("")
+                validated_data["codigo"] = self._resolve_unique_codigo("", empresa=landing.empresa)
                 if validated_data["username"]:
                     validated_data["username"] = self._unique_username(validated_data["username"])
         raise serializers.ValidationError("No se pudo crear el cliente por conflicto de datos. Reintenta.")
@@ -252,6 +272,7 @@ class ClienteCreateSerializer(serializers.Serializer):
 class LandingSerializer(serializers.ModelSerializer):
     bono = serializers.CharField()
     pixel_id = serializers.SerializerMethodField()
+    empresa_codigo_prefijo = serializers.SerializerMethodField()
 
     def get_pixel_id(self, obj):
         cred = obj.credencial_meta
@@ -259,6 +280,9 @@ class LandingSerializer(serializers.ModelSerializer):
             return cred.pixel_id
         cred = credencial_principal_para_empresa(empresa_id=obj.empresa_id)
         return cred.pixel_id if cred else None
+
+    def get_empresa_codigo_prefijo(self, obj):
+        return obtener_prefijo_empresa(getattr(obj, "empresa", None))
 
     def validate(self, attrs):
         credencial_meta = attrs.get("credencial_meta")
@@ -456,6 +480,7 @@ class LandingSerializer(serializers.ModelSerializer):
             "activo",
             "creado_en",
             "pixel_id",
+            "empresa_codigo_prefijo",
         ]
         read_only_fields = ["id", "empresa", "token", "creado_en"]
 

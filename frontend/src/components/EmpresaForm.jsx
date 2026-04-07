@@ -28,6 +28,7 @@ const secondaryButtonSx = { borderColor: "#fff", color: "#fff" };
 export default function EmpresaForm({
     selected,
     nombre,
+    codigoPrefijo = "",
     organizacionId,
     organizaciones = [],
     showOrganizacionField = false,
@@ -41,6 +42,7 @@ export default function EmpresaForm({
     error,
     saving,
     onNombreChange,
+    onCodigoPrefijoChange,
     onOrganizacionIdChange,
     onActivoChange,
     onOperatingModeChange,
@@ -64,6 +66,15 @@ export default function EmpresaForm({
                 fullWidth
                 size="small"
                 sx={textFieldSx}
+            />
+            <TextField
+                label="Prefijo codigo"
+                value={codigoPrefijo}
+                onChange={(e) => onCodigoPrefijoChange?.(e.target.value.replace(/[^a-z]/gi, "").toUpperCase().slice(0, 2))}
+                fullWidth
+                size="small"
+                sx={{ ...textFieldSx, mt: 1 }}
+                helperText="Dos letras. Se usan al inicio del codigo del cliente."
             />
             {showOrganizacionField ? (
                 <TextField

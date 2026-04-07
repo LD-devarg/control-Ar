@@ -757,6 +757,7 @@ export default function Landing() {
                                 landingToken={isPreviewMode ? "preview" : token}
                                 reservedCode={reservedCode}
                                 reservationToken={reservationToken}
+                                codePrefix={landing?.empresa_codigo_prefijo || "CL"}
                                 bonusText={bonusText}
                                 whatsappNumber={whatsappNumber}
                                 onWhatsappOpened={handleWhatsappOpened}

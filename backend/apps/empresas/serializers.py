@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import Group
+import re
 
 from .models import (
     BEAT_TASKS_AVAILABLE,
@@ -31,6 +32,7 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "id",
             "organizacion",
             "nombre",
+            "codigo_prefijo",
             "meta_test_mode",
             "operating_mode",
             "activo",
@@ -86,6 +88,19 @@ class EmpresaSerializer(serializers.ModelSerializer):
                 continue
             cleaned[key] = bool(enabled)
         return cleaned
+
+    def validate_codigo_prefijo(self, value):
+        if value in (None, ""):
+            return None
+        normalized = str(value).strip().upper()
+        if not re.fullmatch(r"[A-Z]{2}", normalized):
+            raise serializers.ValidationError("codigo_prefijo debe tener exactamente 2 letras.")
+        qs = Empresa.objects.filter(codigo_prefijo=normalized)
+        if self.instance:
+            qs = qs.exclude(id=self.instance.id)
+        if qs.exists():
+            raise serializers.ValidationError("codigo_prefijo ya esta en uso por otra empresa.")
+        return normalized
 
     def validate_kommo_subdomain(self, value):
         if value in (None, ""):

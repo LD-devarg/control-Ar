@@ -13,6 +13,9 @@ import { apiClient } from "../services/auth";
 import { markClientesDirty } from "../services/operativo/clientes";
 import { buildClienteDisplayLabel } from "../utils/clientDisplay";
 
+const CLIENT_CODE_MIN_LENGTH = 6;
+const CLIENT_CODE_MAX_LENGTH = 10;
+
 export default function FormClienteCreate({ empresaId, onCreated }) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === "dark";
@@ -68,7 +71,11 @@ export default function FormClienteCreate({ empresaId, onCreated }) {
   }, [empresaId]);
 
   const canSubmit = useMemo(
-    () => Boolean(empresaId) && Boolean(selectedLanding?.token) && codigo.trim().length === 6,
+    () =>
+      Boolean(empresaId) &&
+      Boolean(selectedLanding?.token) &&
+      codigo.trim().length >= CLIENT_CODE_MIN_LENGTH &&
+      codigo.trim().length <= CLIENT_CODE_MAX_LENGTH,
     [empresaId, selectedLanding, codigo]
   );
 
@@ -141,9 +148,9 @@ export default function FormClienteCreate({ empresaId, onCreated }) {
       <TextField
         label="Codigo"
         value={codigo}
-        onChange={(event) => setCodigo(event.target.value.replace(/\D/g, "").slice(0, 6))}
+        onChange={(event) => setCodigo(event.target.value.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, CLIENT_CODE_MAX_LENGTH))}
         required
-        helperText="Obligatorio. Debe tener 6 digitos."
+        helperText="Obligatorio. Usa 6 a 8 digitos o el nuevo formato AA + 8 caracteres."
         sx={fieldSx}
       />
       <TextField label="Nombre" value={nombre} onChange={(event) => setNombre(event.target.value)} sx={fieldSx} />

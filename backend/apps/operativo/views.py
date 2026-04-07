@@ -29,7 +29,20 @@ from apps.empresas.models import Empresa
 from apps.recursos.models import TipoCambio
 from apps.recursos.servicios.whatsapp_rotacion import seleccionar_numero_whatsapp
 from .codigo_reservas import consume_reservation, reserve_code, is_code_reserved
-from .models import Cliente, EventosMeta, Landing, Compra, LandingVisit, Retiro, generar_codigo_corto
+from .models import (
+    CLIENTE_CODIGO_BODY_LENGTH,
+    CLIENTE_CODIGO_LENGTH,
+    CLIENTE_CODIGO_MIN_LENGTH,
+    codigo_cliente_tiene_formato_nuevo,
+    Cliente,
+    EventosMeta,
+    Landing,
+    Compra,
+    LandingVisit,
+    Retiro,
+    generar_codigo_corto,
+    obtener_prefijo_empresa,
+)
 from .serializers import (
     ClienteCreateSerializer,
     ClienteSerializer,
@@ -417,23 +430,32 @@ def _resolve_latest_lead_landing(*, cliente_id: int):
 
 
 def _client_first_ip(request, cliente):
-    return (getattr(cliente, "ip_address", None) if cliente else None) or get_request_ip(request)
+    return getattr(cliente, "ip_address", None) if cliente else None
 
 
 def _client_first_user_agent(request, cliente):
-    return (getattr(cliente, "user_agent", None) if cliente else None) or get_request_user_agent(request)
+    return getattr(cliente, "user_agent", None) if cliente else None
 
 
-def _resolve_unique_cliente_codigo(*, requested_codigo: str = "") -> str:
-    candidate = str(requested_codigo or "").strip()
-    if candidate and len(candidate) == 6 and candidate.isdigit():
+def _resolve_unique_cliente_codigo(*, empresa=None, requested_codigo: str = "") -> str:
+    candidate = str(requested_codigo or "").strip().upper()
+    if (
+        candidate
+        and (
+            (candidate.isdigit() and CLIENTE_CODIGO_MIN_LENGTH <= len(candidate) <= 8)
+            or codigo_cliente_tiene_formato_nuevo(candidate)
+        )
+    ):
         if not Cliente.objects.filter(codigo=candidate).exists() and not is_code_reserved(candidate):
             return candidate
+    prefijo = obtener_prefijo_empresa(empresa)
     for _ in range(20):
-        generated = generar_codigo_corto()
+        generated = generar_codigo_corto(prefijo)
         if not Cliente.objects.filter(codigo=generated).exists() and not is_code_reserved(generated):
             return generated
-    raise ValidationError("No se pudo generar un codigo unico. Reintenta.")
+    raise ValidationError(
+        f"No se pudo generar un codigo unico con formato AA + {CLIENTE_CODIGO_BODY_LENGTH} caracteres. Reintenta."
+    )
 
 
 def _build_lead_event_payload(
@@ -830,7 +852,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
         if not landing_token:
             raise ValidationError("landing_token requerido.")
         landing = get_object_or_404(Landing, token=landing_token, activo=True)
-        codigo = _resolve_unique_cliente_codigo()
+        codigo = _resolve_unique_cliente_codigo(empresa=landing.empresa)
         reservation = reserve_code(code=codigo, landing_token=str(landing.token))
         return Response(
             {
@@ -1869,6 +1891,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 "currency": request.data.get("currency"),
                 "fbp": request.data.get("fbp"),
                 "fbc": request.data.get("fbc"),
+                "external_id": str(cliente.uuid),
                 "event_source_url": cliente.event_source_url or request.data.get("event_source_url"),
             }
             evento = EventosMeta.objects.create(

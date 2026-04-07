@@ -9,13 +9,19 @@ from rest_framework.test import APIClient
 from datetime import timedelta
 
 from apps.empresas.models import Empresa
-from apps.operativo.models import Cliente, EventosMeta, Landing
+from apps.operativo.models import (
+    CLIENTE_CODIGO_BODY_LENGTH,
+    CLIENTE_CODIGO_LENGTH,
+    Cliente,
+    EventosMeta,
+    Landing,
+)
 
 
 class ClienteCreateTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.empresa = Empresa.objects.create(nombre="Empresa Test")
+        self.empresa = Empresa.objects.create(nombre="Empresa Test", codigo_prefijo="ET")
         self.landing = Landing.objects.create(
             empresa=self.empresa,
             nombre="Landing Test",
@@ -28,6 +34,26 @@ class ClienteCreateTests(TestCase):
             password="secret123",
             email="operadortest@example.com",
         )
+
+    @patch("apps.operativo.views.publish_empresa_event")
+    @patch("apps.operativo.views.enviar_evento_meta")
+    def test_codigo_automatico_nuevo_sale_con_longitud_extendida(self, mock_enviar_evento_meta, mock_publish_empresa_event):
+        response = self.client.post(
+            "/clientes/",
+            {
+                "landing_token": str(self.landing.token),
+                "idempotency_key": str(uuid.uuid4()),
+                "nombre": "Cliente Auto",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(response.data["codigo"]), CLIENTE_CODIGO_LENGTH)
+        self.assertTrue(response.data["codigo"].startswith("ET"))
+        self.assertEqual(len(response.data["codigo"][2:]), CLIENTE_CODIGO_BODY_LENGTH)
+        self.assertEqual(sum(1 for ch in response.data["codigo"][2:] if ch.isdigit()), 6)
+        self.assertEqual(sum(1 for ch in response.data["codigo"][2:] if ch.isalpha()), 2)
 
     @patch("apps.operativo.views.publish_empresa_event")
     @patch("apps.operativo.views.enviar_evento_meta")

@@ -23,6 +23,7 @@ class Empresa(models.Model):
         blank=True,
     )
     nombre = models.CharField(max_length=255)
+    codigo_prefijo = models.CharField(max_length=2, null=True, blank=True, unique=True)
     meta_test_mode = models.BooleanField(default=False)
     operating_mode = models.CharField(
         max_length=20,

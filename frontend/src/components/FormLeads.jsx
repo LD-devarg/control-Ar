@@ -56,6 +56,59 @@ function openReservedWindow() {
     } catch {
         // ignore opener hardening failures
     }
+    try {
+        popup.document.write(`
+            <!doctype html>
+            <html lang="es">
+                <head>
+                    <meta charset="utf-8" />
+                    <meta name="viewport" content="width=device-width, initial-scale=1" />
+                    <title>Redirigiendo a WhatsApp</title>
+                    <style>
+                        body {
+                            margin: 0;
+                            min-height: 100vh;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            background: linear-gradient(180deg, #09111f 0%, #0f1a2b 100%);
+                            color: #fff;
+                            font-family: Arial, sans-serif;
+                        }
+                        .wa-loading {
+                            max-width: 320px;
+                            padding: 24px 22px;
+                            border-radius: 22px;
+                            border: 1px solid rgba(255,255,255,0.14);
+                            background: rgba(255,255,255,0.06);
+                            text-align: center;
+                            box-shadow: 0 18px 40px rgba(0,0,0,0.28);
+                        }
+                        .wa-loading strong {
+                            display: block;
+                            margin-bottom: 8px;
+                            font-size: 18px;
+                        }
+                        .wa-loading span {
+                            display: block;
+                            color: rgba(255,255,255,0.78);
+                            font-size: 14px;
+                            line-height: 1.45;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="wa-loading">
+                        <strong>Redirigiendo a WhatsApp…</strong>
+                        <span>Estamos preparando tu acceso. Esta ventana se actualizará automáticamente.</span>
+                    </div>
+                </body>
+            </html>
+        `);
+        popup.document.close();
+    } catch {
+        // ignore popup rendering issues
+    }
     return popup;
 }
 
@@ -132,7 +185,12 @@ function buildResponsiveFontSize(maxRem, minFactor = 0.74, vwFactor = 3.2) {
 }
 
 function saveQueue(queue) {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    try {
+        localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 function removeQueuedClient(idempotencyKey) {
@@ -213,6 +271,7 @@ export default function NuevoLead({
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
     const [error, setError] = useState("");
+    const [retryAttemptNonce, setRetryAttemptNonce] = useState(0);
     const [isRedirecting, setIsRedirecting] = useState(false);
     const [prefetchedCode, setPrefetchedCode] = useState(() => String(reservedCode || "").trim());
     const [activeReservationToken, setActiveReservationToken] = useState(() => String(reservationToken || "").trim());
@@ -221,6 +280,7 @@ export default function NuevoLead({
     const retryIndexRef = useRef(0);
     const retryTimerRef = useRef(null);
     const healthTimerRef = useRef(null);
+    const pendingRetryAttemptRef = useRef(null);
 
     const trimmedName = useMemo(() => name.trim(), [name]);
     const trimmedPhone = useMemo(() => phone.trim(), [phone]);
@@ -235,6 +295,12 @@ export default function NuevoLead({
     useEffect(() => {
         setActiveReservationToken(String(reservationToken || "").trim());
     }, [reservationToken]);
+
+    useEffect(() => {
+        if (!pendingRetryAttemptRef.current) return;
+        clearRetryAttempt();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [name, phone]);
 
     const finalButtonText = buttonText || "JUGÁ AHORA";
     const finalInfoText = infoText || "Atencion personalizada las 24hs.";
@@ -312,6 +378,11 @@ export default function NuevoLead({
                 )
                 : true
         );
+
+    const clearRetryAttempt = () => {
+        pendingRetryAttemptRef.current = null;
+        setRetryAttemptNonce((value) => value + 1);
+    };
 
     const scheduleRetry = () => {
         if (retryTimerRef.current) return;
@@ -544,11 +615,12 @@ export default function NuevoLead({
     const enqueueClient = (payload) => {
         const queue = loadQueue();
         if (payload?.idempotency_key && queue.some((item) => item?.idempotency_key === payload.idempotency_key)) {
-            return;
+            return true;
         }
         queue.push(payload);
-        saveQueue(queue);
+        const stored = saveQueue(queue);
         scheduleRetry();
+        return stored;
     };
 
     const notifyLeadAccepted = () => {
@@ -583,6 +655,7 @@ export default function NuevoLead({
             return;
         }
         setError("");
+        clearRetryAttempt();
 
         const fbp = getCookieValue("_fbp") || undefined;
         const fbc = getCookieValue("_fbc") || undefined;
@@ -677,7 +750,7 @@ export default function NuevoLead({
                 return;
             }
 
-            const payload = {
+            const payload = pendingRetryAttemptRef.current?.payload || {
                 idempotency_key: generateIdempotencyKey(),
                 queued_at: new Date().toISOString(),
                 landing_token: landingToken,
@@ -692,12 +765,12 @@ export default function NuevoLead({
                 ...(eventSourceUrl ? { event_source_url: eventSourceUrl } : {}),
             };
             const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-            let finalCodigo = generatedCodigo;
-            let finalUsername = generatedUsername;
-            let finalNombre = trimmedName;
+            let finalCodigo = String(payload?.codigo || generatedCodigo);
+            let finalUsername = String(payload?.username || generatedUsername);
+            let finalNombre = String(payload?.nombre || trimmedName);
             let leadCreated = false;
 
-            enqueueClient(payload);
+            const queuedLocally = enqueueClient(payload);
             try {
                 const { data } = await axios.post(`${baseUrl}/clientes/`, payload, { timeout: 8000 });
                 finalCodigo = String(data?.codigo || generatedCodigo);
@@ -707,6 +780,7 @@ export default function NuevoLead({
                 removeQueuedClient(payload.idempotency_key);
                 setPrefetchedCode("");
                 setActiveReservationToken("");
+                clearRetryAttempt();
                 notifyLeadAccepted();
             } catch {
                 sendWithBeacon(baseUrl, payload);
@@ -715,6 +789,13 @@ export default function NuevoLead({
                 });
                 tryFlushQueue();
                 checkQueueHealth();
+                pendingRetryAttemptRef.current = { payload };
+                setRetryAttemptNonce((value) => value + 1);
+                setError(
+                    !queuedLocally
+                        ? "No pudimos abrirlo bien. Tocá acá para insistir."
+                        : "Si no abrió WhatsApp, tocá acá y probamos de nuevo."
+                );
             }
 
             const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
@@ -730,7 +811,7 @@ export default function NuevoLead({
             if (typeof onWhatsappOpened === "function") {
                 onWhatsappOpened();
             }
-            if (!leadCreated) {
+            if (leadCreated) {
                 setError("");
             }
         } finally {
@@ -870,7 +951,21 @@ export default function NuevoLead({
                             />
                         ) : null}
                     </Stack>
-                    {error ? <span className='text-red-400 text-xs mt-2' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>{error}</span> : null}
+                    {error ? (
+                        pendingRetryAttemptRef.current ? (
+                            <button
+                                key={retryAttemptNonce}
+                                type="button"
+                                onClick={handleWhatsappClickSafe}
+                                className='text-amber-300 text-xs mt-2 underline decoration-dotted underline-offset-4'
+                                style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}
+                            >
+                                {error}
+                            </button>
+                        ) : (
+                            <span className='text-red-400 text-xs mt-2' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>{error}</span>
+                        )
+                    ) : null}
                 </>
             ) : (
                 imagenReemplazoForm ? (

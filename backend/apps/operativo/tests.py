@@ -16,6 +16,7 @@ from apps.operativo.models import (
     EventosMeta,
     Landing,
 )
+from apps.recursos.models import WhatsApp
 
 
 class ClienteCreateTests(TestCase):
@@ -233,6 +234,48 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(evento_dedup.data.get("request_user_agent"), "Instagram-UA-1")
         self.assertEqual(evento_dedup.data.get("dedup_matched_by"), "fingerprint_fbp")
         self.assertEqual(evento_dedup.data.get("dedup_matched_value"), "fb.1.meta.shared")
+
+
+class LandingWhatsappRotationTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.empresa = Empresa.objects.create(nombre="Empresa WA", codigo_prefijo="EW")
+        self.landing = Landing.objects.create(
+            empresa=self.empresa,
+            nombre="Landing WA",
+            url="https://example.com/landing-wa",
+            activo=True,
+            mostrar_formulario=True,
+        )
+
+    def test_rotacion_con_una_sola_linea_devuelve_la_misma_en_peek_y_consume(self):
+        linea = WhatsApp.objects.create(
+            empresa=self.empresa,
+            numero="5491122334455",
+            activo=True,
+        )
+
+        peek_response = self.client.get(
+            "/landings/whatsapp-rotacion/",
+            {"landing_token": str(self.landing.token)},
+        )
+        self.assertEqual(peek_response.status_code, 200)
+        self.assertEqual(peek_response.data["numero"], "5491122334455")
+
+        linea.refresh_from_db()
+        self.assertIsNone(linea.ultimo_uso)
+
+        consume_response = self.client.post(
+            "/landings/whatsapp-rotacion/consume/",
+            {"landing_token": str(self.landing.token)},
+            format="json",
+        )
+        self.assertEqual(consume_response.status_code, 200)
+        self.assertEqual(consume_response.data["numero"], "5491122334455")
+        self.assertEqual(consume_response.data["siguiente_numero"], "5491122334455")
+
+        linea.refresh_from_db()
+        self.assertIsNotNone(linea.ultimo_uso)
 
     @override_settings(
         LANDING_LEAD_DEDUP_MINUTES=0,

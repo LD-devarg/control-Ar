@@ -308,6 +308,7 @@ function LandingConfig() {
     const [submitting, setSubmitting] = useState(false);
     const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
     const [previewUrls, setPreviewUrls] = useState({ vertical: "", horizontal: "", reemplazoForm: "" });
+    const [clearImagenReemplazoForm, setClearImagenReemplazoForm] = useState(false);
     const [uploadKey, setUploadKey] = useState(0);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const previewWindowRef = useRef(null);
@@ -364,6 +365,7 @@ function LandingConfig() {
             setActivo(true);
             setInitialActivo(true);
             setPreviewUrls({ vertical: "", horizontal: "", reemplazoForm: "" });
+            setClearImagenReemplazoForm(false);
             return;
         }
         const nextForm = {
@@ -443,6 +445,7 @@ function LandingConfig() {
             horizontal: value.background_horizontal || "",
             reemplazoForm: value.imagen_reemplazo_form || "",
         });
+        setClearImagenReemplazoForm(false);
     }, []);
 
     const loadLandings = useCallback(async (keepId = null) => {
@@ -527,6 +530,7 @@ function LandingConfig() {
     const isDirty = useMemo(() => {
         const hasNewFiles = Boolean(form.backgroundVertical) || Boolean(form.backgroundHorizontal) || Boolean(form.imagenReemplazoForm);
         if (hasNewFiles) return true;
+        if (clearImagenReemplazoForm) return true;
         if (activo !== initialActivo) return true;
         if (currentGradient !== initialForm.bgGradient) return true;
         if (String(form.credencialMetaId || "") !== String(initialForm.credencialMetaId || "")) return true;
@@ -535,7 +539,7 @@ function LandingConfig() {
             const toValue = normalize || ((value) => value);
             return toValue(form[formKey]) !== toValue(initialForm[formKey]);
         });
-    }, [form, initialForm, activo, initialActivo, currentGradient]);
+    }, [form, initialForm, activo, initialActivo, currentGradient, clearImagenReemplazoForm]);
     const primaryLabel = isEditMode ? "Guardar cambios" : "Crear";
     const primaryDisabled = isEditMode ? !isDirty : !isComplete;
     const previewDisabled =
@@ -558,6 +562,7 @@ function LandingConfig() {
         setActivo(true);
         setInitialActivo(true);
         setPreviewUrls({ vertical: "", horizontal: "", reemplazoForm: "" });
+        setClearImagenReemplazoForm(false);
         setUploadKey((prev) => prev + 1);
     };
 
@@ -592,6 +597,9 @@ function LandingConfig() {
             }
             if (form.imagenReemplazoForm) {
                 formData.append("imagen_reemplazo_form", form.imagenReemplazoForm);
+            }
+            if (clearImagenReemplazoForm) {
+                formData.append("clear_imagen_reemplazo_form", "true");
             }
         };
 
@@ -1156,6 +1164,7 @@ function LandingConfig() {
                                 key={`upload-reemplazoForm-${uploadKey}`}
                                 label="Imagen Formulario (Opcional)"
                                 onUpload={(file) => {
+                                    setClearImagenReemplazoForm(false);
                                     setForm((prev) => ({ ...prev, imagenReemplazoForm: file }));
                                     setPreviewUrlFromFile("reemplazoForm", file);
                                 }}
@@ -1176,6 +1185,20 @@ function LandingConfig() {
                                 onClick={() => previewUrls.reemplazoForm && window.open(previewUrls.reemplazoForm, "_blank", "noopener,noreferrer")}
                             >
                                 Ver Imagen Formulario
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                color="error"
+                                size="small"
+                                disabled={!previewUrls.reemplazoForm}
+                                onClick={() => {
+                                    setForm((prev) => ({ ...prev, imagenReemplazoForm: null }));
+                                    setPreviewUrls((prev) => ({ ...prev, reemplazoForm: "" }));
+                                    setClearImagenReemplazoForm(Boolean(selectedLanding?.imagen_reemplazo_form));
+                                    setUploadKey((prev) => prev + 1);
+                                }}
+                            >
+                                Borrar Imagen Formulario
                             </Button>
                         </div>
                     </div>

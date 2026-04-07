@@ -454,7 +454,7 @@ function NuevosLeads() {
                 </div>
             </div>
 
-            <div className="recent-compras-scroll overflow-y-auto pr-1 flex-1 min-h-0">
+            <div className="recent-compras-scroll overflow-y-auto overflow-x-hidden pr-1 flex-1 min-h-0">
                 {!loading && !error && leadRows.length === 0 ? (
                     <div className="rounded-xl bg-white/[0.03] px-3 py-4 text-sm text-white/55">
                         No hay leads sin contactar.
@@ -484,20 +484,40 @@ function NuevosLeads() {
                                                 handleOpen(lead);
                                             }
                                         }}
-                                        className="group grid w-full grid-cols-[44px_minmax(0,1fr)_88px] items-start gap-2 border-b border-white/7 py-3 text-left transition-colors hover:bg-white/[0.03] cursor-pointer"
+                                        className="group grid w-full grid-cols-[52px_minmax(0,1fr)] items-start gap-3 border-b border-white/7 py-3 text-left transition-colors hover:bg-white/[0.03] cursor-pointer"
                                     >
                                         <div className="pt-1 text-[13px] font-medium tabular-nums text-white/45">
                                             {formatClock(lead.creado_en)}
                                         </div>
 
-                                        <div className="min-w-0 pr-2">
-                                            <div className="flex items-center gap-2">
-                                                <PendingActionsOutlinedIcon className="text-sky-300" sx={{ fontSize: 14 }} />
-                                                <span className="truncate text-[14px] font-semibold text-white">
-                                                    {lead.title}
-                                                </span>
+                                        <div className="min-w-0">
+                                            <div className="flex min-w-0 items-start justify-between gap-2">
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    <PendingActionsOutlinedIcon className="shrink-0 text-sky-300" sx={{ fontSize: 14 }} />
+                                                    <span className="truncate text-[14px] font-semibold text-white">
+                                                        {lead.title}
+                                                    </span>
+                                                </div>
+                                                <div className="shrink-0 pt-0.5 text-right">
+                                                    {lead.cliente_codigo ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => handleCopyCodigo(event, lead.cliente_codigo)}
+                                                            className="block whitespace-nowrap text-[15px] font-semibold tracking-[0.01em] text-sky-200 transition-colors hover:text-sky-100"
+                                                            title={copiedCode === String(lead.cliente_codigo) ? "Copiado" : `Copiar ${lead.cliente_codigo}`}
+                                                        >
+                                                            {copiedCode === String(lead.cliente_codigo)
+                                                                ? "Copiado"
+                                                                : `ID ${lead.cliente_codigo}`}
+                                                        </button>
+                                                    ) : (
+                                                        <span className="block whitespace-nowrap text-[15px] font-semibold tracking-[0.01em] text-sky-200">
+                                                            -
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div className="mt-1 pl-6 text-[12px] text-white/52">
+                                            <div className="mt-1 pl-5 text-[12px] text-white/52">
                                                 {lead?.data?.deduplicado
                                                     ? (formatLeadResult(lead) || "Lead deduplicado")
                                                     : "Lead"}{" "}
@@ -505,27 +525,8 @@ function NuevosLeads() {
                                             </div>
                                         </div>
 
-                                        <div className="pt-0.5 text-right">
-                                            {lead.cliente_codigo ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={(event) => handleCopyCodigo(event, lead.cliente_codigo)}
-                                                    className="block whitespace-nowrap text-[16px] font-semibold tracking-[0.01em] text-sky-200 transition-colors hover:text-sky-100"
-                                                    title={copiedCode === String(lead.cliente_codigo) ? "Copiado" : `Copiar ${lead.cliente_codigo}`}
-                                                >
-                                                    {copiedCode === String(lead.cliente_codigo)
-                                                        ? "Copiado"
-                                                        : `ID ${lead.cliente_codigo}`}
-                                                </button>
-                                            ) : (
-                                                <span className="block whitespace-nowrap text-[16px] font-semibold tracking-[0.01em] text-sky-200">
-                                                    -
-                                                </span>
-                                            )}
-                                        </div>
-
                                         {lead?.data?.codigo_provisorio_distinto ? (
-                                            <div className="col-[2/4] ml-6 mt-1 rounded-xl border border-amber-400/25 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-200">
+                                            <div className="col-[2/3] ml-5 mt-1 rounded-xl border border-amber-400/25 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-200">
                                                 Solicitado {lead?.data?.codigo_solicitado || "-"} {"->"} asignado {lead?.data?.codigo_final || lead?.cliente_codigo || "-"}
                                             </div>
                                         ) : null}

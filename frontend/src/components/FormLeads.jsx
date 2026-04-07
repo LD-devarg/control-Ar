@@ -124,6 +124,13 @@ function loadQueue() {
     }
 }
 
+function buildResponsiveFontSize(maxRem, minFactor = 0.74, vwFactor = 3.2) {
+    const numeric = Number(maxRem);
+    const safeMax = Number.isFinite(numeric) ? numeric : 1;
+    const safeMin = Math.max(0.78, Number((safeMax * minFactor).toFixed(2)));
+    return `clamp(${safeMin}rem, ${vwFactor}vw, ${safeMax}rem)`;
+}
+
 function saveQueue(queue) {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
@@ -803,7 +810,7 @@ export default function NuevoLead({
             {mostrarFormulario && (
                 <h3
                     className='text-white text-xl lg:text-2xl my-1'
-                    style={{ fontFamily: formTextFontStack, fontSize: `${1.5 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}
+                    style={{ fontFamily: formTextFontStack, fontSize: buildResponsiveFontSize(1.5 * resolvedFormSize, 0.8, 4.6), fontWeight: resolvedFormWeight }}
                 >
                     Contactanos
                 </h3>
@@ -833,7 +840,7 @@ export default function NuevoLead({
                                         "&.Mui-focused fieldset": { borderColor: "#fff" },
                                     },
                                     "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
-                                    "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
+                                    "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: buildResponsiveFontSize(resolvedFormSize, 0.82, 3.8), fontWeight: resolvedFormWeight },
                                 }}
                             />
                         ) : null}
@@ -858,7 +865,7 @@ export default function NuevoLead({
                                         "&.Mui-focused fieldset": { borderColor: "#fff" },
                                     },
                                     "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.85)", fontFamily: formTextFontStack, fontWeight: resolvedFormWeight },
-                                    "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: `${1 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight },
+                                    "& .MuiInputBase-input": { color: "#fff", fontFamily: formTextFontStack, fontSize: buildResponsiveFontSize(resolvedFormSize, 0.82, 3.8), fontWeight: resolvedFormWeight },
                                 }}
                             />
                         ) : null}
@@ -868,7 +875,7 @@ export default function NuevoLead({
             ) : (
                 imagenReemplazoForm ? (
                     <div className="w-full flex justify-center mb-2 px-2">
-                        <img src={imagenReemplazoForm} alt="Placeholder" className="w-full max-h-48 object-contain rounded-full" />
+                        <img src={imagenReemplazoForm} alt="Placeholder" className="form-leads-replacement-image" />
                     </div>
                 ) : null
             )}
@@ -884,7 +891,7 @@ export default function NuevoLead({
                         borderRadius: "20px",
                         padding: "12px 26px",
                         fontWeight: resolvedButtonWeight,
-                        fontSize: `${resolvedButtonSize}rem`,
+                        fontSize: buildResponsiveFontSize(resolvedButtonSize, 0.78, 4.1),
                         fontFamily: buttonFontStack,
                         background: "linear-gradient(135deg, #2bd528 0%, #038f0c 100%)",
                         boxShadow: "0 4px 15px rgba(255, 203, 13, 0.4), 0 2px 5px rgba(0, 0, 0, 0.2)",
@@ -901,7 +908,7 @@ export default function NuevoLead({
                     {finalButtonText}
                 </Button>
             </div>
-            <span className='font-bold text-md mt-4 text-center' style={{ color: infoColor || "#ffffff", fontFamily: infoFontStack, fontSize: `${resolvedInfoSize}rem`, fontWeight: resolvedInfoWeight }}>{finalInfoText}</span>
+            <span className='font-bold text-md mt-4 text-center' style={{ color: infoColor || "#ffffff", fontFamily: infoFontStack, fontSize: buildResponsiveFontSize(resolvedInfoSize, 0.8, 3.6), fontWeight: resolvedInfoWeight }}>{finalInfoText}</span>
             {pasosNode && (
                 <div className="w-full mt-2 flex justify-center">
                     {pasosNode}

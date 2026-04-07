@@ -1,8 +1,9 @@
 
 .form-leads-panel {
     width: min(100%, 40rem);
+    max-width: calc(100% - 0.75rem);
     min-height: 0;
-    padding: 1.35rem 1.8rem 1.5rem;
+    padding: clamp(0.95rem, 2.8vw, 1.35rem) clamp(0.9rem, 3.8vw, 1.8rem) clamp(1.05rem, 3vw, 1.5rem);
 }
 
 .form-leads-stack {
@@ -59,9 +60,21 @@
 }
 
 .landing-submit-wrap {
+    width: min(100%, 22rem);
     opacity: 0;
     transform: translateY(10px);
     animation: landingSubmitIn 0.45s ease-out forwards;
+}
+
+.landing-submit-wrap .MuiButton-root {
+    width: 100%;
+}
+
+.form-leads-replacement-image {
+    width: min(100%, 26rem);
+    max-height: clamp(7.5rem, 18vh, 11.5rem);
+    object-fit: contain;
+    border-radius: 1.5rem;
 }
 
 .landing-submit-wrap.is-active {

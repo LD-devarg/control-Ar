@@ -129,6 +129,13 @@ function getTextStyle(colorValue, baseStyle = {}) {
     return { ...baseStyle, color: colorValue };
 }
 
+function buildResponsiveFontSize(maxRem, minFactor = 0.72, vwFactor = 4) {
+    const numeric = Number(maxRem);
+    const safeMax = Number.isFinite(numeric) ? numeric : 1;
+    const safeMin = Math.max(0.82, Number((safeMax * minFactor).toFixed(2)));
+    return `clamp(${safeMin}rem, ${vwFactor}vw, ${safeMax}rem)`;
+}
+
 export default function Landing() {
     const [landing, setLanding] = useState(null);
     const [whatsappNumber, setWhatsappNumber] = useState("");
@@ -582,7 +589,7 @@ export default function Landing() {
         return (
             <>
                 {before}
-                <span className="keyword" style={getTextStyle(colorKeyword, { fontFamily: fontKeywordStack, fontSize: `${sizeKeyword}rem`, fontWeight: weightKeyword })}>{keyword}</span>
+                <span className="keyword" style={getTextStyle(colorKeyword, { fontFamily: fontKeywordStack, fontSize: buildResponsiveFontSize(sizeKeyword, 0.68, 4.8), fontWeight: weightKeyword })}>{keyword}</span>
                 {after}
             </>
         );
@@ -722,19 +729,19 @@ export default function Landing() {
                         decoding="async"
                     />
                 ) : null}
-                <div className="relative z-index-1 w-full flex flex-col items-center justify-center h-full">
+                <div className="landing-stage">
                     {hasLandingData ? (
-                        <div className="text-center">
+                        <div className="landing-copy-block">
                             <h1
                                 className="mt-10 text-center font-bold landing-fade-in"
-                                style={getTextStyle(colorTitulo, { fontFamily: fontTituloStack, fontSize: `${sizeTitulo}rem`, fontWeight: weightTitulo })}
+                                style={getTextStyle(colorTitulo, { fontFamily: fontTituloStack, fontSize: buildResponsiveFontSize(sizeTitulo, 0.58, 6.4), fontWeight: weightTitulo, lineHeight: 1.05 })}
                             >
                                 {titleText}
                             </h1>
                             <div className="landing-bono-pulse">
-                                <span className="landing-bono" style={getTextStyle(colorBono, { fontFamily: fontBonoStack, fontSize: `${sizeBono}rem`, fontWeight: weightBono })}> {bonusText} </span>
+                                <span className="landing-bono" style={getTextStyle(colorBono, { fontFamily: fontBonoStack, fontSize: buildResponsiveFontSize(sizeBono, 0.56, 8.2), fontWeight: weightBono, lineHeight: 1.05 })}> {bonusText} </span>
                             </div>
-                            <h2 className="" style={getTextStyle(colorSubtitulo, { fontFamily: fontSubtituloStack, fontSize: `${sizeSubtitulo}rem`, fontWeight: weightSubtitulo })}>{renderSubtitle()}</h2>
+                            <h2 className="" style={getTextStyle(colorSubtitulo, { fontFamily: fontSubtituloStack, fontSize: buildResponsiveFontSize(sizeSubtitulo, 0.68, 4.6), fontWeight: weightSubtitulo, lineHeight: 1.12 })}>{renderSubtitle()}</h2>
                             {hasLandingData && mostrarComunidad && textoComunidad && (
                                 <div className="mt-1 mb-1 px-2 lg:p-0 landing-fade-in flex justify-center w-full ">
                                     <span className="px-4 py-1 rounded-full bg-white/10 border border-white/20 text-white font-semibold backdrop-blur-sm text-sm" style={{ fontFamily: fontSubtituloStack, color: colorSubtitulo }}>
@@ -806,7 +813,7 @@ export default function Landing() {
                     ) : null}
                 </div>
             </section>
-            <div className="w-full py-2 flex justify-center bg-black/80 relative z-20">
+            <div className="landing-footer">
                 <span className="text-xs text-gray">
                     {hasLandingData ? (landing?.footer_text || "© 2026 ControlAR. Todos los derechos reservados.") : ""}
                 </span>

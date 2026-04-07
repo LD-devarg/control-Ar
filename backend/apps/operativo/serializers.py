@@ -273,6 +273,7 @@ class LandingSerializer(serializers.ModelSerializer):
     bono = serializers.CharField()
     pixel_id = serializers.SerializerMethodField()
     empresa_codigo_prefijo = serializers.SerializerMethodField()
+    clear_imagen_reemplazo_form = serializers.BooleanField(write_only=True, required=False, default=False)
 
     def get_pixel_id(self, obj):
         cred = obj.credencial_meta
@@ -413,6 +414,13 @@ class LandingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("font_scale debe estar entre 0.8 y 1.6.")
         return value
 
+    def update(self, instance, validated_data):
+        clear_imagen_reemplazo_form = bool(validated_data.pop("clear_imagen_reemplazo_form", False))
+        if clear_imagen_reemplazo_form and instance.imagen_reemplazo_form:
+            instance.imagen_reemplazo_form.delete(save=False)
+            instance.imagen_reemplazo_form = None
+        return super().update(instance, validated_data)
+
     class Meta:
         model = Landing
         fields = [
@@ -477,6 +485,7 @@ class LandingSerializer(serializers.ModelSerializer):
             "background_vertical",
             "background_horizontal",
             "imagen_reemplazo_form",
+            "clear_imagen_reemplazo_form",
             "activo",
             "creado_en",
             "pixel_id",

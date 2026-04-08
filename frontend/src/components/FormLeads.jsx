@@ -46,6 +46,44 @@ function buildWhatsappUrl(number, text) {
     return `https://wa.me/${normalizedNumber}?text=${encoded}`;
 }
 
+function extractWhatsappLaunchData(url) {
+    if (!url) return null;
+    try {
+        const parsed = new URL(url);
+        const phone = parsed.pathname.replace(/\//g, "").trim();
+        const text = parsed.searchParams.get("text") || "";
+        if (!phone) return null;
+        return {
+            phone,
+            text,
+            encodedText: encodeURIComponent(text),
+        };
+    } catch {
+        return null;
+    }
+}
+
+function getWhatsappLaunchUrl(url) {
+    const launchData = extractWhatsappLaunchData(url);
+    if (!launchData || typeof navigator === "undefined") return url;
+
+    const ua = String(navigator.userAgent || "");
+    const isAndroid = /Android/i.test(ua);
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+    const isInAppBrowser = /FB_IAB|FB4A|Instagram|wv\b|WebView/i.test(ua);
+    const apiUrl = `https://api.whatsapp.com/send?phone=${launchData.phone}&text=${launchData.encodedText}`;
+
+    if (isAndroid && isInAppBrowser) {
+        return `intent://send?phone=${launchData.phone}&text=${launchData.encodedText}#Intent;scheme=whatsapp;package=com.whatsapp;S.browser_fallback_url=${encodeURIComponent(apiUrl)};end`;
+    }
+
+    if (isMobile) {
+        return `whatsapp://send?phone=${launchData.phone}&text=${launchData.encodedText}`;
+    }
+
+    return apiUrl;
+}
+
 function openReservedWindow() {
     if (typeof window === "undefined" || typeof window.open !== "function") return null;
     const popup = window.open("", "_blank");
@@ -111,9 +149,15 @@ function openReservedWindow() {
     return popup;
 }
 
-function navigateToWhatsapp(url) {
+function navigateToWhatsapp(url, reservedWindow = null) {
     if (!url || typeof window === "undefined") return;
-    window.location.assign(url);
+    const launchUrl = getWhatsappLaunchUrl(url);
+    const targetWindow = reservedWindow && !reservedWindow.closed ? reservedWindow : window;
+    try {
+        targetWindow.location.assign(launchUrl);
+    } catch {
+        window.location.assign(launchUrl);
+    }
 }
 
 function randomInt(maxExclusive) {
@@ -721,15 +765,17 @@ export default function NuevoLead({
 
             const generatedCodigo = prefetchedCode || generateLeadCode(codePrefix);
             const generatedUsername = buildUsername(trimmedName, generatedCodigo);
+            
+            const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
+                bono: bonusText || "100%",
+                username: generatedUsername,
+                nombre: trimmedName,
+                contacto: normalizedPhone,
+                codigo: generatedCodigo,
+            });
+            const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
+
             if (isTestMode) {
-                const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
-                    bono: bonusText || "100%",
-                    username: generatedUsername,
-                    nombre: trimmedName,
-                    contacto: normalizedPhone,
-                    codigo: generatedCodigo,
-                });
-                const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
                 navigateToWhatsapp(currentWhatsappUrl);
                 return;
             }
@@ -748,54 +794,34 @@ export default function NuevoLead({
                 ...Object.fromEntries(Object.entries(tracking).filter(([, value]) => Boolean(value))),
                 ...(eventSourceUrl ? { event_source_url: eventSourceUrl } : {}),
             };
+
             const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-            let finalCodigo = String(payload?.codigo || generatedCodigo);
-            let finalUsername = String(payload?.username || generatedUsername);
-            let finalNombre = String(payload?.nombre || trimmedName);
-            let leadCreated = false;
-
-            const queuedLocally = enqueueClient(payload);
-            try {
-                const { data } = await axios.post(`${baseUrl}/clientes/`, payload, { timeout: 8000 });
-                finalCodigo = String(data?.codigo || generatedCodigo);
-                finalUsername = String(data?.username || generatedUsername);
-                finalNombre = String(data?.nombre || trimmedName);
-                leadCreated = true;
-                removeQueuedClient(payload.idempotency_key);
-                setPrefetchedCode("");
-                setActiveReservationToken("");
-                clearRetryAttempt();
-                notifyLeadAccepted();
-            } catch {
-                sendWithBeacon(baseUrl, payload);
-                sendWithKeepalive(baseUrl, payload).catch(() => {
-                    // keepalive is best-effort only
+            
+            enqueueClient(payload);
+            sendWithBeacon(baseUrl, payload);
+            
+            // Fire and forget, no await!
+            axios.post(`${baseUrl}/clientes/`, payload)
+                .then(() => {
+                    removeQueuedClient(payload.idempotency_key);
+                    notifyLeadAccepted();
+                    tryFlushQueue();
+                    checkQueueHealth();
+                })
+                .catch(() => {
+                    // Falls back to background queue syncing 
+                    checkQueueHealth();
                 });
-                tryFlushQueue();
-                checkQueueHealth();
-                pendingRetryAttemptRef.current = { payload };
-                setRetryAttemptNonce((value) => value + 1);
-                setError(
-                    !queuedLocally
-                        ? "No pudimos abrirlo bien. Tocá acá para insistir."
-                        : "Si no abrió WhatsApp, tocá acá y probamos de nuevo."
-                );
-            }
+            
+            setPrefetchedCode("");
+            setActiveReservationToken("");
+            clearRetryAttempt();
+            setError("");
 
-            const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
-                bono: bonusText || "100%",
-                username: finalUsername,
-                nombre: finalNombre,
-                contacto: normalizedPhone,
-                codigo: finalCodigo,
-            });
-            const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
             navigateToWhatsapp(currentWhatsappUrl);
+            
             if (typeof onWhatsappOpened === "function") {
                 onWhatsappOpened();
-            }
-            if (leadCreated) {
-                setError("");
             }
         } finally {
             submittingLeadRef.current = false;

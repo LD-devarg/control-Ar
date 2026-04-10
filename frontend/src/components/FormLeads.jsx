@@ -89,6 +89,18 @@ function getWhatsappLaunchUrl(url) {
 
 function openReservedWindow() {
     if (typeof window === "undefined" || typeof window.open !== "function") return null;
+    
+    // Detectamos si es Android o navegador integrado (Instagram/Facebook)
+    const ua = typeof navigator !== "undefined" ? String(navigator.userAgent || "") : "";
+    const isAndroid = /Android/i.test(ua);
+    const isInAppBrowser = /FB_IAB|FB4A|Instagram|wv\b|WebView/i.test(ua);
+    
+    // En webviews de Android o Instagram, abrir un popup o pestaña en blanco "rompe" el deep link.
+    // El 'intent://' debe ejecutarse sobre la ventana principal, de lo contrario se quedan atascados en 'Redirigiendo...'.
+    if (isAndroid || isInAppBrowser) {
+        return null;
+    }
+
     const popup = window.open("", "_blank");
     if (!popup) return null;
     try {

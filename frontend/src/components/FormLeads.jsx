@@ -14,6 +14,7 @@ const ALERT_THRESHOLD_MS = 5 * 60 * 1000;
 const ALERT_INTERVAL_MS = 60 * 1000;
 const ALERT_DEDUP_MS = 30 * 60 * 1000;
 const PRIMARY_SUBMIT_TIMEOUT_MS = 3000;
+const SUBMIT_LOCK_MS = 4500;
 const RECENT_QUEUE_GRACE_MS = 8000;
 
 function generateIdempotencyKey() {
@@ -324,6 +325,7 @@ export default function NuevoLead({
     const retryTimerRef = useRef(null);
     const healthTimerRef = useRef(null);
     const inFlightLeadKeysRef = useRef(new Set());
+    const submissionUnlockTimerRef = useRef(null);
 
     const trimmedName = useMemo(() => name.trim(), [name]);
     const trimmedPhone = useMemo(() => phone.trim(), [phone]);
@@ -415,6 +417,26 @@ export default function NuevoLead({
                 )
                 : true
         );
+
+    const releaseSubmissionLock = () => {
+        if (submissionUnlockTimerRef.current) {
+            clearTimeout(submissionUnlockTimerRef.current);
+            submissionUnlockTimerRef.current = null;
+        }
+        submittingLeadRef.current = false;
+        setIsSubmitting(false);
+    };
+
+    const armSubmissionUnlock = () => {
+        if (submissionUnlockTimerRef.current) {
+            clearTimeout(submissionUnlockTimerRef.current);
+        }
+        submissionUnlockTimerRef.current = setTimeout(() => {
+            submissionUnlockTimerRef.current = null;
+            submittingLeadRef.current = false;
+            setIsSubmitting(false);
+        }, SUBMIT_LOCK_MS);
+    };
 
     const scheduleRetry = () => {
         if (retryTimerRef.current) return;
@@ -528,7 +550,9 @@ export default function NuevoLead({
                     anySuccess = true;
                 } catch (err) {
                     lastError = err;
-                    remaining.push(item);
+                    if (!err.response || err.response.status >= 500) {
+                        remaining.push(item);
+                    }
                 }
             }
             saveQueue(remaining);
@@ -575,6 +599,7 @@ export default function NuevoLead({
             queue.filter((item) => shouldBeaconQueueItem(item, inFlightLeadKeysRef.current)).slice(0, 20).forEach((item) => {
                 sendWithBeacon(baseUrl, item);
             });
+            releaseSubmissionLock();
         };
         const handlePageHide = () => {
             const queue = loadQueue();
@@ -583,6 +608,7 @@ export default function NuevoLead({
             queue.filter((item) => shouldBeaconQueueItem(item, inFlightLeadKeysRef.current)).slice(0, 20).forEach((item) => {
                 sendWithBeacon(baseUrl, item);
             });
+            releaseSubmissionLock();
         };
         window.addEventListener("online", handleOnline);
         document.addEventListener("visibilitychange", handleHidden);
@@ -601,6 +627,10 @@ export default function NuevoLead({
             if (healthTimerRef.current) {
                 clearInterval(healthTimerRef.current);
                 healthTimerRef.current = null;
+            }
+            if (submissionUnlockTimerRef.current) {
+                clearTimeout(submissionUnlockTimerRef.current);
+                submissionUnlockTimerRef.current = null;
             }
         };
     }, [isPreview, isTestMode]);
@@ -691,6 +721,8 @@ export default function NuevoLead({
 
         submittingLeadRef.current = true;
         setIsSubmitting(true);
+        armSubmissionUnlock();
+        const reservedWindow = openReservedWindow();
         try {
             const fbp = getCookieValue("_fbp") || undefined;
             const fbc = getCookieValue("_fbc") || undefined;
@@ -713,7 +745,10 @@ export default function NuevoLead({
             const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
 
             if (isTestMode) {
-                navigateToWhatsapp(currentWhatsappUrl);
+                navigateToWhatsapp(currentWhatsappUrl, reservedWindow);
+                if (typeof onWhatsappOpened === "function") {
+                    onWhatsappOpened();
+                }
                 return;
             }
 
@@ -749,17 +784,16 @@ export default function NuevoLead({
 
             setPrefetchedCode("");
             setActiveReservationToken("");
-            clearRetryAttempt();
             setError("");
 
-            navigateToWhatsapp(currentWhatsappUrl);
+            navigateToWhatsapp(currentWhatsappUrl, reservedWindow);
 
             if (typeof onWhatsappOpened === "function") {
                 onWhatsappOpened();
             }
-        } finally {
-            submittingLeadRef.current = false;
-            setIsSubmitting(false);
+        } catch {
+            releaseSubmissionLock();
+            setError("No pudimos abrir WhatsApp. Intenta nuevamente.");
         }
     };
 

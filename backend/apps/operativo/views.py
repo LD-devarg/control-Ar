@@ -719,76 +719,80 @@ class ClienteViewSet(viewsets.ModelViewSet):
         request_ip = get_request_ip(request)
         request_user_agent = get_request_user_agent(request)
 
-        fingerprint_cliente, fingerprint_dedup_details = _find_recent_fingerprint_cliente(
-            empresa_id=landing.empresa_id,
-            fbp=normalized_fbp,
-            event_source_url=normalized_event_source_url,
-            user_agent=request_user_agent or "",
-            ip_address=request_ip,
-        )
-        if fingerprint_cliente:
-            cliente = _merge_cliente_missing_fields(
-                cliente=fingerprint_cliente,
-                validated_data=serializer.validated_data,
-                request=request,
-            )
-            _create_lead_event(
-                landing=landing,
-                cliente=cliente,
-                request=request,
-                requested_codigo=requested_codigo,
-                resultado="deduplicado_fingerprint",
-                motivo="cliente_existente_por_fingerprint",
-                dedup_details=fingerprint_dedup_details,
-            )
-            if reservation_token:
-                consume_reservation(reservation_token)
-            output = ClienteSerializer(cliente)
-            return Response(output.data, status=status.HTTP_200_OK)
+        skip_landing_dedup = bool(reservation_token)
 
-        duplicate_cliente, duplicate_dedup_details = _find_recent_duplicate_lead_cliente(
-            landing_id=landing.id,
-            contacto=normalized_contacto,
-            fbp=normalized_fbp,
-            fbc=normalized_fbc,
-            ip_address=request_ip,
-            user_agent=request_user_agent,
-        )
-        if duplicate_cliente:
-            cliente = _merge_cliente_missing_fields(
-                cliente=duplicate_cliente,
-                validated_data=serializer.validated_data,
-                request=request,
+        if not skip_landing_dedup:
+            fingerprint_cliente, fingerprint_dedup_details = _find_recent_fingerprint_cliente(
+                empresa_id=landing.empresa_id,
+                fbp=normalized_fbp,
+                event_source_url=normalized_event_source_url,
+                user_agent=request_user_agent or "",
+                ip_address=request_ip,
             )
-            _create_lead_event(
-                landing=landing,
-                cliente=cliente,
-                request=request,
-                requested_codigo=requested_codigo,
-                resultado="deduplicado_lead",
-                motivo="lead_reciente_duplicado",
-                dedup_details=duplicate_dedup_details,
+            if fingerprint_cliente:
+                cliente = _merge_cliente_missing_fields(
+                    cliente=fingerprint_cliente,
+                    validated_data=serializer.validated_data,
+                    request=request,
+                )
+                _create_lead_event(
+                    landing=landing,
+                    cliente=cliente,
+                    request=request,
+                    requested_codigo=requested_codigo,
+                    resultado="deduplicado_fingerprint",
+                    motivo="cliente_existente_por_fingerprint",
+                    dedup_details=fingerprint_dedup_details,
+                )
+                if reservation_token:
+                    consume_reservation(reservation_token)
+                output = ClienteSerializer(cliente)
+                return Response(output.data, status=status.HTTP_200_OK)
+
+            duplicate_cliente, duplicate_dedup_details = _find_recent_duplicate_lead_cliente(
+                landing_id=landing.id,
+                contacto=normalized_contacto,
+                fbp=normalized_fbp,
+                fbc=normalized_fbc,
+                ip_address=request_ip,
+                user_agent=request_user_agent,
             )
-            if reservation_token:
-                consume_reservation(reservation_token)
-            output = ClienteSerializer(cliente)
-            return Response(output.data, status=status.HTTP_200_OK)
+            if duplicate_cliente:
+                cliente = _merge_cliente_missing_fields(
+                    cliente=duplicate_cliente,
+                    validated_data=serializer.validated_data,
+                    request=request,
+                )
+                _create_lead_event(
+                    landing=landing,
+                    cliente=cliente,
+                    request=request,
+                    requested_codigo=requested_codigo,
+                    resultado="deduplicado_lead",
+                    motivo="lead_reciente_duplicado",
+                    dedup_details=duplicate_dedup_details,
+                )
+                if reservation_token:
+                    consume_reservation(reservation_token)
+                output = ClienteSerializer(cliente)
+                return Response(output.data, status=status.HTTP_200_OK)
 
         cliente = serializer.save()
-        recent_event = _find_recent_lead_event(cliente_id=cliente.id, landing_id=landing.id)
-        if recent_event:
-            _create_lead_event(
-                landing=landing,
-                cliente=cliente,
-                request=request,
-                requested_codigo=requested_codigo,
-                resultado="deduplicado_evento_reciente",
-                motivo="lead_reciente_existente",
-            )
-            if reservation_token:
-                consume_reservation(reservation_token)
-            output = ClienteSerializer(cliente)
-            return Response(output.data, status=status.HTTP_200_OK)
+        if not skip_landing_dedup:
+            recent_event = _find_recent_lead_event(cliente_id=cliente.id, landing_id=landing.id)
+            if recent_event:
+                _create_lead_event(
+                    landing=landing,
+                    cliente=cliente,
+                    request=request,
+                    requested_codigo=requested_codigo,
+                    resultado="deduplicado_evento_reciente",
+                    motivo="lead_reciente_existente",
+                )
+                if reservation_token:
+                    consume_reservation(reservation_token)
+                output = ClienteSerializer(cliente)
+                return Response(output.data, status=status.HTTP_200_OK)
 
         resultado = "creado_reasignado" if requested_codigo and requested_codigo != cliente.codigo else "creado"
         motivo = "codigo_reasignado" if resultado == "creado_reasignado" else "cliente_nuevo"

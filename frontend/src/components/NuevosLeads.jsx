@@ -84,18 +84,13 @@ function buildEffectiveLeads(rows) {
 function wasLeadSentToMeta(lead) {
     if (!lead || lead.tipo !== "lead") return false;
 
-    const payload = lead?.data && typeof lead.data === "object" ? lead.data : {};
-    if (payload.meta_skipped) return false;
+    // Solo mostrar los que SE ENVIARON a Meta (si enviado_en es null, no se envio)
+    if (!lead.enviado_en) return false;
 
-    const respuestaMeta =
-        lead?.respuesta_meta && typeof lead.respuesta_meta === "object" ? lead.respuesta_meta : null;
-    const targets = Array.isArray(respuestaMeta?.targets) ? respuestaMeta.targets : [];
-    if (!targets.length) return false;
+    // Solo mostrar los que NO tienen contacto aun
+    if (lead.contactado) return false;
 
-    const hasPositiveTarget = targets.some((target) => target?.ok === true);
-    if (!hasPositiveTarget) return false;
-
-    return lead?.estado_envio === "enviado" || respuestaMeta?.primary_ok === true || Boolean(lead?.enviado_en);
+    return true;
 }
 
 function buildDayGroups(items) {

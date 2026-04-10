@@ -114,6 +114,23 @@ function buildEffectiveLeads(rows) {
     });
 }
 
+function wasLeadSentToMeta(lead) {
+    if (!lead || lead.tipo !== "lead") return false;
+
+    const payload = lead?.data && typeof lead.data === "object" ? lead.data : {};
+    if (payload.meta_skipped) return false;
+
+    const respuestaMeta =
+        lead?.respuesta_meta && typeof lead.respuesta_meta === "object" ? lead.respuesta_meta : null;
+    const targets = Array.isArray(respuestaMeta?.targets) ? respuestaMeta.targets : [];
+    if (!targets.length) return false;
+
+    const hasPositiveTarget = targets.some((target) => target?.ok === true);
+    if (!hasPositiveTarget) return false;
+
+    return lead?.estado_envio === "enviado" || respuestaMeta?.primary_ok === true || Boolean(lead?.enviado_en);
+}
+
 function buildDayGroups(items) {
     const now = dayjs();
     const grouped = new Map();
@@ -176,7 +193,8 @@ function NuevosLeads() {
             const { data } = await apiClient.get("/eventos-meta/", {
                 params: { tipo: "lead", sin_contacto: 1, limit: 50 },
             });
-            const nextRows = buildEffectiveLeads(data);
+            const metaSentRows = (Array.isArray(data) ? data : []).filter(wasLeadSentToMeta);
+            const nextRows = buildEffectiveLeads(metaSentRows);
             setLeads(nextRows);
             if (typeof window !== "undefined") {
                 window.sessionStorage.setItem(cacheKey, JSON.stringify(nextRows));

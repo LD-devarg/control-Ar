@@ -52,7 +52,7 @@ export default function FormCompra() {
     const load = async () => {
       setLoading(true);
       try {
-        const data = await fetchClientes({ onlyWithContact: true });
+        const data = await fetchClientes();
         if (mounted) {
           const options = (data || []).map((cliente) => ({
             ...cliente,
@@ -174,8 +174,14 @@ export default function FormCompra() {
         loading={loading}
         className="form-autocomplete"
         getOptionLabel={(option) => option.label || ""}
+        isOptionEqualToValue={(option, value) => option?.id === value?.id}
         value={selectedCliente}
         onChange={(event, value) => setSelectedCliente(value)}
+        renderOption={(props, option) => (
+          <li {...props}>
+            {option.label || buildClienteDisplayLabel(option)}
+          </li>
+        )}
         renderInput={(params) => <TextField {...params} label="Seleccione el cliente" 
         sx={{ ...fieldSx, 
               '& .MuiAutocomplete-input': { color: `${color} !important` },

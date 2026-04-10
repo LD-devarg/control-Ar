@@ -316,7 +316,6 @@ export default function NuevoLead({
     const [phone, setPhone] = useState("");
     const [error, setError] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [retryAttemptNonce, setRetryAttemptNonce] = useState(0);
     const [prefetchedCode, setPrefetchedCode] = useState(() => String(reservedCode || "").trim());
     const [activeReservationToken, setActiveReservationToken] = useState(() => String(reservationToken || "").trim());
     const sendingRef = useRef(false);
@@ -324,7 +323,6 @@ export default function NuevoLead({
     const retryIndexRef = useRef(0);
     const retryTimerRef = useRef(null);
     const healthTimerRef = useRef(null);
-    const pendingRetryAttemptRef = useRef(null);
     const inFlightLeadKeysRef = useRef(new Set());
 
     const trimmedName = useMemo(() => name.trim(), [name]);
@@ -340,12 +338,6 @@ export default function NuevoLead({
     useEffect(() => {
         setActiveReservationToken(String(reservationToken || "").trim());
     }, [reservationToken]);
-
-    useEffect(() => {
-        if (!pendingRetryAttemptRef.current) return;
-        clearRetryAttempt();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [name, phone]);
 
     const finalButtonText = buttonText || "JUGÁ AHORA";
     const finalInfoText = infoText || "Atencion personalizada las 24hs.";
@@ -423,11 +415,6 @@ export default function NuevoLead({
                 )
                 : true
         );
-
-    const clearRetryAttempt = () => {
-        pendingRetryAttemptRef.current = null;
-        setRetryAttemptNonce((value) => value + 1);
-    };
 
     const scheduleRetry = () => {
         if (retryTimerRef.current) return;
@@ -689,84 +676,9 @@ export default function NuevoLead({
             return;
         }
         setError("");
-        clearRetryAttempt();
     };
 
-    const handleWhatsappClick = () => {
-        if (isPreview) return;
-        if (!canSubmit) {
-            if (showNameField && showPhoneField && !(isNameValid || isPhoneValid)) {
-                setError("Ingresá un nombre válido.");
-            } else if (showNameField && !showPhoneField && !isNameValid) {
-                setError("Ingresa un nombre valido.");
-            } else if (!showNameField && showPhoneField && !isPhoneValid) {
-                setError("Ingresa un telefono valido.");
-            } else if (!landingToken) {
-                setError("Landing inválida o sin token.");
-            }
-            return;
-        }
-        if (!whatsappNumber) {
-            setError("No hay líneas de WhatsApp activas para esta empresa.");
-            return;
-        }
-        setError("");
-        clearRetryAttempt();
-
-        const fbp = getCookieValue("_fbp") || undefined;
-        const fbc = getCookieValue("_fbc") || undefined;
-        const tracking = getTrackingParams();
-        const eventSourceUrl =
-            typeof window !== "undefined"
-                ? `${window.location.origin}${window.location.pathname}`
-                : undefined;
-
-        const generatedCodigo = generateLeadCode(codePrefix);
-        const generatedUsername = buildUsername(trimmedName, generatedCodigo);
-
-        const messageWithCodigo = renderWhatsappMessage(whatsappTemplate, {
-            bono: bonusText || "100%",
-            username: generatedUsername,
-            nombre: trimmedName,
-            contacto: normalizedPhone,
-            codigo: generatedCodigo,
-        });
-        const currentWhatsappUrl = buildWhatsappUrl(whatsappNumber, messageWithCodigo);
-
-        if (isTestMode) {
-            navigateToWhatsapp(currentWhatsappUrl);
-            return;
-        }
-
-        const payload = {
-            idempotency_key: generateIdempotencyKey(),
-            queued_at: new Date().toISOString(),
-            landing_token: landingToken,
-            nombre: trimmedName,
-            contacto: normalizedPhone,
-            username: generatedUsername,
-            codigo: generatedCodigo,
-            ...(fbp ? { fbp } : {}),
-            ...(fbc ? { fbc } : {}),
-            ...Object.fromEntries(Object.entries(tracking).filter(([, value]) => Boolean(value))),
-            ...(eventSourceUrl ? { event_source_url: eventSourceUrl } : {}),
-        };
-        enqueueClient(payload);
-        const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-        sendWithBeacon(baseUrl, payload);
-        sendWithKeepalive(baseUrl, payload).catch(() => {
-            // keepalive is best-effort only
-        });
-        tryFlushQueue();
-        checkQueueHealth();
-
-        navigateToWhatsapp(currentWhatsappUrl);
-        if (typeof onWhatsappOpened === "function") {
-            onWhatsappOpened();
-        }
-    };
-
-    const handleWhatsappClickSafe = async () => {
+    const handleWhatsappClickSafe = () => {
         if (isPreview || submittingLeadRef.current || isSubmitting) return;
         if (!canSubmit) {
             showValidationError();
@@ -805,8 +717,7 @@ export default function NuevoLead({
                 return;
             }
 
-            const reservedWindow = openReservedWindow();
-            const payload = pendingRetryAttemptRef.current?.payload || {
+            const payload = {
                 idempotency_key: generateIdempotencyKey(),
                 queued_at: new Date().toISOString(),
                 landing_token: landingToken,
@@ -822,37 +733,31 @@ export default function NuevoLead({
             };
 
             const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+            enqueueClient(payload);
             inFlightLeadKeysRef.current.add(payload.idempotency_key);
 
-            let shouldEnqueueFallback = false;
-            try {
-                await axios.post(`${baseUrl}/clientes/`, payload, {
-                    timeout: PRIMARY_SUBMIT_TIMEOUT_MS,
-                });
+            axios.post(`${baseUrl}/clientes/`, payload, {
+                timeout: PRIMARY_SUBMIT_TIMEOUT_MS,
+            }).then(() => {
                 removeQueuedClient(payload.idempotency_key);
                 notifyLeadAccepted();
-            } catch {
-                shouldEnqueueFallback = true;
-                enqueueClient(payload);
+            }).catch(() => {
                 checkQueueHealth();
-            }
+            }).finally(() => {
+                inFlightLeadKeysRef.current.delete(payload.idempotency_key);
+            });
 
             setPrefetchedCode("");
             setActiveReservationToken("");
             clearRetryAttempt();
             setError("");
 
-            navigateToWhatsapp(currentWhatsappUrl, reservedWindow);
-
-            if (shouldEnqueueFallback) {
-                tryFlushQueue();
-            }
+            navigateToWhatsapp(currentWhatsappUrl);
 
             if (typeof onWhatsappOpened === "function") {
                 onWhatsappOpened();
             }
         } finally {
-            inFlightLeadKeysRef.current.clear();
             submittingLeadRef.current = false;
             setIsSubmitting(false);
         }
@@ -940,19 +845,7 @@ export default function NuevoLead({
                         ) : null}
                     </Stack>
                     {error ? (
-                        pendingRetryAttemptRef.current ? (
-                            <button
-                                key={retryAttemptNonce}
-                                type="button"
-                                onClick={handleWhatsappClickSafe}
-                                className='text-amber-300 text-xs mt-2 underline decoration-dotted underline-offset-4'
-                                style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}
-                            >
-                                {error}
-                            </button>
-                        ) : (
-                            <span className='text-red-400 text-xs mt-2' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>{error}</span>
-                        )
+                        <span className='text-red-400 text-xs mt-2' style={{ fontFamily: formTextFontStack, fontSize: `${0.8 * resolvedFormSize}rem`, fontWeight: resolvedFormWeight }}>{error}</span>
                     ) : null}
                 </>
             ) : (

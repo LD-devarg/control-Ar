@@ -72,42 +72,9 @@ function formatLeadResult(lead) {
     }
 }
 
-function rankLeadForAside(lead) {
-    const payload = lead?.data && typeof lead.data === "object" ? lead.data : {};
-    if (payload.resultado === "creado_reasignado") return 3;
-    if (payload.resultado === "creado") return 2;
-    if (payload.deduplicado) return 1;
-    return 0;
-}
-
 function buildEffectiveLeads(rows) {
     const items = Array.isArray(rows) ? rows : [];
-    const byCliente = new Map();
-
-    items.forEach((lead, index) => {
-        const clienteKey = lead?.cliente ? `cliente:${lead.cliente}` : `evento:${lead?.id ?? index}`;
-        const current = byCliente.get(clienteKey);
-        if (!current) {
-            byCliente.set(clienteKey, lead);
-            return;
-        }
-
-        const currentRank = rankLeadForAside(current);
-        const nextRank = rankLeadForAside(lead);
-        if (nextRank > currentRank) {
-            byCliente.set(clienteKey, lead);
-            return;
-        }
-        if (nextRank === currentRank) {
-            const currentDate = new Date(current?.creado_en || 0).getTime();
-            const nextDate = new Date(lead?.creado_en || 0).getTime();
-            if (nextDate > currentDate) {
-                byCliente.set(clienteKey, lead);
-            }
-        }
-    });
-
-    return Array.from(byCliente.values()).sort((a, b) => {
+    return items.slice().sort((a, b) => {
         const aDate = new Date(a?.creado_en || 0).getTime();
         const bDate = new Date(b?.creado_en || 0).getTime();
         return bDate - aDate;
@@ -191,7 +158,7 @@ function NuevosLeads() {
         setError("");
         try {
             const { data } = await apiClient.get("/eventos-meta/", {
-                params: { tipo: "lead", sin_contacto: 1, limit: 50 },
+                params: { tipo: "lead", limit: 50 },
             });
             const metaSentRows = (Array.isArray(data) ? data : []).filter(wasLeadSentToMeta);
             const nextRows = buildEffectiveLeads(metaSentRows);

@@ -13,6 +13,8 @@ const RETRY_DELAYS = [2000, 5000, 15000, 30000, 60000, 300000];
 const ALERT_THRESHOLD_MS = 5 * 60 * 1000;
 const ALERT_INTERVAL_MS = 60 * 1000;
 const ALERT_DEDUP_MS = 30 * 60 * 1000;
+const PRIMARY_SUBMIT_TIMEOUT_MS = 3000;
+const RECENT_QUEUE_GRACE_MS = 8000;
 
 function generateIdempotencyKey() {
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -242,6 +244,15 @@ function toMillis(value) {
     return Number.isFinite(ms) ? ms : 0;
 }
 
+function shouldBeaconQueueItem(item, blockedKeys) {
+    const idempotencyKey = String(item?.idempotency_key || "").trim();
+    if (!idempotencyKey) return true;
+    if (blockedKeys?.has(idempotencyKey)) return false;
+    const queuedAtMs = toMillis(item?.queued_at);
+    if (!queuedAtMs) return true;
+    return Date.now() - queuedAtMs >= RECENT_QUEUE_GRACE_MS;
+}
+
 function getCookieValue(name) {
     if (typeof document === "undefined") return "";
     const parts = document.cookie.split("; ");
@@ -304,6 +315,7 @@ export default function NuevoLead({
     const [name, setName] = useState("");
     const [phone, setPhone] = useState("");
     const [error, setError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [retryAttemptNonce, setRetryAttemptNonce] = useState(0);
     const [prefetchedCode, setPrefetchedCode] = useState(() => String(reservedCode || "").trim());
     const [activeReservationToken, setActiveReservationToken] = useState(() => String(reservationToken || "").trim());
@@ -313,6 +325,7 @@ export default function NuevoLead({
     const retryTimerRef = useRef(null);
     const healthTimerRef = useRef(null);
     const pendingRetryAttemptRef = useRef(null);
+    const inFlightLeadKeysRef = useRef(new Set());
 
     const trimmedName = useMemo(() => name.trim(), [name]);
     const trimmedPhone = useMemo(() => phone.trim(), [phone]);
@@ -433,17 +446,6 @@ export default function NuevoLead({
         } catch {
             return false;
         }
-    };
-
-    const sendWithKeepalive = async (baseUrl, payload) => {
-        if (typeof fetch === "undefined") return;
-        await fetch(`${baseUrl}/clientes/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-            keepalive: true,
-            credentials: "omit",
-        });
     };
 
     const sendQueueAlert = (landingTokenToAlert, queueSize, oldestPendingMs) => {
@@ -583,7 +585,7 @@ export default function NuevoLead({
             const queue = loadQueue();
             if (!queue.length) return;
             const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-            queue.slice(0, 20).forEach((item) => {
+            queue.filter((item) => shouldBeaconQueueItem(item, inFlightLeadKeysRef.current)).slice(0, 20).forEach((item) => {
                 sendWithBeacon(baseUrl, item);
             });
         };
@@ -591,7 +593,7 @@ export default function NuevoLead({
             const queue = loadQueue();
             if (!queue.length) return;
             const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-            queue.slice(0, 20).forEach((item) => {
+            queue.filter((item) => shouldBeaconQueueItem(item, inFlightLeadKeysRef.current)).slice(0, 20).forEach((item) => {
                 sendWithBeacon(baseUrl, item);
             });
         };
@@ -666,6 +668,28 @@ export default function NuevoLead({
                 // ignore storage errors
             }
         }
+    };
+
+    const showValidationError = () => {
+        if (isPreview) return;
+        if (!canSubmit) {
+            if (showNameField && showPhoneField && !(isNameValid || isPhoneValid)) {
+                setError("Ingresá un nombre válido.");
+            } else if (showNameField && !showPhoneField && !isNameValid) {
+                setError("Ingresa un nombre valido.");
+            } else if (!showNameField && showPhoneField && !isPhoneValid) {
+                setError("Ingresa un telefono valido.");
+            } else if (!landingToken) {
+                setError("Landing inválida o sin token.");
+            }
+            return;
+        }
+        if (!whatsappNumber) {
+            setError("No hay líneas de WhatsApp activas para esta empresa.");
+            return;
+        }
+        setError("");
+        clearRetryAttempt();
     };
 
     const handleWhatsappClick = () => {
@@ -743,17 +767,18 @@ export default function NuevoLead({
     };
 
     const handleWhatsappClickSafe = async () => {
-        if (isPreview || submittingLeadRef.current) return;
+        if (isPreview || submittingLeadRef.current || isSubmitting) return;
         if (!canSubmit) {
-            handleWhatsappClick();
+            showValidationError();
             return;
         }
         if (!whatsappNumber) {
-            handleWhatsappClick();
+            showValidationError();
             return;
         }
 
         submittingLeadRef.current = true;
+        setIsSubmitting(true);
         try {
             const fbp = getCookieValue("_fbp") || undefined;
             const fbc = getCookieValue("_fbc") || undefined;
@@ -780,6 +805,7 @@ export default function NuevoLead({
                 return;
             }
 
+            const reservedWindow = openReservedWindow();
             const payload = pendingRetryAttemptRef.current?.payload || {
                 idempotency_key: generateIdempotencyKey(),
                 queued_at: new Date().toISOString(),
@@ -796,35 +822,39 @@ export default function NuevoLead({
             };
 
             const baseUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-            
-            enqueueClient(payload);
-            sendWithBeacon(baseUrl, payload);
-            
-            // Fire and forget, no await!
-            axios.post(`${baseUrl}/clientes/`, payload)
-                .then(() => {
-                    removeQueuedClient(payload.idempotency_key);
-                    notifyLeadAccepted();
-                    tryFlushQueue();
-                    checkQueueHealth();
-                })
-                .catch(() => {
-                    // Falls back to background queue syncing 
-                    checkQueueHealth();
+            inFlightLeadKeysRef.current.add(payload.idempotency_key);
+
+            let shouldEnqueueFallback = false;
+            try {
+                await axios.post(`${baseUrl}/clientes/`, payload, {
+                    timeout: PRIMARY_SUBMIT_TIMEOUT_MS,
                 });
-            
+                removeQueuedClient(payload.idempotency_key);
+                notifyLeadAccepted();
+            } catch {
+                shouldEnqueueFallback = true;
+                enqueueClient(payload);
+                checkQueueHealth();
+            }
+
             setPrefetchedCode("");
             setActiveReservationToken("");
             clearRetryAttempt();
             setError("");
 
-            navigateToWhatsapp(currentWhatsappUrl);
-            
+            navigateToWhatsapp(currentWhatsappUrl, reservedWindow);
+
+            if (shouldEnqueueFallback) {
+                tryFlushQueue();
+            }
+
             if (typeof onWhatsappOpened === "function") {
                 onWhatsappOpened();
             }
         } finally {
+            inFlightLeadKeysRef.current.clear();
             submittingLeadRef.current = false;
+            setIsSubmitting(false);
         }
     };
 
@@ -935,7 +965,7 @@ export default function NuevoLead({
             <div className={`landing-submit-wrap ${canSubmit ? "is-active" : ""}`}>
                 <Button variant="contained" startIcon={<WhatsAppIcon />}
                     onClick={handleWhatsappClickSafe}
-                    disabled={isPreview || !canSubmit}
+                    disabled={isPreview || !canSubmit || isSubmitting}
                     sx={{
                         backgroundColor: "transparent",
                         marginTop: "14px",
@@ -958,7 +988,7 @@ export default function NuevoLead({
                         },
                     }}
                 >
-                    {finalButtonText}
+                    {isSubmitting ? "Redirigiendo..." : finalButtonText}
                 </Button>
             </div>
             <span className='font-bold text-md mt-4 text-center' style={{ color: infoColor || "#ffffff", fontFamily: infoFontStack, fontSize: buildResponsiveFontSize(resolvedInfoSize, 0.8, 3.6), fontWeight: resolvedInfoWeight }}>{finalInfoText}</span>

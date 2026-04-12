@@ -1626,6 +1626,7 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 "operador__username",
                 "tipo",
                 "data",
+                "ocurrido_en",
                 "fbp",
                 "fbc",
                 "ip_address",
@@ -2168,7 +2169,7 @@ class StatsViewSet(viewsets.ViewSet):
         rendimientos_qs = RendimientoPautaDiario.objects.filter(empresa_id=empresa_id)
 
         visitas_qs = _apply_date_filters(visitas_qs, "creado_en", request)
-        eventos_qs = _apply_date_filters(eventos_qs, "creado_en", request)
+        eventos_qs = _apply_date_filters(eventos_qs, "ocurrido_en", request)
         compras_qs = _apply_date_filters(compras_qs, "creado_en", request)
         retiros_qs = _apply_date_filters(retiros_qs, "creado_en", request)
         from_date, to_date = _get_date_range(request)

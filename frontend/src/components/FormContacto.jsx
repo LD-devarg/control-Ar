@@ -82,6 +82,7 @@ export default function FormContacto() {
           username: evento.cliente_username || "",
           contacto: evento.cliente_contacto || "",
           nombre: evento.cliente_nombre || "",
+          leadOcurridoEn: evento.ocurrido_en || "",
         };
         unique.set(evento.cliente, {
           ...cliente,
@@ -224,7 +225,14 @@ export default function FormContacto() {
         className="form-autocomplete"
         getOptionLabel={(option) => option.label || ""}
         value={selectedCliente}
-        onChange={(event, value) => setSelectedCliente(value)}
+        onChange={(event, value) => {
+          setSelectedCliente(value);
+          setOcurridoEn(
+            value?.leadOcurridoEn
+              ? toDateTimeLocalInputValue(value.leadOcurridoEn)
+              : toDateTimeLocalInputValue()
+          );
+        }}
         renderOption={(props, option) => (
           <li {...props}>
             {option.label || buildClienteDisplayLabel(option)}

@@ -874,7 +874,7 @@ class PautaKPIViewSet(viewsets.ViewSet):
         end_dt = timezone.make_aware(timezone.datetime.combine(to_date, timezone.datetime.max.time()))
 
         visitas_qs = LandingVisit.objects.filter(creado_en__gte=start_dt, creado_en__lte=end_dt, **operational_filters)
-        eventos_qs = EventosMeta.objects.filter(creado_en__gte=start_dt, creado_en__lte=end_dt, **operational_filters)
+        eventos_qs = EventosMeta.objects.filter(ocurrido_en__gte=start_dt, ocurrido_en__lte=end_dt, **operational_filters)
         compras_qs = Compra.objects.filter(creado_en__gte=start_dt, creado_en__lte=end_dt, **operational_filters)
 
         first_purchase_id_subquery = (

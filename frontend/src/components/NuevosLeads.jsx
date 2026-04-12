@@ -90,6 +90,9 @@ function wasLeadSentToMeta(lead) {
     // Solo mostrar los que NO tienen contacto aun
     if (lead.contactado) return false;
 
+    // NO mostrar los leads descartados
+    if (lead.data?.lead_discarded) return false;
+
     return true;
 }
 
@@ -153,7 +156,7 @@ function NuevosLeads() {
         setError("");
         try {
             const { data } = await apiClient.get("/eventos-meta/", {
-                params: { tipo: "lead", limit: 50 },
+                params: { tipo: "lead", limit: 50, sin_contacto: 1 },
             });
             const metaSentRows = (Array.isArray(data) ? data : []).filter(wasLeadSentToMeta);
             const nextRows = buildEffectiveLeads(metaSentRows);

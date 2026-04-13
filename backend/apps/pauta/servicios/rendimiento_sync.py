@@ -22,11 +22,16 @@ LEAD_ACTIONS = {
     "onsite_conversion.lead_grouped",
     "onsite_conversion.lead",
     "offsite_conversion.fb_pixel_lead",
+    "onsite_conversion.messaging_lead",
 }
 CONTACT_ACTIONS = {
     "contact",
     "onsite_conversion.contact",
     "offsite_conversion.fb_pixel_contact",
+    "offsite_conversion.custom.contact",
+    "offsite_conversion.custom.Contact",
+    "onsite_conversion.messaging_conversation_started_7d",
+    "onsite_conversion.messaging_first_reply",
 }
 PURCHASE_ACTIONS = {
     "purchase",

@@ -124,10 +124,25 @@ function mapApiToLocalShape(payload) {
     moneyDisplay,
     executiveCards: cards,
     footerCards,
-    dailySeries: daily.map((d) => ({
-      day: d.day || "-",
-      roas: Number(d.roas || 0),
-    })),
+    dailySeries: daily.map((d) => {
+      let label = d.day || "-";
+      if (d.date) {
+        try {
+          const parsed = new Date(`${d.date}T12:00:00`);
+          if (!Number.isNaN(parsed.getTime())) {
+            const dayStr = String(parsed.getDate()).padStart(2, "0");
+            const monthStr = String(parsed.getMonth() + 1).padStart(2, "0");
+            const weekday = parsed.toLocaleDateString("es-AR", { weekday: "long" });
+            const capitalizedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+            label = `${dayStr}/${monthStr}, ${capitalizedWeekday}`;
+          }
+        } catch {}
+      }
+      return {
+        day: label,
+        roas: Number(d.roas || 0),
+      };
+    }),
     performanceScore: Number(payload?.executive?.performance_score || 0),
     lastSync: payload?.last_sync || {},
     operativeData: {

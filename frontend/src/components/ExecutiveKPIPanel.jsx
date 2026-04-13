@@ -53,16 +53,16 @@ function formatFooterValue(card, formatters) {
 function RoasWeeklyPanel({ dailySeries }) {
   const hasData = Array.isArray(dailySeries) && dailySeries.length > 0;
   return (
-    <aside className="h-full rounded-xl border border-white/10 bg-black/45 px-3 py-3">
-      <h3 className="mb-2 text-sm font-semibold text-white">ROAS semanal</h3>
-      <div className="space-y-2">
+    <aside className="h-full rounded-xl border border-white/10 bg-black/45 px-3 py-3 flex flex-col">
+      <h3 className="mb-2 shrink-0 text-sm font-semibold text-white">ROAS semanal</h3>
+      <div className="app-scrollbar flex-1 space-y-2 overflow-y-auto pr-1 pb-1" style={{ maxHeight: "18rem" }}>
         {!hasData ? (
           <div className="text-xs text-white/55">Sin datos reales para el periodo seleccionado.</div>
         ) : null}
-        {hasData ? dailySeries.map((item) => {
+        {hasData ? dailySeries.map((item, index) => {
           const tone = item.roas >= 3.4 ? "bg-emerald-400" : item.roas >= 2.8 ? "bg-amber-300" : "bg-rose-400";
           return (
-            <div key={`weekly-${item.day}`}>
+            <div key={`weekly-${item.day}-${index}`}>
               <div className="mb-1 flex items-center justify-between text-xs text-white/65">
                 <span>{item.day}</span>
                 <span>{item.roas.toFixed(2)}</span>

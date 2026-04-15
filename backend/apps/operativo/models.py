@@ -2,6 +2,7 @@ import secrets
 import string
 import uuid
 from django.db import models
+from django.utils import timezone
 from .storages import PrivateMediaStorage, PublicMediaStorage
 
 
@@ -308,6 +309,7 @@ class Compra(models.Model):
         blank=True,
     )
     creado_en = models.DateTimeField(auto_now_add=True)
+    ocurrido_en = models.DateTimeField(default=timezone.now)
     monto_usd = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     bono_ars = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     bono_usd = models.DecimalField(max_digits=10, decimal_places=2, default=0)

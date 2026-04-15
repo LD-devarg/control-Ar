@@ -709,8 +709,9 @@ class CompraSerializer(serializers.ModelSerializer):
             "comprobante_archivo",
             "tipo_cambio",
             "creado_en",
+            "ocurrido_en",
         ]
-        read_only_fields = ["id", "empresa", "tc", "monto_usd", "bono_usd", "creado_en"]
+        read_only_fields = ["id", "empresa", "tc", "monto_usd", "bono_usd", "creado_en", "ocurrido_en"]
 
 
 class RetiroSerializer(serializers.ModelSerializer):

@@ -2007,61 +2007,135 @@ class CompraViewSet(viewsets.ModelViewSet):
         was_first_purchase = False
         compra = None
 
-        with transaction.atomic():
-            cliente = Cliente.objects.select_for_update().get(pk=cliente.pk)
-            was_first_purchase = cliente.cant_compras == 0
-            tc_obj, tc_valor, monto_usd = calcular_compra(monto_ars)
-            _, _, bono_usd = calcular_compra(bono_ars) if bono_ars else (None, None, 0)
-            compra = Compra.objects.create(
-                cliente=cliente,
-                empresa=cliente.empresa,
-                operador=request.user,
-                monto_ars=monto_ars,
-                bono_ars=bono_ars,
-                bono_usd=bono_usd,
-                comprobante=comprobante,
-                comprobante_archivo=comprobante_archivo,
-                tc=tc_valor,
-                monto_usd=monto_usd,
-                tipo_cambio=tc_obj,
-            )
+        logger.info(
+            "Compra create iniciada cliente_id=%s empresa_id=%s user_id=%s monto_ars=%s bono_ars=%s has_file=%s evento_ocurrido_en=%s",
+            cliente.id,
+            cliente.empresa_id,
+            getattr(request.user, "id", None),
+            monto_ars,
+            bono_ars,
+            bool(comprobante_archivo),
+            request.data.get("evento_ocurrido_en"),
+        )
 
-            cliente.cant_compras += 1
-            cliente.total_compras_ars = (cliente.total_compras_ars or 0) + monto_ars
-            cliente.total_compras_usd = (cliente.total_compras_usd or 0) + monto_usd
-            cliente.save(update_fields=["cant_compras", "total_compras_ars", "total_compras_usd"])
+        try:
+            with transaction.atomic():
+                cliente = Cliente.objects.select_for_update().get(pk=cliente.pk)
+                was_first_purchase = cliente.cant_compras == 0
+                logger.info(
+                    "Compra create cliente bloqueado cliente_id=%s cant_compras=%s first_purchase=%s",
+                    cliente.id,
+                    cliente.cant_compras,
+                    was_first_purchase,
+                )
 
-        if was_first_purchase:
-            payload = {
-                "value": float(compra.monto_usd) if compra.monto_usd is not None else float(monto_ars),
-                "currency": "USD",
-                "phone": cliente.contacto,
-                "external_id": str(cliente.uuid),
-                "event_source_url": cliente.event_source_url,
-            }
-            evento = EventosMeta.objects.create(
-                id_evento=uuid.uuid4(),
-                cliente=cliente,
-                empresa=cliente.empresa,
-                landing=_resolve_latest_lead_landing(cliente_id=cliente.id),
-                operador=request.user,
-                tipo="purchase",
-                data=payload,
-                ocurrido_en=_parse_event_datetime_input(
+                tc_obj, tc_valor, monto_usd = calcular_compra(monto_ars)
+                _, _, bono_usd = calcular_compra(bono_ars) if bono_ars else (None, None, 0)
+                evento_ocurrido_en = _parse_event_datetime_input(
                     request.data.get("evento_ocurrido_en"),
                     field_name="evento_ocurrido_en",
-                ),
-                fbp=cliente.fbp,
-                fbc=cliente.fbc,
-                ip_address=_client_first_ip(request, cliente),
-                user_agent=_client_first_user_agent(request, cliente),
+                )
+                logger.info(
+                    "Compra create calculada cliente_id=%s tc=%s monto_usd=%s bono_usd=%s ocurrido_en=%s",
+                    cliente.id,
+                    tc_valor,
+                    monto_usd,
+                    bono_usd,
+                    evento_ocurrido_en,
+                )
+
+                compra = Compra.objects.create(
+                    cliente=cliente,
+                    empresa=cliente.empresa,
+                    operador=request.user,
+                    monto_ars=monto_ars,
+                    bono_ars=bono_ars,
+                    bono_usd=bono_usd,
+                    comprobante=comprobante,
+                    comprobante_archivo=comprobante_archivo,
+                    tc=tc_valor,
+                    monto_usd=monto_usd,
+                    tipo_cambio=tc_obj,
+                    ocurrido_en=evento_ocurrido_en,
+                )
+                logger.info(
+                    "Compra creada compra_id=%s cliente_id=%s monto_ars=%s monto_usd=%s",
+                    compra.id,
+                    cliente.id,
+                    compra.monto_ars,
+                    compra.monto_usd,
+                )
+
+                cliente.cant_compras += 1
+                cliente.total_compras_ars = (cliente.total_compras_ars or 0) + monto_ars
+                cliente.total_compras_usd = (cliente.total_compras_usd or 0) + monto_usd
+                cliente.save(update_fields=["cant_compras", "total_compras_ars", "total_compras_usd"])
+                logger.info(
+                    "Cliente actualizado tras compra cliente_id=%s cant_compras=%s total_compras_ars=%s total_compras_usd=%s",
+                    cliente.id,
+                    cliente.cant_compras,
+                    cliente.total_compras_ars,
+                    cliente.total_compras_usd,
+                )
+
+            if was_first_purchase:
+                payload = {
+                    "value": float(compra.monto_usd) if compra.monto_usd is not None else float(monto_ars),
+                    "currency": "USD",
+                    "phone": cliente.contacto,
+                    "external_id": str(cliente.uuid),
+                    "event_source_url": cliente.event_source_url,
+                }
+                logger.info(
+                    "Creando evento purchase de primera compra cliente_id=%s compra_id=%s payload_keys=%s",
+                    cliente.id,
+                    compra.id,
+                    sorted(payload.keys()),
+                )
+                evento = EventosMeta.objects.create(
+                    id_evento=uuid.uuid4(),
+                    cliente=cliente,
+                    empresa=cliente.empresa,
+                    landing=_resolve_latest_lead_landing(cliente_id=cliente.id),
+                    operador=request.user,
+                    tipo="purchase",
+                    data=payload,
+                    ocurrido_en=compra.ocurrido_en,
+                    fbp=cliente.fbp,
+                    fbc=cliente.fbc,
+                    ip_address=_client_first_ip(request, cliente),
+                    user_agent=_client_first_user_agent(request, cliente),
+                )
+                logger.info(
+                    "Evento purchase creado evento_id=%s cliente_id=%s compra_id=%s",
+                    evento.id,
+                    cliente.id,
+                    compra.id,
+                )
+                try:
+                    enviar_evento_meta(evento, request=request)
+                except Exception as exc:
+                    logger.exception(
+                        "Fallo envio Meta para purchase evento_id=%s cliente_id=%s compra_id=%s",
+                        evento.id,
+                        cliente.id,
+                        compra.id,
+                    )
+                    evento.estado_envio = "fallido"
+                    evento.respuesta_meta = {"error": str(exc)}
+                    evento.save(update_fields=["estado_envio", "respuesta_meta"])
+        except Exception:
+            logger.exception(
+                "Fallo creando compra cliente_id=%s empresa_id=%s user_id=%s monto_ars=%s bono_ars=%s has_file=%s evento_ocurrido_en=%s",
+                getattr(cliente, "id", None),
+                getattr(cliente, "empresa_id", None),
+                getattr(request.user, "id", None),
+                monto_ars,
+                bono_ars,
+                bool(comprobante_archivo),
+                request.data.get("evento_ocurrido_en"),
             )
-            try:
-                enviar_evento_meta(evento, request=request)
-            except Exception as exc:
-                evento.estado_envio = "fallido"
-                evento.respuesta_meta = {"error": str(exc)}
-                evento.save(update_fields=["estado_envio", "respuesta_meta"])
+            raise
 
         output = self.get_serializer(compra)
         _safe_publish_empresa_event(
@@ -2100,7 +2174,7 @@ class RetiroViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if user.is_authenticated and is_operador(user):
             qs = qs.filter(operador=user)
-        qs = _apply_date_filters(qs, "creado_en", self.request)
+        qs = _apply_date_filters(qs, "ocurrido_en", self.request)
         return qs
 
     def create(self, request, *args, **kwargs):
@@ -2170,7 +2244,7 @@ class StatsViewSet(viewsets.ViewSet):
 
         visitas_qs = _apply_date_filters(visitas_qs, "creado_en", request)
         eventos_qs = _apply_date_filters(eventos_qs, "ocurrido_en", request)
-        compras_qs = _apply_date_filters(compras_qs, "creado_en", request)
+        compras_qs = _apply_date_filters(compras_qs, "ocurrido_en", request)
         retiros_qs = _apply_date_filters(retiros_qs, "creado_en", request)
         from_date, to_date = _get_date_range(request)
         rendimientos_qs = rendimientos_qs.filter(fecha__gte=from_date, fecha__lte=to_date)
@@ -2195,7 +2269,7 @@ class StatsViewSet(viewsets.ViewSet):
 
         first_purchase_id_subquery = (
             Compra.objects.filter(empresa_id=empresa_id, cliente_id=OuterRef("cliente_id"))
-            .order_by("creado_en", "id")
+            .order_by("ocurrido_en", "id")
             .values("id")[:1]
         )
         primeras_compras_qs = Compra.objects.filter(
@@ -2204,27 +2278,27 @@ class StatsViewSet(viewsets.ViewSet):
         )
         start_dt, end_dt = _get_datetime_range(request)
         if start_dt:
-            primeras_compras_qs = primeras_compras_qs.filter(creado_en__gte=start_dt)
+            primeras_compras_qs = primeras_compras_qs.filter(ocurrido_en__gte=start_dt)
         if end_dt:
-            primeras_compras_qs = primeras_compras_qs.filter(creado_en__lte=end_dt)
+            primeras_compras_qs = primeras_compras_qs.filter(ocurrido_en__lte=end_dt)
         primeras_compras_count = primeras_compras_qs.count()
         primeras_compras_total_ars = float(primeras_compras_qs.aggregate(total=Sum("monto_ars"))["total"] or 0)
         primeras_compras_usd = float(primeras_compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0)
         firsts = (
             compras_qs.values("cliente_id")
-            .annotate(first=Min("creado_en"))
+            .annotate(first=Min("ocurrido_en"))
         )
         first_map = {row["cliente_id"]: row["first"] for row in firsts}
         retenidos = 0
         if first_map:
             compras_all = (
                 Compra.objects.filter(empresa_id=empresa_id, cliente_id__in=first_map.keys())
-                .values("cliente_id", "creado_en")
-                .order_by("cliente_id", "creado_en")
+                .values("cliente_id", "ocurrido_en")
+                .order_by("cliente_id", "ocurrido_en")
             )
             by_cliente = {}
             for row in compras_all:
-                by_cliente.setdefault(row["cliente_id"], []).append(row["creado_en"])
+                by_cliente.setdefault(row["cliente_id"], []).append(row["ocurrido_en"])
             for cliente_id, first_date in first_map.items():
                 compras_cliente = by_cliente.get(cliente_id, [])
                 for fecha in compras_cliente:
@@ -2234,23 +2308,23 @@ class StatsViewSet(viewsets.ViewSet):
         retencion_pct = (retenidos / len(first_map) * 100) if first_map else 0
 
         cohort_rows = list(
-            primeras_compras_qs.values("cliente_id", "creado_en")
+            primeras_compras_qs.values("cliente_id", "ocurrido_en")
         )
 
         def _compute_ltv(days: int, amount_field: str, bonus_field: str) -> float:
             if not cohort_rows:
                 return 0.0
             cohort_ids = [row["cliente_id"] for row in cohort_rows]
-            first_map_local = {row["cliente_id"]: row["creado_en"] for row in cohort_rows}
+            first_map_local = {row["cliente_id"]: row["ocurrido_en"] for row in cohort_rows}
             min_first = min(first_map_local.values())
             max_end = max(dt + timedelta(days=days) for dt in first_map_local.values())
 
             compras_movs = Compra.objects.filter(
                 empresa_id=empresa_id,
                 cliente_id__in=cohort_ids,
-                creado_en__gte=min_first,
-                creado_en__lte=max_end,
-            ).values("cliente_id", "creado_en", amount_field, bonus_field)
+                ocurrido_en__gte=min_first,
+                ocurrido_en__lte=max_end,
+            ).values("cliente_id", "ocurrido_en", amount_field, bonus_field)
 
             retiros_movs = Retiro.objects.filter(
                 empresa_id=empresa_id,
@@ -2265,7 +2339,7 @@ class StatsViewSet(viewsets.ViewSet):
                 first_at = first_map_local.get(cliente_id)
                 if not first_at:
                     continue
-                if first_at <= row["creado_en"] <= first_at + timedelta(days=days):
+                if first_at <= row["ocurrido_en"] <= first_at + timedelta(days=days):
                     net_by_cliente[cliente_id] += float(row.get(amount_field) or 0)
                     if wallet_enabled:
                         net_by_cliente[cliente_id] -= float(row.get(bonus_field) or 0)
@@ -2390,8 +2464,8 @@ class StatsViewSet(viewsets.ViewSet):
         if is_operador(user):
             compras_qs = compras_qs.filter(operador=user)
 
-        compras_qs = _apply_date_filters(compras_qs, "creado_en", request)
-        compras_qs = compras_qs.order_by("-creado_en")[:limit]
+        compras_qs = _apply_date_filters(compras_qs, "ocurrido_en", request)
+        compras_qs = compras_qs.order_by("-ocurrido_en")[:limit]
 
         data = [
             {
@@ -2399,7 +2473,7 @@ class StatsViewSet(viewsets.ViewSet):
                 "cliente_codigo": compra.cliente.codigo if compra.cliente else "",
                 "username": compra.cliente.username if compra.cliente else "",
                 "contacto": compra.cliente.contacto if compra.cliente else "",
-                "hora": compra.creado_en,
+                "hora": compra.ocurrido_en,
                 "monto_ars": compra.monto_ars,
                 "monto_usd": compra.monto_usd,
                 "operador": compra.operador.username if compra.operador else "",
@@ -2428,6 +2502,7 @@ class StatsViewSet(viewsets.ViewSet):
                 "tipo",
                 "data",
                 "creado_en",
+                "ocurrido_en",
                 "cliente_id",
                 "cliente__codigo",
                 "cliente__username",
@@ -2441,7 +2516,7 @@ class StatsViewSet(viewsets.ViewSet):
                 (models.Q(tipo="lead") & models.Q(operador__isnull=True))
                 | (models.Q(tipo="contact") & models.Q(operador=user))
             )
-        eventos_qs = _apply_date_filters(eventos_qs, "creado_en", request).order_by("-creado_en")[:limit]
+        eventos_qs = _apply_date_filters(eventos_qs, "ocurrido_en", request).order_by("-ocurrido_en")[:limit]
 
         compras_qs = (
             Compra.objects.filter(empresa_id=empresa_id)
@@ -2449,6 +2524,7 @@ class StatsViewSet(viewsets.ViewSet):
             .only(
                 "id",
                 "creado_en",
+                "ocurrido_en",
                 "monto_ars",
                 "monto_usd",
                 "comprobante",
@@ -2463,7 +2539,7 @@ class StatsViewSet(viewsets.ViewSet):
         )
         if is_operador(user):
             compras_qs = compras_qs.filter(operador=user)
-        compras_qs = _apply_date_filters(compras_qs, "creado_en", request).order_by("-creado_en")[:limit]
+        compras_qs = _apply_date_filters(compras_qs, "ocurrido_en", request).order_by("-ocurrido_en")[:limit]
 
         feed = []
 
@@ -2474,7 +2550,7 @@ class StatsViewSet(viewsets.ViewSet):
                     "id": f"{evento.tipo}-{evento.id}",
                     "evento": evento.tipo,
                     "evento_label": "Lead" if evento.tipo == "lead" else "Contacto",
-                    "fecha_hora": evento.creado_en,
+                    "fecha_hora": evento.ocurrido_en,
                     "cliente": evento.cliente_id,
                     "cliente_codigo": evento.cliente.codigo if evento.cliente else "",
                     "username": evento.cliente.username if evento.cliente else "",
@@ -2505,7 +2581,7 @@ class StatsViewSet(viewsets.ViewSet):
                     "id": f"compra-{compra.id}",
                     "evento": "compra",
                     "evento_label": "Compra",
-                    "fecha_hora": compra.creado_en,
+                    "fecha_hora": compra.ocurrido_en,
                     "cliente": compra.cliente_id,
                     "cliente_codigo": compra.cliente.codigo if compra.cliente else "",
                     "username": compra.cliente.username if compra.cliente else "",

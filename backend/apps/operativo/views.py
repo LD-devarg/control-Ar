@@ -2007,135 +2007,62 @@ class CompraViewSet(viewsets.ModelViewSet):
         was_first_purchase = False
         compra = None
 
-        logger.info(
-            "Compra create iniciada cliente_id=%s empresa_id=%s user_id=%s monto_ars=%s bono_ars=%s has_file=%s evento_ocurrido_en=%s",
-            cliente.id,
-            cliente.empresa_id,
-            getattr(request.user, "id", None),
-            monto_ars,
-            bono_ars,
-            bool(comprobante_archivo),
-            request.data.get("evento_ocurrido_en"),
-        )
-
-        try:
-            with transaction.atomic():
-                cliente = Cliente.objects.select_for_update().get(pk=cliente.pk)
-                was_first_purchase = cliente.cant_compras == 0
-                logger.info(
-                    "Compra create cliente bloqueado cliente_id=%s cant_compras=%s first_purchase=%s",
-                    cliente.id,
-                    cliente.cant_compras,
-                    was_first_purchase,
-                )
-
-                tc_obj, tc_valor, monto_usd = calcular_compra(monto_ars)
-                _, _, bono_usd = calcular_compra(bono_ars) if bono_ars else (None, None, 0)
-                evento_ocurrido_en = _parse_event_datetime_input(
+        with transaction.atomic():
+            cliente = Cliente.objects.select_for_update().get(pk=cliente.pk)
+            was_first_purchase = cliente.cant_compras == 0
+            tc_obj, tc_valor, monto_usd = calcular_compra(monto_ars)
+            _, _, bono_usd = calcular_compra(bono_ars) if bono_ars else (None, None, 0)
+            compra = Compra.objects.create(
+                cliente=cliente,
+                empresa=cliente.empresa,
+                operador=request.user,
+                monto_ars=monto_ars,
+                bono_ars=bono_ars,
+                bono_usd=bono_usd,
+                comprobante=comprobante,
+                comprobante_archivo=comprobante_archivo,
+                tc=tc_valor,
+                monto_usd=monto_usd,
+                tipo_cambio=tc_obj,
+                ocurrido_en=_parse_event_datetime_input(
                     request.data.get("evento_ocurrido_en"),
                     field_name="evento_ocurrido_en",
-                )
-                logger.info(
-                    "Compra create calculada cliente_id=%s tc=%s monto_usd=%s bono_usd=%s ocurrido_en=%s",
-                    cliente.id,
-                    tc_valor,
-                    monto_usd,
-                    bono_usd,
-                    evento_ocurrido_en,
-                )
-
-                compra = Compra.objects.create(
-                    cliente=cliente,
-                    empresa=cliente.empresa,
-                    operador=request.user,
-                    monto_ars=monto_ars,
-                    bono_ars=bono_ars,
-                    bono_usd=bono_usd,
-                    comprobante=comprobante,
-                    comprobante_archivo=comprobante_archivo,
-                    tc=tc_valor,
-                    monto_usd=monto_usd,
-                    tipo_cambio=tc_obj,
-                    ocurrido_en=evento_ocurrido_en,
-                )
-                logger.info(
-                    "Compra creada compra_id=%s cliente_id=%s monto_ars=%s monto_usd=%s",
-                    compra.id,
-                    cliente.id,
-                    compra.monto_ars,
-                    compra.monto_usd,
-                )
-
-                cliente.cant_compras += 1
-                cliente.total_compras_ars = (cliente.total_compras_ars or 0) + monto_ars
-                cliente.total_compras_usd = (cliente.total_compras_usd or 0) + monto_usd
-                cliente.save(update_fields=["cant_compras", "total_compras_ars", "total_compras_usd"])
-                logger.info(
-                    "Cliente actualizado tras compra cliente_id=%s cant_compras=%s total_compras_ars=%s total_compras_usd=%s",
-                    cliente.id,
-                    cliente.cant_compras,
-                    cliente.total_compras_ars,
-                    cliente.total_compras_usd,
-                )
-
-            if was_first_purchase:
-                payload = {
-                    "value": float(compra.monto_usd) if compra.monto_usd is not None else float(monto_ars),
-                    "currency": "USD",
-                    "phone": cliente.contacto,
-                    "external_id": str(cliente.uuid),
-                    "event_source_url": cliente.event_source_url,
-                }
-                logger.info(
-                    "Creando evento purchase de primera compra cliente_id=%s compra_id=%s payload_keys=%s",
-                    cliente.id,
-                    compra.id,
-                    sorted(payload.keys()),
-                )
-                evento = EventosMeta.objects.create(
-                    id_evento=uuid.uuid4(),
-                    cliente=cliente,
-                    empresa=cliente.empresa,
-                    landing=_resolve_latest_lead_landing(cliente_id=cliente.id),
-                    operador=request.user,
-                    tipo="purchase",
-                    data=payload,
-                    ocurrido_en=compra.ocurrido_en,
-                    fbp=cliente.fbp,
-                    fbc=cliente.fbc,
-                    ip_address=_client_first_ip(request, cliente),
-                    user_agent=_client_first_user_agent(request, cliente),
-                )
-                logger.info(
-                    "Evento purchase creado evento_id=%s cliente_id=%s compra_id=%s",
-                    evento.id,
-                    cliente.id,
-                    compra.id,
-                )
-                try:
-                    enviar_evento_meta(evento, request=request)
-                except Exception as exc:
-                    logger.exception(
-                        "Fallo envio Meta para purchase evento_id=%s cliente_id=%s compra_id=%s",
-                        evento.id,
-                        cliente.id,
-                        compra.id,
-                    )
-                    evento.estado_envio = "fallido"
-                    evento.respuesta_meta = {"error": str(exc)}
-                    evento.save(update_fields=["estado_envio", "respuesta_meta"])
-        except Exception:
-            logger.exception(
-                "Fallo creando compra cliente_id=%s empresa_id=%s user_id=%s monto_ars=%s bono_ars=%s has_file=%s evento_ocurrido_en=%s",
-                getattr(cliente, "id", None),
-                getattr(cliente, "empresa_id", None),
-                getattr(request.user, "id", None),
-                monto_ars,
-                bono_ars,
-                bool(comprobante_archivo),
-                request.data.get("evento_ocurrido_en"),
+                ),
             )
-            raise
+
+            cliente.cant_compras += 1
+            cliente.total_compras_ars = (cliente.total_compras_ars or 0) + monto_ars
+            cliente.total_compras_usd = (cliente.total_compras_usd or 0) + monto_usd
+            cliente.save(update_fields=["cant_compras", "total_compras_ars", "total_compras_usd"])
+
+        if was_first_purchase:
+            payload = {
+                "value": float(compra.monto_usd) if compra.monto_usd is not None else float(monto_ars),
+                "currency": "USD",
+                "phone": cliente.contacto,
+                "external_id": str(cliente.uuid),
+                "event_source_url": cliente.event_source_url,
+            }
+            evento = EventosMeta.objects.create(
+                id_evento=uuid.uuid4(),
+                cliente=cliente,
+                empresa=cliente.empresa,
+                landing=_resolve_latest_lead_landing(cliente_id=cliente.id),
+                operador=request.user,
+                tipo="purchase",
+                data=payload,
+                ocurrido_en=compra.ocurrido_en,
+                fbp=cliente.fbp,
+                fbc=cliente.fbc,
+                ip_address=_client_first_ip(request, cliente),
+                user_agent=_client_first_user_agent(request, cliente),
+            )
+            try:
+                enviar_evento_meta(evento, request=request)
+            except Exception as exc:
+                evento.estado_envio = "fallido"
+                evento.respuesta_meta = {"error": str(exc)}
+                evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
         output = self.get_serializer(compra)
         _safe_publish_empresa_event(

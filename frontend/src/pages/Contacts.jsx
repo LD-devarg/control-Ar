@@ -7,11 +7,13 @@ import Stack from '@mui/material/Stack';
 import { useState } from 'react';
 import FormClienteCreate from '../components/FormClienteCreate.jsx';
 import TablaContactos from '../components/TablaContactos.jsx';
+import CargaMasivaContactos from '../components/CargaMasivaContactos.jsx';
 import { useTenant } from '../context/TenantContext';
 
 
 function Agenda() {
     const [openCreate, setOpenCreate] = useState(false);
+    const [openCargaMasiva, setOpenCargaMasiva] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
     const { tenantId } = useTenant();
 
@@ -20,6 +22,9 @@ function Agenda() {
             title="Agenda de Contactos"
             actions={(
                 <Stack direction="row" spacing={1}>
+                    <Button variant="outlined" color="secondary" onClick={() => setOpenCargaMasiva(true)}>
+                        Carga Masiva
+                    </Button>
                     <Button variant="outlined" onClick={() => setOpenCreate(true)}>
                         Crear cliente
                     </Button>
@@ -41,6 +46,15 @@ function Agenda() {
                         />
                     </DialogContent>
                 </Dialog>
+                
+                {/* Componente Carga Masiva */}
+                <CargaMasivaContactos 
+                    open={openCargaMasiva} 
+                    onClose={() => {
+                        setOpenCargaMasiva(false);
+                        setRefreshKey((prev) => prev + 1);
+                    }} 
+                />
         </Page>
     );
 }

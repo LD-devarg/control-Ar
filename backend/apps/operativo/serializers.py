@@ -414,6 +414,10 @@ class LandingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("font_scale debe estar entre 0.8 y 1.6.")
         return value
 
+    def create(self, validated_data):
+        validated_data.pop("clear_imagen_reemplazo_form", None)
+        return super().create(validated_data)
+
     def update(self, instance, validated_data):
         clear_imagen_reemplazo_form = bool(validated_data.pop("clear_imagen_reemplazo_form", False))
         if clear_imagen_reemplazo_form and instance.imagen_reemplazo_form:

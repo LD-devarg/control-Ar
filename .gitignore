@@ -29,6 +29,9 @@ celerybeat.pid
 .env.*
 !frontend/.env.production
 
+# Claude Code
+.claude/settings.local.json
+
 # IDEs / OS
 .vscode/
 .idea/

@@ -2181,13 +2181,13 @@ class StatsViewSet(viewsets.ViewSet):
         contactos = eventos_qs.filter(tipo="contact").count()
 
         compras_count = compras_qs.count()
-        compras_total = compras_qs.aggregate(total=Sum("monto_ars"))["total"] or 0
-        compras_total_usd = compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0
-        bonos_total_ars = (compras_qs.aggregate(total=Sum("bono_ars"))["total"] or 0) if wallet_enabled else 0
-        bonos_total_usd = (compras_qs.aggregate(total=Sum("bono_usd"))["total"] or 0) if wallet_enabled else 0
+        compras_total = float(compras_qs.aggregate(total=Sum("monto_ars"))["total"] or 0)
+        compras_total_usd = float(compras_qs.aggregate(total=Sum("monto_usd"))["total"] or 0)
+        bonos_total_ars = float(compras_qs.aggregate(total=Sum("bono_ars"))["total"] or 0) if wallet_enabled else 0
+        bonos_total_usd = float(compras_qs.aggregate(total=Sum("bono_usd"))["total"] or 0) if wallet_enabled else 0
         retiros_count = retiros_qs.count() if wallet_enabled else 0
-        retiros_total_ars = (retiros_qs.aggregate(total=Sum("monto_ars"))["total"] or 0) if wallet_enabled else 0
-        retiros_total_usd = (retiros_qs.aggregate(total=Sum("monto_usd"))["total"] or 0) if wallet_enabled else 0
+        retiros_total_ars = float(retiros_qs.aggregate(total=Sum("monto_ars"))["total"] or 0) if wallet_enabled else 0
+        retiros_total_usd = float(retiros_qs.aggregate(total=Sum("monto_usd"))["total"] or 0) if wallet_enabled else 0
 
         compras_clientes = compras_qs.values("cliente_id").distinct().count()
         conversion_pct = (compras_clientes / contactos * 100) if contactos else 0

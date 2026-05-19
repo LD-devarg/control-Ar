@@ -19,8 +19,9 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { useTheme } from '@mui/material/styles';
 import { apiClient } from '../services/auth';
 import { useTenant } from '../context/TenantContext';
+import { markClientesDirty } from '../services/operativo/clientes';
 
-export default function CargaMasivaContactos({ open, onClose }) {
+export default function CargaMasivaContactos({ open, onClose, onProcessed }) {
   const theme = useTheme();
   const isDarkMode = theme.palette.mode === 'dark';
   const color = isDarkMode ? '#f4f4f5' : '#000000';
@@ -150,7 +151,10 @@ export default function CargaMasivaContactos({ open, onClose }) {
     }
 
     setProcessing(false);
-    // Disparar eventos para actualizar tablas de fondo
+    if (newRows.some((row) => row.status === 'success')) {
+      markClientesDirty();
+      onProcessed?.();
+    }
     window.dispatchEvent(new CustomEvent("leads:refresh"));
   };
 

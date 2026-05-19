@@ -50,10 +50,8 @@ function Agenda() {
                 {/* Componente Carga Masiva */}
                 <CargaMasivaContactos 
                     open={openCargaMasiva} 
-                    onClose={() => {
-                        setOpenCargaMasiva(false);
-                        setRefreshKey((prev) => prev + 1);
-                    }} 
+                    onClose={() => setOpenCargaMasiva(false)}
+                    onProcessed={() => setRefreshKey((prev) => prev + 1)}
                 />
         </Page>
     );

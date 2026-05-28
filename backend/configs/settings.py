@@ -39,6 +39,23 @@ def env_required(name: str, *, dev_default: str = "") -> str:
         raise ImproperlyConfigured(f"{name} es obligatorio cuando DEBUG=False.")
     return dev_default
 
+
+def env_csv(name: str) -> list[str]:
+    return [
+        item.strip().strip("\"'")
+        for item in (os.getenv(name, "") or "").split(",")
+        if item.strip().strip("\"'")
+    ]
+
+
+def normalize_origin(value: str) -> str:
+    return value.strip().strip("\"'").rstrip("/")
+
+
+def normalize_host(value: str) -> str:
+    host = value.strip().strip("\"'").removeprefix("https://").removeprefix("http://").rstrip("/")
+    return host.split("/", 1)[0]
+
 # SECURITY WARNING: keep the secret key used in production secret!
 DEBUG = env_bool("DEBUG", False)
 SECRET_KEY = env_required("SECRET_KEY", dev_default="django-insecure-local-dev-only-change-me")
@@ -56,21 +73,12 @@ KOMMO_ACCESS_TOKEN = (os.getenv("KOMMO_ACCESS_TOKEN") or "").strip()
 KOMMO_CONTACT_DEDUP_DAYS = int(os.getenv("KOMMO_CONTACT_DEDUP_DAYS", "7"))
 LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS = int(os.getenv("LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS", "7"))
 
-allowed_hosts_env = os.getenv("ALLOWED_HOSTS", "")
-ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(",") if host.strip()]
+ALLOWED_HOSTS = [normalize_host(host) for host in env_csv("ALLOWED_HOSTS")]
 
-cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "")
-CORS_ALLOWED_ORIGINS = [
-    origin.strip() for origin in cors_origins_env.split(",") if origin.strip()
-]
+CORS_ALLOWED_ORIGINS = [normalize_origin(origin) for origin in env_csv("CORS_ALLOWED_ORIGINS")]
 CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", True)
 
-csrf_trusted_origins_env = os.getenv("CSRF_TRUSTED_ORIGINS", "")
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
-    for origin in csrf_trusted_origins_env.split(",")
-    if origin.strip()
-]
+CSRF_TRUSTED_ORIGINS = [normalize_origin(origin) for origin in env_csv("CSRF_TRUSTED_ORIGINS")]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True

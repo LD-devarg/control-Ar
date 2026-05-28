@@ -1,8 +1,7 @@
 import uuid
-import json
 import logging
 from collections import defaultdict
-from datetime import datetime, time, timedelta
+from datetime import timedelta
 import requests
 
 from django.db import models, transaction
@@ -13,9 +12,7 @@ from django.core.cache import cache
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.utils.dateparse import parse_date
 from django.utils.dateparse import parse_datetime
-from django.utils.dateparse import parse_date
 from rest_framework import status, viewsets
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.decorators import action
@@ -60,7 +57,21 @@ from .serializers import (
     normalize_contacto,
 )
 from .servicios.calculos import calcular_compra
+from .servicios.compras import crear_compra_con_agregados
+from .servicios.fechas import (
+    apply_date_filters as _apply_date_filters,
+    get_date_range as _get_date_range,
+    get_datetime_range as _get_datetime_range,
+)
 from .servicios.enviador import enviar_evento_meta
+from .servicios.leads import crear_cliente_desde_viewset
+from .servicios.kommo import (
+    as_dict as kommo_as_dict,
+    extract_kommo_custom_fields,
+    first_kommo_entity,
+    normalize_phone,
+    phone_candidates,
+)
 from apps.pauta.servicios.insights import fetch_meta_page_views
 from apps.pauta.servicios.credenciales import credencial_aplica_a_empresa
 from apps.pauta.servicios.telegram_alerts import send_lead_queue_alert
@@ -83,91 +94,6 @@ def _safe_publish_empresa_event(*, empresa_id: int, event_type: str, payload: di
             event_type,
             empresa_id,
         )
-
-def _apply_date_filters(qs, field: str, request):
-    period = request.query_params.get("period")
-    from_str = request.query_params.get("from")
-    to_str = request.query_params.get("to")
-
-    start = end = None
-
-    if from_str:
-        d = parse_date(from_str)
-        if d:
-            start = timezone.make_aware(datetime.combine(d, time.min))
-    if to_str:
-        d = parse_date(to_str)
-        if d:
-            end = timezone.make_aware(datetime.combine(d, time.max))
-
-    if not start and not end and period:
-        now = timezone.now()
-        if period == "day":
-            start = now - timedelta(days=1)
-        elif period == "week":
-            start = now - timedelta(days=7)
-        elif period == "month":
-            start = now - timedelta(days=30)
-
-    if start:
-        qs = qs.filter(**{f"{field}__gte": start})
-    if end:
-        qs = qs.filter(**{f"{field}__lte": end})
-
-    return qs
-
-
-def _get_date_range(request):
-    period = request.query_params.get("period")
-    from_str = request.query_params.get("from")
-    to_str = request.query_params.get("to")
-
-    if from_str and to_str:
-        from_date = parse_date(from_str)
-        to_date = parse_date(to_str)
-        if from_date and to_date:
-            return from_date, to_date
-
-    if period:
-        today = timezone.now().date()
-        if period == "day":
-            return today - timedelta(days=1), today
-        if period == "week":
-            return today - timedelta(days=7), today
-        if period == "month":
-            return today - timedelta(days=30), today
-
-    today = timezone.now().date()
-    return today - timedelta(days=7), today
-
-
-def _get_datetime_range(request):
-    period = request.query_params.get("period")
-    from_str = request.query_params.get("from")
-    to_str = request.query_params.get("to")
-
-    start = end = None
-
-    if from_str:
-        d = parse_date(from_str)
-        if d:
-            start = timezone.make_aware(datetime.combine(d, time.min))
-    if to_str:
-        d = parse_date(to_str)
-        if d:
-            end = timezone.make_aware(datetime.combine(d, time.max))
-
-    if not start and not end and period:
-        now = timezone.now()
-        if period == "day":
-            start = now - timedelta(days=1)
-        elif period == "week":
-            start = now - timedelta(days=7)
-        elif period == "month":
-            start = now - timedelta(days=30)
-
-    return start, end
-
 
 def _parse_event_datetime_input(raw_value, *, field_name: str = "ocurrido_en"):
     if raw_value in (None, ""):
@@ -671,164 +597,19 @@ class ClienteViewSet(viewsets.ModelViewSet):
         return ClienteSerializer
 
     def create(self, request, *args, **kwargs):
-        reservation_token = str(request.data.get("reservation_token") or "").strip()
-        serializer = self.get_serializer(
-            data=request.data,
-            context={**self.get_serializer_context(), "reservation_token": reservation_token},
-        )
-        serializer.is_valid(raise_exception=True)
-        requested_codigo = str(request.data.get("codigo") or "").strip()
-
-        idempotency_key = serializer.validated_data.get("idempotency_key")
-        if idempotency_key:
-            existing = Cliente.objects.filter(idempotency_key=idempotency_key).first()
-            if existing:
-                if reservation_token:
-                    consume_reservation(reservation_token)
-                output = ClienteSerializer(existing)
-                return Response(output.data, status=status.HTTP_200_OK)
-
-        landing = serializer.validated_data["landing"]
-        manual_create = bool(serializer.validated_data.get("manual_create"))
-        confirm_existing_code = bool(serializer.validated_data.get("confirm_existing_code"))
-        if manual_create and requested_codigo and not confirm_existing_code:
-            existing_cliente = (
-                Cliente.objects.filter(empresa_id=landing.empresa_id, codigo=requested_codigo)
-                .only("id", "codigo", "nombre", "username", "contacto")
-                .first()
-            )
-            if existing_cliente:
-                return Response(
-                    {
-                        "detail": "Cliente existente, desea crear igualmente?",
-                        "code_conflict": True,
-                        "existing_cliente": {
-                            "id": existing_cliente.id,
-                            "codigo": existing_cliente.codigo,
-                            "nombre": existing_cliente.nombre,
-                            "username": existing_cliente.username,
-                            "contacto": existing_cliente.contacto,
-                        },
-                    },
-                    status=status.HTTP_409_CONFLICT,
-                )
-        normalized_contacto = normalize_contacto(serializer.validated_data.get("contacto"))
-        normalized_fbp = str(serializer.validated_data.get("fbp") or "").strip()
-        normalized_fbc = str(serializer.validated_data.get("fbc") or "").strip()
-        normalized_event_source_url = str(serializer.validated_data.get("event_source_url") or "").strip()
-        request_ip = get_request_ip(request)
-        request_user_agent = get_request_user_agent(request)
-
-        skip_landing_dedup = bool(reservation_token)
-
-        if not skip_landing_dedup:
-            fingerprint_cliente, fingerprint_dedup_details = _find_recent_fingerprint_cliente(
-                empresa_id=landing.empresa_id,
-                fbp=normalized_fbp,
-                event_source_url=normalized_event_source_url,
-                user_agent=request_user_agent or "",
-                ip_address=request_ip,
-            )
-            if fingerprint_cliente:
-                cliente = _merge_cliente_missing_fields(
-                    cliente=fingerprint_cliente,
-                    validated_data=serializer.validated_data,
-                    request=request,
-                )
-                _create_lead_event(
-                    landing=landing,
-                    cliente=cliente,
-                    request=request,
-                    requested_codigo=requested_codigo,
-                    resultado="deduplicado_fingerprint",
-                    motivo="cliente_existente_por_fingerprint",
-                    dedup_details=fingerprint_dedup_details,
-                )
-                if reservation_token:
-                    consume_reservation(reservation_token)
-                output = ClienteSerializer(cliente)
-                return Response(output.data, status=status.HTTP_200_OK)
-
-            duplicate_cliente, duplicate_dedup_details = _find_recent_duplicate_lead_cliente(
-                landing_id=landing.id,
-                contacto=normalized_contacto,
-                fbp=normalized_fbp,
-                fbc=normalized_fbc,
-                ip_address=request_ip,
-                user_agent=request_user_agent,
-            )
-            if duplicate_cliente:
-                cliente = _merge_cliente_missing_fields(
-                    cliente=duplicate_cliente,
-                    validated_data=serializer.validated_data,
-                    request=request,
-                )
-                _create_lead_event(
-                    landing=landing,
-                    cliente=cliente,
-                    request=request,
-                    requested_codigo=requested_codigo,
-                    resultado="deduplicado_lead",
-                    motivo="lead_reciente_duplicado",
-                    dedup_details=duplicate_dedup_details,
-                )
-                if reservation_token:
-                    consume_reservation(reservation_token)
-                output = ClienteSerializer(cliente)
-                return Response(output.data, status=status.HTTP_200_OK)
-
-        cliente = serializer.save()
-        if not skip_landing_dedup:
-            recent_event = _find_recent_lead_event(cliente_id=cliente.id, landing_id=landing.id)
-            if recent_event:
-                _create_lead_event(
-                    landing=landing,
-                    cliente=cliente,
-                    request=request,
-                    requested_codigo=requested_codigo,
-                    resultado="deduplicado_evento_reciente",
-                    motivo="lead_reciente_existente",
-                )
-                if reservation_token:
-                    consume_reservation(reservation_token)
-                output = ClienteSerializer(cliente)
-                return Response(output.data, status=status.HTTP_200_OK)
-
-        resultado = "creado_reasignado" if requested_codigo and requested_codigo != cliente.codigo else "creado"
-        motivo = "codigo_reasignado" if resultado == "creado_reasignado" else "cliente_nuevo"
-        evento = _create_lead_event(
-            landing=landing,
-            cliente=cliente,
+        return crear_cliente_desde_viewset(
+            viewset=self,
             request=request,
-            requested_codigo=requested_codigo,
-            resultado=resultado,
-            motivo=motivo,
-        )
-        try:
-            enviar_evento_meta(evento, request=request)
-        except Exception as exc:
-            evento.estado_envio = "fallido"
-            evento.respuesta_meta = {"error": str(exc)}
-            evento.save(update_fields=["estado_envio", "respuesta_meta"])
-
-        _safe_publish_empresa_event(
-            empresa_id=landing.empresa_id,
-            event_type="lead_created",
-            payload={
-                "id": evento.id,
-                "cliente": cliente.id,
-                "cliente_codigo": cliente.codigo,
-                "cliente_nombre": cliente.nombre,
-                "cliente_username": cliente.username,
-                "cliente_contacto": cliente.contacto,
-                "creado_en": evento.creado_en.isoformat(),
+            deps={
+                "find_recent_fingerprint_cliente": _find_recent_fingerprint_cliente,
+                "find_recent_duplicate_lead_cliente": _find_recent_duplicate_lead_cliente,
+                "find_recent_lead_event": _find_recent_lead_event,
+                "merge_cliente_missing_fields": _merge_cliente_missing_fields,
+                "create_lead_event": _create_lead_event,
+                "enviar_evento_meta": enviar_evento_meta,
+                "safe_publish_empresa_event": _safe_publish_empresa_event,
             },
         )
-        if reservation_token:
-            consume_reservation(reservation_token)
-
-        output = ClienteSerializer(cliente)
-        return Response(output.data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -873,9 +654,7 @@ class KommoWebhookViewSet(viewsets.ViewSet):
     permission_classes = [AllowAny]
 
     def _normalize_phone(self, value):
-        if not value:
-            return ""
-        return "".join(ch for ch in str(value) if ch.isdigit())[:15]
+        return normalize_phone(value)
 
     def _resolve_landing(self, landing_token):
         if not landing_token:
@@ -883,23 +662,7 @@ class KommoWebhookViewSet(viewsets.ViewSet):
         return get_object_or_404(Landing, token=landing_token, activo=True)
 
     def _phone_candidates(self, value):
-        digits = self._normalize_phone(value)
-        if not digits:
-            return []
-        candidates = [digits]
-        if len(digits) > 10:
-            candidates.append(digits[-10:])
-        if len(digits) > 8:
-            candidates.append(digits[-8:])
-        # keep order and unique
-        seen = set()
-        result = []
-        for item in candidates:
-            if item in seen:
-                continue
-            seen.add(item)
-            result.append(item)
-        return result
+        return phone_candidates(value)
 
     def _resolve_cliente(self, data, landing=None):
         cliente_id = data.get("cliente_id")
@@ -972,59 +735,13 @@ class KommoWebhookViewSet(viewsets.ViewSet):
         ).exists()
 
     def _as_dict(self, value):
-        if isinstance(value, dict):
-            return value
-        if isinstance(value, str):
-            try:
-                parsed = json.loads(value)
-                if isinstance(parsed, dict):
-                    return parsed
-            except Exception:
-                return {}
-        return {}
+        return kommo_as_dict(value)
 
     def _first_kommo_entity(self, block):
-        if not isinstance(block, dict):
-            return None
-        for key in ("add", "update", "status", "restore", "merge"):
-            items = block.get(key)
-            if isinstance(items, list) and items:
-                return items[0]
-        return None
+        return first_kommo_entity(block)
 
     def _extract_kommo_custom_fields(self, entity):
-        result = {}
-        if not isinstance(entity, dict):
-            return result
-        fields = entity.get("custom_fields_values")
-        if not isinstance(fields, list):
-            return result
-        for field in fields:
-            if not isinstance(field, dict):
-                continue
-            field_code = str(field.get("field_code") or "").upper()
-            field_name = str(field.get("field_name") or "").strip().lower()
-            values = field.get("values")
-            if not isinstance(values, list) or not values:
-                continue
-            raw_value = values[0].get("value")
-            if raw_value in (None, ""):
-                continue
-            value = str(raw_value)
-            if field_code == "PHONE" and not result.get("phone"):
-                result["phone"] = value
-            elif field_code == "EMAIL" and not result.get("email"):
-                result["email"] = value
-            elif field_name in {"cliente_id", "client_id"} and not result.get("cliente_id"):
-                try:
-                    result["cliente_id"] = int(value)
-                except (TypeError, ValueError):
-                    pass
-            elif field_name in {"cliente_uuid", "client_uuid", "uuid_cliente"} and not result.get("cliente_uuid"):
-                result["cliente_uuid"] = value
-            elif field_name in {"landing_token"} and not result.get("landing_token"):
-                result["landing_token"] = value
-        return result
+        return extract_kommo_custom_fields(entity)
 
     def _resolve_kommo_empresa(self, data):
         account_id = data.get("kommo_account_id")
@@ -2004,36 +1721,21 @@ class CompraViewSet(viewsets.ModelViewSet):
         bono_ars = (serializer.validated_data.get("bono_ars") or 0) if wallet_enabled else 0
         comprobante = serializer.validated_data.get("comprobante")
         comprobante_archivo = serializer.validated_data.get("comprobante_archivo")
-        was_first_purchase = False
-        compra = None
-
-        with transaction.atomic():
-            cliente = Cliente.objects.select_for_update().get(pk=cliente.pk)
-            was_first_purchase = cliente.cant_compras == 0
-            tc_obj, tc_valor, monto_usd = calcular_compra(monto_ars)
-            _, _, bono_usd = calcular_compra(bono_ars) if bono_ars else (None, None, 0)
-            compra = Compra.objects.create(
-                cliente=cliente,
-                empresa=cliente.empresa,
-                operador=request.user,
-                monto_ars=monto_ars,
-                bono_ars=bono_ars,
-                bono_usd=bono_usd,
-                comprobante=comprobante,
-                comprobante_archivo=comprobante_archivo,
-                tc=tc_valor,
-                monto_usd=monto_usd,
-                tipo_cambio=tc_obj,
-                ocurrido_en=_parse_event_datetime_input(
-                    request.data.get("evento_ocurrido_en"),
-                    field_name="evento_ocurrido_en",
-                ),
-            )
-
-            cliente.cant_compras += 1
-            cliente.total_compras_ars = (cliente.total_compras_ars or 0) + monto_ars
-            cliente.total_compras_usd = (cliente.total_compras_usd or 0) + monto_usd
-            cliente.save(update_fields=["cant_compras", "total_compras_ars", "total_compras_usd"])
+        resultado_compra = crear_compra_con_agregados(
+            cliente=cliente,
+            operador=request.user,
+            monto_ars=monto_ars,
+            bono_ars=bono_ars,
+            comprobante=comprobante,
+            comprobante_archivo=comprobante_archivo,
+            ocurrido_en=_parse_event_datetime_input(
+                request.data.get("evento_ocurrido_en"),
+                field_name="evento_ocurrido_en",
+            ),
+        )
+        compra = resultado_compra.compra
+        cliente = resultado_compra.cliente
+        was_first_purchase = resultado_compra.was_first_purchase
 
         if was_first_purchase:
             payload = {

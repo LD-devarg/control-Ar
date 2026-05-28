@@ -42,6 +42,23 @@ function getViewportType() {
   return 'desktop'
 }
 
+function GuardedRoute({ path, element }) {
+  const currentUser = getCurrentUser()
+  if (!currentUser) return <Navigate to="/" replace />
+  if (!canAccessPath(path, currentUser)) {
+    return <Navigate to={getDefaultPath(currentUser)} replace />
+  }
+  return element
+}
+
+function LoginRoute() {
+  const currentUser = getCurrentUser()
+  if (currentUser) {
+    return <Navigate to={getDefaultPath(currentUser)} replace />
+  }
+  return <Login />
+}
+
 function App() {
   const [viewportType, setViewportType] = useState(() => getViewportType())
   const [, setAuthVersion] = useState(0)
@@ -67,23 +84,6 @@ function App() {
       : viewportType === 'tablet'
         ? TabletLayout
         : DesktopLayout
-
-  const GuardedRoute = ({ path, element }) => {
-    const currentUser = getCurrentUser()
-    if (!currentUser) return <Navigate to="/" replace />
-    if (!canAccessPath(path, currentUser)) {
-      return <Navigate to={getDefaultPath(currentUser)} replace />
-    }
-    return element
-  }
-
-  const LoginRoute = () => {
-    const currentUser = getCurrentUser()
-    if (currentUser) {
-      return <Navigate to={getDefaultPath(currentUser)} replace />
-    }
-    return <Login />
-  }
 
   return (
     <>

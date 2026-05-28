@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -30,3 +31,27 @@ class LoggedTokenObtainPairViewTests(APITestCase):
         self.assertIn("access", response.data)
         self.assertIn("refresh", response.data)
         mock_delay.assert_called_once_with(self.user.id)
+
+
+class CorsPreflightTests(APITestCase):
+    @override_settings(CORS_ALLOWED_ORIGINS=["https://app.control-ar.com"])
+    def test_preflight_allows_configured_origin(self):
+        response = self.client.options(
+            "/clientes/",
+            HTTP_ORIGIN="https://app.control-ar.com",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["access-control-allow-origin"], "https://app.control-ar.com")
+
+    @override_settings(CORS_ALLOWED_ORIGINS=["https://app.control-ar.com"])
+    def test_preflight_rejects_unconfigured_origin(self):
+        response = self.client.options(
+            "/clientes/",
+            HTTP_ORIGIN="https://evil.example",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("access-control-allow-origin", response)

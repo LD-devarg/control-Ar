@@ -40,11 +40,15 @@ def _resolve_test_event_code(evento, request=None, explicit_code: str | None = N
     return env_code if _empresa_test_mode_enabled(evento.empresa_id) else None
 
 
-def _build_capi_url(pixel_id: str, access_token: str, test_event_code: str | None = None) -> str:
-    base = f"https://graph.facebook.com/{META_API_VERSION}/{pixel_id}/events?access_token={access_token}"
+def _build_capi_url(pixel_id: str, test_event_code: str | None = None) -> str:
+    base = f"https://graph.facebook.com/{META_API_VERSION}/{pixel_id}/events"
     if test_event_code:
-        return f"{base}&test_event_code={test_event_code}"
+        return f"{base}?test_event_code={test_event_code}"
     return base
+
+
+def _build_capi_headers(access_token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {access_token}"}
 
 
 def obtener_credenciales_meta(empresa_id: int, landing=None) -> CredencialesMeta | None:
@@ -135,12 +139,13 @@ def enviar_evento_meta(
 
     for current_credencial in target_credentials:
         token_acceso = decrypt_token(current_credencial.token_acceso_encrypted)
-        url = _build_capi_url(current_credencial.pixel_id, token_acceso, resolved_test_code)
+        url = _build_capi_url(current_credencial.pixel_id, resolved_test_code)
+        headers = _build_capi_headers(token_acceso)
 
         response = None
         target_response: dict[str, Any]
         try:
-            response = requests.post(url, json={"data": [data]}, timeout=META_TIMEOUT_SECONDS)
+            response = requests.post(url, headers=headers, json={"data": [data]}, timeout=META_TIMEOUT_SECONDS)
             target_response = response.json()
         except requests.RequestException as exc:
             target_response = {"error": str(exc)}

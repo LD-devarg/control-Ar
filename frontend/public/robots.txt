@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /landing
+Allow: /assets/
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.webp$
+Allow: /*.css$
+Allow: /*.js$
+Disallow: /
+
+Sitemap: https://control-ar.com/sitemap.xml

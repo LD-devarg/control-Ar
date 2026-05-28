@@ -19,6 +19,7 @@ from .models import (
 )
 from apps.pauta.servicios.credenciales import credencial_aplica_a_empresa, credencial_principal_para_empresa
 from apps.empresas.scope import get_user_empresa_ids
+from .servicios.landing_config import landing_config_groups
 
 
 def normalize_contacto(value):
@@ -273,6 +274,7 @@ class LandingSerializer(serializers.ModelSerializer):
     bono = serializers.CharField()
     pixel_id = serializers.SerializerMethodField()
     empresa_codigo_prefijo = serializers.SerializerMethodField()
+    config_groups = serializers.SerializerMethodField()
     clear_imagen_reemplazo_form = serializers.BooleanField(write_only=True, required=False, default=False)
 
     def get_pixel_id(self, obj):
@@ -284,6 +286,9 @@ class LandingSerializer(serializers.ModelSerializer):
 
     def get_empresa_codigo_prefijo(self, obj):
         return obtener_prefijo_empresa(getattr(obj, "empresa", None))
+
+    def get_config_groups(self, obj):
+        return landing_config_groups(obj)
 
     def validate(self, attrs):
         credencial_meta = attrs.get("credencial_meta")
@@ -494,6 +499,7 @@ class LandingSerializer(serializers.ModelSerializer):
             "creado_en",
             "pixel_id",
             "empresa_codigo_prefijo",
+            "config_groups",
         ]
         read_only_fields = ["id", "empresa", "token", "creado_en"]
 

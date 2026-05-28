@@ -23,7 +23,7 @@ from .servicios.validaciones_empresa import (
     validar_borrado_usuario,
     validar_modificacion_usuario,
 )
-from .permissions import RoleBasedPermission, is_admin, is_admin_organizacional, is_pauta
+from .permissions import GROUP_ADMIN_ORGANIZACIONAL, RoleBasedPermission, is_admin, is_admin_organizacional, is_pauta
 from .scope import get_user_empresa_ids
 from .notificaciones import crear_notificacion_estructural
 
@@ -217,7 +217,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
         if self.request.user.is_superuser:
             target_groups = serializer.validated_data.get("groups") or []
             target_group_names = {group.name for group in target_groups}
-            is_org_admin_target = "Admin Organizacional" in target_group_names
+            is_org_admin_target = GROUP_ADMIN_ORGANIZACIONAL in target_group_names
             if is_org_admin_target:
                 if serializer.validated_data.get("organizacion") is None:
                     raise ValidationError("Para Admin Organizacional, organizacion es obligatoria.")
@@ -229,7 +229,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             serializer.validated_data["organizacion"] = self.request.user.organizacion
             target_groups = serializer.validated_data.get("groups") or []
             target_group_names = {group.name for group in target_groups}
-            if "Admin Organizacional" in target_group_names:
+            if GROUP_ADMIN_ORGANIZACIONAL in target_group_names:
                 raise ValidationError("No podes crear usuarios de tipo Admin Organizacional.")
             empresa = serializer.validated_data.get("empresa")
             if empresa is None:
@@ -258,7 +258,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             next_empresa = serializer.validated_data.get("empresa", instance.empresa)
             next_groups = serializer.validated_data.get("groups", instance.groups.all())
             next_group_names = {group.name for group in next_groups}
-            is_org_admin_target = "Admin Organizacional" in next_group_names
+            is_org_admin_target = GROUP_ADMIN_ORGANIZACIONAL in next_group_names
             if is_org_admin_target:
                 next_org = serializer.validated_data.get("organizacion", instance.organizacion)
                 if next_org is None:
@@ -270,7 +270,7 @@ class UsuarioViewSet(viewsets.ModelViewSet):
                 raise ValidationError("Tu usuario no tiene organizacion asignada.")
             next_groups = serializer.validated_data.get("groups", instance.groups.all())
             next_group_names = {group.name for group in next_groups}
-            if "Admin Organizacional" in next_group_names:
+            if GROUP_ADMIN_ORGANIZACIONAL in next_group_names:
                 raise ValidationError("No podes asignar grupo Admin Organizacional.")
             next_empresa = serializer.validated_data.get("empresa", instance.empresa)
             if next_empresa is None:

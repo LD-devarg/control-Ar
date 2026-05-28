@@ -58,3 +58,7 @@ frontend/.eslintcache
 # Temp
 *.tmp
 *.swp
+tmp_*.py
+*_tmp.py
+modify_*.py
+refactor_*.py

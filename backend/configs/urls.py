@@ -52,6 +52,7 @@ router.register(r"tipos-cambio", TipoCambioViewSet, basename="tipo-cambio")
 router.register(r"bms", BMViewSet, basename="bm")
 router.register(r"cuentas-publicitarias", CuentaPublicitariaViewSet, basename="cuenta-publicitaria")
 router.register(r"campanas", CampañaViewSet, basename="campana")
+# Legacy accent-compatible route. Keep for external clients; prefer /campanas/.
 router.register(r"campañas", CampañaViewSet, basename="campana-legacy")
 router.register(r"conjuntos-anuncios", ConjuntoAnunciosViewSet, basename="conjunto-anuncios")
 router.register(r"anuncios", AnuncioViewSet, basename="anuncio")

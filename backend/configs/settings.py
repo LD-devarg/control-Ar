@@ -1,7 +1,9 @@
 import os
+import sys
 from datetime import date
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -25,14 +27,23 @@ def env_date(name: str, default: date) -> date:
     except ValueError:
         return default
 
+def _is_test_command() -> bool:
+    return any(arg in {"test", "pytest"} or arg.endswith("pytest") for arg in sys.argv)
+
+
+def env_required(name: str, *, dev_default: str = "") -> str:
+    value = os.getenv(name)
+    if value not in (None, ""):
+        return value
+    if not DEBUG and not _is_test_command():
+        raise ImproperlyConfigured(f"{name} es obligatorio cuando DEBUG=False.")
+    return dev_default
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv(
-    "SECRET_KEY",
-    "django-insecure-xpqm9x)fpaqfe@n&ys)sl+0zyju55enfzw^6o3dh!^%qyxo4l&",
-)
+DEBUG = env_bool("DEBUG", False)
+SECRET_KEY = env_required("SECRET_KEY", dev_default="django-insecure-local-dev-only-change-me")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env_bool("DEBUG", False)
 PAUTA_SYNC_START_DATE = env_date("PAUTA_SYNC_START_DATE", date(2025, 12, 1))
 TELEGRAM_BOT_TOKEN = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
 TELEGRAM_ALERT_CHAT_IDS = [
@@ -54,24 +65,12 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", True)
 
-default_public_origins = [
-    "https://app.control-ar.com",
-    "https://control-ar.com",
-    "https://www.control-ar.com",
-]
-for origin in default_public_origins:
-    if origin not in CORS_ALLOWED_ORIGINS:
-        CORS_ALLOWED_ORIGINS.append(origin)
-
 csrf_trusted_origins_env = os.getenv("CSRF_TRUSTED_ORIGINS", "")
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in csrf_trusted_origins_env.split(",")
     if origin.strip()
 ]
-for origin in default_public_origins:
-    if origin not in CSRF_TRUSTED_ORIGINS:
-        CSRF_TRUSTED_ORIGINS.append(origin)
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
@@ -113,7 +112,6 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
-    'apps.empresas.middleware.CorsPreflightBypassMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -147,11 +145,11 @@ ASGI_APPLICATION = "configs.asgi.application"
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("DB_NAME", "postgres"),
-        'USER': os.getenv("DB_USER", "postgres.jgrvubpozutmdhlkcbpe"),
-        'PASSWORD': os.getenv("DB_PASSWORD", "Desarrollo2026!"),
-        'HOST': os.getenv("DB_HOST", "aws-1-us-east-2.pooler.supabase.com"),
-        'PORT': int(os.getenv("DB_PORT", "5432")),
+        'NAME': env_required("DB_NAME", dev_default="postgres"),
+        'USER': env_required("DB_USER", dev_default="postgres"),
+        'PASSWORD': env_required("DB_PASSWORD", dev_default=""),
+        'HOST': env_required("DB_HOST", dev_default="localhost"),
+        'PORT': int(env_required("DB_PORT", dev_default="5432")),
         "OPTIONS": {
             "sslmode": os.getenv("DB_SSLMODE", "require"),
             "options": os.getenv("DB_OPTIONS", "-c search_path=control_ar,public"),

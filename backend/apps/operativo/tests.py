@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -13,10 +14,14 @@ from apps.operativo.models import (
     CLIENTE_CODIGO_BODY_LENGTH,
     CLIENTE_CODIGO_LENGTH,
     Cliente,
+    Compra,
     EventosMeta,
     Landing,
 )
 from apps.recursos.models import WhatsApp
+from apps.recursos.models import TipoCambio
+from apps.operativo.servicios.compras import reconciliar_cliente_compras
+from apps.operativo.servicios.enviador import _build_capi_headers, _build_capi_url
 
 
 class ClienteCreateTests(TestCase):
@@ -638,3 +643,64 @@ class EventosMetaDiscardTests(TestCase):
         self.assertEqual(response_3.status_code, 200)
         self.assertEqual(Cliente.objects.count(), 1)
         self.assertEqual(EventosMeta.objects.filter(tipo="lead").count(), 2)
+
+
+class MetaCapiUrlTests(TestCase):
+    def test_capi_url_no_expone_access_token(self):
+        url = _build_capi_url("123456", test_event_code="TEST123")
+        headers = _build_capi_headers("secret-token")
+
+        self.assertEqual(url, "https://graph.facebook.com/v18.0/123456/events?test_event_code=TEST123")
+        self.assertNotIn("secret-token", url)
+        self.assertEqual(headers["Authorization"], "Bearer secret-token")
+
+
+class CompraReconciliacionTests(TestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(nombre="Empresa Test", codigo_prefijo="ET")
+        self.user = get_user_model().objects.create_superuser(
+            username="operadortest2",
+            password="secret123",
+            email="operadortest2@example.com",
+        )
+        self.cliente = Cliente.objects.create(
+            empresa=self.empresa,
+            nombre="Cliente Compra",
+            codigo="ET12AB34",
+            cant_compras=99,
+            total_compras_ars=Decimal("999.00"),
+            total_compras_usd=Decimal("9.99"),
+        )
+        self.tc = TipoCambio.objects.create(
+            moneda_origen="ARS",
+            moneda_destino="USD",
+            valor=Decimal("1000.0000"),
+        )
+
+    def test_reconcilia_agregados_desde_compras(self):
+        Compra.objects.create(
+            cliente=self.cliente,
+            empresa=self.empresa,
+            operador=self.user,
+            monto_ars=Decimal("1000.00"),
+            monto_usd=Decimal("1.00"),
+            tc=self.tc.valor,
+            tipo_cambio=self.tc,
+        )
+        Compra.objects.create(
+            cliente=self.cliente,
+            empresa=self.empresa,
+            operador=self.user,
+            monto_ars=Decimal("2500.00"),
+            monto_usd=Decimal("2.50"),
+            tc=self.tc.valor,
+            tipo_cambio=self.tc,
+        )
+
+        result = reconciliar_cliente_compras(self.cliente)
+        self.cliente.refresh_from_db()
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(self.cliente.cant_compras, 2)
+        self.assertEqual(self.cliente.total_compras_ars, Decimal("3500.00"))
+        self.assertEqual(self.cliente.total_compras_usd, Decimal("3.50"))

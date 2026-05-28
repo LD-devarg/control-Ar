@@ -99,6 +99,39 @@ function normalizePreviewLanding(payload = {}) {
     };
 }
 
+function setMeta(selector, attr, value) {
+    if (!value || typeof document === "undefined") return;
+    let element = document.head.querySelector(selector);
+    if (!element) {
+        element = document.createElement("meta");
+        if (selector.includes("property=")) {
+            element.setAttribute("property", selector.match(/property="([^"]+)"/)?.[1] || "");
+        } else {
+            element.setAttribute("name", selector.match(/name="([^"]+)"/)?.[1] || "");
+        }
+        document.head.appendChild(element);
+    }
+    element.setAttribute(attr, value);
+}
+
+function updateLandingSeo(landing) {
+    if (!landing || typeof document === "undefined") return;
+    const title = landing.titulo || landing.nombre || "ControlAR";
+    const description = landing.subtitulo || landing.texto_info || "Registrate en ControlAR y accede a atencion personalizada.";
+    const image = landing.background_horizontal || landing.background_vertical || `${window.location.origin}/controlar_fondo_blanco.png`;
+    const url = window.location.href;
+
+    document.title = `${title} | ControlAR`;
+    setMeta('meta[name="description"]', "content", description);
+    setMeta('meta[property="og:title"]', "content", title);
+    setMeta('meta[property="og:description"]', "content", description);
+    setMeta('meta[property="og:url"]', "content", url);
+    setMeta('meta[property="og:image"]', "content", image);
+    setMeta('meta[name="twitter:title"]', "content", title);
+    setMeta('meta[name="twitter:description"]', "content", description);
+    setMeta('meta[name="twitter:image"]', "content", image);
+}
+
 function parseGradient(gradient) {
     if (!gradient || typeof gradient !== "string") return null;
     const match = gradient.match(
@@ -279,6 +312,10 @@ export default function Landing() {
             mounted = false;
         };
     }, [fetchReservedCode, isPreviewMode, isTestMode]);
+
+    useEffect(() => {
+        updateLandingSeo(landing);
+    }, [landing]);
 
     useEffect(() => {
         if (isPreviewMode) return undefined;

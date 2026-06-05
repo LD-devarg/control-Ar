@@ -300,10 +300,18 @@ CHANNEL_LAYERS = {
                 {
                     "address": CHANNEL_REDIS_URL,
                     "socket_keepalive": True,
+                    "socket_keepalive_interval": 30,
                     "health_check_interval": 30,
                     "retry_on_timeout": True,
+                    "connection_kwargs": {
+                        "socket_connect_timeout": 10,
+                        "socket_timeout": 10,
+                        "retry_on_timeout": True,
+                    },
                 }
             ],
+            "capacity": 1500,
+            "expiry": 10,
         },
     },
 }
@@ -360,3 +368,4 @@ REST_FRAMEWORK = {
         "django_filters.rest_framework.DjangoFilterBackend",
     ],
 }
+

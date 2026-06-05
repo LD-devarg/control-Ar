@@ -168,9 +168,9 @@ export default function CRMWhatsApp() {
   }, [tenantId, estado]);
 
   useEffect(() => {
-    loadConfigs();
+    if (configOpen) loadConfigs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, canManageConfig]);
+  }, [tenantId, canManageConfig, configOpen]);
 
   useEffect(() => {
     let mounted = true;

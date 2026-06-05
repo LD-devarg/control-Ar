@@ -61,9 +61,9 @@ class WhatsAppWebhookView(APIView):
         return False
 
     def post(self, request):
-        logger.info("WhatsApp Webhook POST received payload: %s", request.data)
         if not self._validate_signature(request):
             logger.warning("WhatsApp Webhook signature validation failed")
             return JsonResponse({"detail": "invalid signature"}, status=403)
+        logger.info("WhatsApp Webhook POST received payload: %s", request.data)
         procesar_evento_whatsapp.delay(request.data)
         return JsonResponse({"status": "received"}, status=200)

@@ -23,8 +23,6 @@ class OrganizacionSerializer(serializers.ModelSerializer):
 
 class EmpresaSerializer(serializers.ModelSerializer):
     beat_tasks_available = serializers.SerializerMethodField(read_only=True)
-    has_kommo_access_token = serializers.SerializerMethodField(read_only=True)
-    has_kommo_webhook_secret = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Empresa
@@ -41,13 +39,6 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "beat_tasks_config",
             "beat_tasks_available",
             "telegram_chat_ids",
-            "kommo_enabled",
-            "kommo_subdomain",
-            "kommo_account_id",
-            "kommo_access_token",
-            "has_kommo_access_token",
-            "kommo_webhook_secret",
-            "has_kommo_webhook_secret",
             "kpi_sync_last_run_at",
             "kpi_sync_last_status",
             "kpi_sync_last_error",
@@ -58,8 +49,6 @@ class EmpresaSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-            "has_kommo_access_token",
-            "has_kommo_webhook_secret",
             "kpi_sync_last_run_at",
             "kpi_sync_last_status",
             "kpi_sync_last_error",
@@ -68,10 +57,6 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "estado_sync_last_error",
             "creado_en",
         ]
-        extra_kwargs = {
-            "kommo_access_token": {"write_only": True, "required": False, "allow_blank": True},
-            "kommo_webhook_secret": {"write_only": True, "required": False, "allow_blank": True},
-        }
 
     def get_beat_tasks_available(self, obj):
         return [{"key": key, "label": label} for key, label in BEAT_TASKS_AVAILABLE.items()]
@@ -101,17 +86,6 @@ class EmpresaSerializer(serializers.ModelSerializer):
         if qs.exists():
             raise serializers.ValidationError("codigo_prefijo ya esta en uso por otra empresa.")
         return normalized
-
-    def validate_kommo_subdomain(self, value):
-        if value in (None, ""):
-            return None
-        return str(value).strip().lower()
-
-    def get_has_kommo_access_token(self, obj):
-        return bool(str(obj.kommo_access_token or "").strip())
-
-    def get_has_kommo_webhook_secret(self, obj):
-        return bool(str(obj.kommo_webhook_secret or "").strip())
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -316,7 +290,6 @@ class UsuarioSerializer(serializers.ModelSerializer):
                     "activo": bool(acceso.empresa.activo),
                     "operating_mode": acceso.empresa.operating_mode,
                     "meta_test_mode": bool(acceso.empresa.meta_test_mode),
-                    "kommo_enabled": bool(acceso.empresa.kommo_enabled),
                 }
             )
 
@@ -329,7 +302,6 @@ class UsuarioSerializer(serializers.ModelSerializer):
                     "activo": bool(getattr(obj.empresa, "activo", True)),
                     "operating_mode": getattr(obj.empresa, "operating_mode", Empresa.OPERATING_MODE_FULL),
                     "meta_test_mode": bool(getattr(obj.empresa, "meta_test_mode", False)),
-                    "kommo_enabled": bool(getattr(obj.empresa, "kommo_enabled", False)),
                 },
             )
         return empresas

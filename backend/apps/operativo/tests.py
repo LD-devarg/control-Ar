@@ -2,7 +2,7 @@ import uuid
 from decimal import Decimal
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -22,7 +22,27 @@ from apps.recursos.models import WhatsApp
 from apps.recursos.models import TipoCambio
 from apps.operativo.servicios.compras import reconciliar_cliente_compras
 from apps.operativo.servicios.enviador import _build_capi_headers, _build_capi_url
+from apps.operativo.servicios.constructor import MetaEventBuilder
 
+
+class MetaEventBuilderTests(SimpleTestCase):
+    def test_whatsapp_payload_usa_business_messaging_y_ctwa(self):
+        data, _ = MetaEventBuilder.build(
+            tipo="lead",
+            payload={
+                "phone": "5491122334455",
+                "external_id": "cliente-1",
+                "ctwa_clid": "ctwa-123",
+                "action_source": "business_messaging",
+                "messaging_channel": "whatsapp",
+                "event_source_url": "https://example.com/landing",
+            },
+        )
+
+        self.assertEqual(data["action_source"], "business_messaging")
+        self.assertEqual(data["messaging_channel"], "whatsapp")
+        self.assertEqual(data["user_data"]["ctwa_clid"], "ctwa-123")
+        self.assertNotIn("event_source_url", data)
 
 class ClienteCreateTests(TestCase):
     def setUp(self):
@@ -42,7 +62,7 @@ class ClienteCreateTests(TestCase):
         )
 
     @patch("apps.operativo.views.publish_empresa_event")
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_codigo_automatico_nuevo_sale_con_longitud_extendida(self, mock_enviar_evento_meta, mock_publish_empresa_event):
         response = self.client.post(
             "/clientes/",
@@ -62,7 +82,7 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(sum(1 for ch in response.data["codigo"][2:] if ch.isalpha()), 2)
 
     @patch("apps.operativo.views.publish_empresa_event")
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_alta_manual_avisa_si_codigo_ya_existe(self, mock_enviar_evento_meta, mock_publish_empresa_event):
         Cliente.objects.create(
             empresa=self.empresa,
@@ -91,7 +111,7 @@ class ClienteCreateTests(TestCase):
         self.assertEqual(Cliente.objects.count(), 1)
 
     @patch("apps.operativo.views.publish_empresa_event")
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_alta_manual_confirmada_crea_con_codigo_reasignado(self, mock_enviar_evento_meta, mock_publish_empresa_event):
         Cliente.objects.create(
             empresa=self.empresa,
@@ -120,7 +140,7 @@ class ClienteCreateTests(TestCase):
         self.assertNotEqual(response.data["codigo"], "123456")
 
     @patch("apps.operativo.views.publish_empresa_event")
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_deduplica_leads_por_mismo_fbp_fbc(self, mock_enviar_evento_meta, mock_publish_empresa_event):
         payload_base = {
             "landing_token": str(self.landing.token),
@@ -171,7 +191,7 @@ class ClienteCreateTests(TestCase):
         LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS=7,
     )
     @patch("apps.operativo.views.publish_empresa_event")
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_deduplica_cliente_por_fingerprint_meta_en_7_dias_y_completa_datos(
         self,
         mock_enviar_evento_meta,
@@ -287,7 +307,7 @@ class LandingWhatsappRotationTests(TestCase):
         LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS=7,
     )
     @patch("apps.operativo.views.publish_empresa_event")
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_no_deduplica_fingerprint_meta_fuera_de_ventana(
         self,
         mock_enviar_evento_meta,
@@ -439,7 +459,7 @@ class EventosMetaDiscardTests(TestCase):
         LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS=7,
     )
     @patch("apps.operativo.views.publish_empresa_event")
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_deduplica_por_mismo_dispositivo_ip_y_origen_aunque_cambie_fbp(
         self,
         mock_enviar_evento_meta,
@@ -482,7 +502,7 @@ class EventosMetaDiscardTests(TestCase):
         self.assertEqual(response_1.data["id"], response_2.data["id"])
 
     @patch("apps.operativo.views.publish_empresa_event", side_effect=RuntimeError("redis caido"))
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_create_no_falla_si_realtime_explota(self, mock_enviar_evento_meta, mock_publish_empresa_event):
         response = self.client.post(
             "/clientes/",
@@ -520,7 +540,7 @@ class EventosMetaDiscardTests(TestCase):
         self.assertEqual(response["Access-Control-Allow-Credentials"], "true")
 
     @patch("apps.operativo.views.publish_empresa_event")
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_deduplica_leads_por_misma_ip_y_user_agent(self, mock_enviar_evento_meta, mock_publish_empresa_event):
         response_1 = self.client.post(
             "/clientes/",
@@ -556,7 +576,7 @@ class EventosMetaDiscardTests(TestCase):
         self.assertEqual(response_1.data["id"], response_2.data["id"])
 
     @patch("apps.operativo.views.publish_empresa_event")
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_deduplica_leads_por_mismo_telefono(self, mock_enviar_evento_meta, mock_publish_empresa_event):
         response_1 = self.client.post(
             "/clientes/",
@@ -592,7 +612,7 @@ class EventosMetaDiscardTests(TestCase):
         LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS=7,
     )
     @patch("apps.operativo.views.publish_empresa_event")
-    @patch("apps.operativo.views.enviar_evento_meta")
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta")
     def test_no_duplica_eventos_deduplicados_identicos_en_ventana_corta(
         self,
         mock_enviar_evento_meta,

@@ -12,6 +12,7 @@ const ROLE_ALLOWED_PATHS = {
     "/home",
     "/stats",
     "/contacts",
+    "/crm",
     "/whatsapp",
     "/tipo-cambio",
     "/landing-config",
@@ -20,8 +21,8 @@ const ROLE_ALLOWED_PATHS = {
     "/empresas",
     "/usuarios",
   ],
-  [ROLE_ADMIN]: ["/home", "/stats", "/contacts", "/whatsapp", "/tipo-cambio", "/usuarios"],
-  [ROLE_OPERADOR]: ["/home", "/whatsapp"],
+  [ROLE_ADMIN]: ["/home", "/stats", "/contacts", "/crm", "/whatsapp", "/tipo-cambio", "/usuarios"],
+  [ROLE_OPERADOR]: ["/home", "/crm", "/whatsapp"],
   [ROLE_PAUTA]: ["/landing-config", "/pauta-database", "/pauta-kpi"],
 };
 

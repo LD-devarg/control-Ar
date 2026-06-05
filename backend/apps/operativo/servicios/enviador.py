@@ -95,6 +95,11 @@ def _merge_payload(evento) -> dict[str, Any]:
         payload["fbp"] = evento.fbp
     if evento.fbc:
         payload["fbc"] = evento.fbc
+    if getattr(evento, "ctwa_clid", None):
+        payload["ctwa_clid"] = evento.ctwa_clid
+    if getattr(evento, "fuente", None) == "whatsapp":
+        payload["action_source"] = payload.get("action_source") or "business_messaging"
+        payload["messaging_channel"] = payload.get("messaging_channel") or "whatsapp"
     if getattr(evento, "ip_address", None):
         payload["ip_address"] = evento.ip_address
     elif getattr(evento, "cliente", None) and getattr(evento.cliente, "ip_address", None):

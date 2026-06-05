@@ -68,9 +68,14 @@ TELEGRAM_ALERT_CHAT_IDS = [
     for item in (os.getenv("TELEGRAM_ALERT_CHAT_IDS") or "").split(",")
     if item.strip()
 ]
-KOMMO_WEBHOOK_SECRET = (os.getenv("KOMMO_WEBHOOK_SECRET") or "").strip()
-KOMMO_ACCESS_TOKEN = (os.getenv("KOMMO_ACCESS_TOKEN") or "").strip()
-KOMMO_CONTACT_DEDUP_DAYS = int(os.getenv("KOMMO_CONTACT_DEDUP_DAYS", "7"))
+WHATSAPP = {
+    "PHONE_NUMBER_ID": (os.getenv("WA_PHONE_NUMBER_ID") or "").strip(),
+    "WABA_ID": (os.getenv("WA_WABA_ID") or "").strip(),
+    "ACCESS_TOKEN": (os.getenv("WA_ACCESS_TOKEN") or "").strip(),
+    "VERIFY_TOKEN": (os.getenv("WA_VERIFY_TOKEN") or "").strip(),
+    "APP_SECRET": (os.getenv("WA_APP_SECRET") or "").strip(),
+    "API_VERSION": (os.getenv("WA_API_VERSION") or "v21.0").strip(),
+}
 LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS = int(os.getenv("LANDING_CLIENT_FINGERPRINT_DEDUP_DAYS", "7"))
 
 ALLOWED_HOSTS = [normalize_host(host) for host in env_csv("ALLOWED_HOSTS")]
@@ -111,6 +116,7 @@ INSTALLED_APPS = [
     'apps.recursos.apps.RecursosConfig',
     'apps.operativo.apps.OperativoConfig',
     'apps.pauta.apps.PautaConfig',
+    'apps.crm.apps.CrmConfig',
     'storages',
 ]
 
@@ -129,7 +135,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'configs.urls'
+ROOT_URLCONF = os.getenv("DJANGO_URLCONF", "configs.urls")
 
 TEMPLATES = [
     {
@@ -262,7 +268,7 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
-CELERY_IMPORTS = ("apps.empresas.tasks", "apps.recursos.tasks", "apps.pauta.tasks")
+CELERY_IMPORTS = ("apps.empresas.tasks", "apps.recursos.tasks", "apps.pauta.tasks", "apps.crm.tasks")
 CELERY_TASK_IGNORE_RESULT = env_bool("CELERY_TASK_IGNORE_RESULT", True)
 CELERY_RESULT_EXPIRES = int(os.getenv("CELERY_RESULT_EXPIRES", "3600"))
 CELERY_TASK_ACKS_LATE = env_bool("CELERY_TASK_ACKS_LATE", True)

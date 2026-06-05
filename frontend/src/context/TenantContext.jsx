@@ -37,7 +37,6 @@ function normalizeTenantOptions(items = []) {
     activo: Boolean(item.activo),
     operating_mode: item.operating_mode || "full",
     meta_test_mode: Boolean(item.meta_test_mode),
-    kommo_enabled: Boolean(item.kommo_enabled),
   }));
 }
 
@@ -62,7 +61,6 @@ export function TenantProvider({ children }) {
     [tenantOptions, tenantId]
   );
   const operatingMode = selectedTenant?.operating_mode || "full";
-  const kommoEnabled = Boolean(selectedTenant?.kommo_enabled);
   const features = useMemo(() => resolveUserFeatures({ operating_mode: operatingMode }), [operatingMode]);
   const canSelectTenant = isUserSuperuser || isUserPauta || isUserAdminOrganizacional;
 
@@ -111,7 +109,6 @@ export function TenantProvider({ children }) {
             nombre: item.nombre || `Empresa #${item.id}`,
             activo: Boolean(item.activo),
             meta_test_mode: Boolean(item.meta_test_mode),
-            kommo_enabled: Boolean(item.kommo_enabled),
           }))
         : [];
       setTenantOptions(allowed);
@@ -180,7 +177,6 @@ export function TenantProvider({ children }) {
               activo: true,
               operating_mode: user?.empresa_operating_mode || "full",
               meta_test_mode: false,
-              kommo_enabled: false,
             }]
           : []
       );
@@ -241,7 +237,6 @@ export function TenantProvider({ children }) {
       canSelectTenant,
       operatingMode,
       features,
-      kommoEnabled,
       setTenantId,
       setTenantMetaTestMode,
     }),
@@ -253,7 +248,6 @@ export function TenantProvider({ children }) {
       canSelectTenant,
       operatingMode,
       features,
-      kommoEnabled,
       setTenantId,
       setTenantMetaTestMode,
     ]

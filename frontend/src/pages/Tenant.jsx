@@ -64,11 +64,6 @@ export default function Tenant() {
     const [organizacionId, setOrganizacionId] = useState("");
     const [activo, setActivo] = useState(true);
     const [operatingMode, setOperatingMode] = useState("full");
-    const [kommoEnabled, setKommoEnabled] = useState(false);
-    const [kommoSubdomain, setKommoSubdomain] = useState("");
-    const [kommoAccountId, setKommoAccountId] = useState("");
-    const [kommoAccessToken, setKommoAccessToken] = useState("");
-    const [kommoWebhookSecret, setKommoWebhookSecret] = useState("");
     const [listLoading, setListLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -109,11 +104,6 @@ export default function Tenant() {
         setOrganizacionId(empresa?.organizacion || "");
         setActivo(Boolean(empresa?.activo));
         setOperatingMode(empresa?.operating_mode || "full");
-        setKommoEnabled(Boolean(empresa?.kommo_enabled));
-        setKommoSubdomain(empresa?.kommo_subdomain || "");
-        setKommoAccountId(empresa?.kommo_account_id ? String(empresa.kommo_account_id) : "");
-        setKommoAccessToken("");
-        setKommoWebhookSecret("");
         setError("");
     };
 
@@ -124,11 +114,6 @@ export default function Tenant() {
         setOrganizacionId("");
         setActivo(true);
         setOperatingMode("full");
-        setKommoEnabled(false);
-        setKommoSubdomain("");
-        setKommoAccountId("");
-        setKommoAccessToken("");
-        setKommoWebhookSecret("");
         setError("");
     };
 
@@ -147,10 +132,6 @@ export default function Tenant() {
             setError("Selecciona una organizacion.");
             return;
         }
-        if (kommoEnabled && kommoAccountId.trim() !== "" && Number.isNaN(Number(kommoAccountId.trim()))) {
-            setError("Kommo account id debe ser numerico.");
-            return;
-        }
         setSaving(true);
         setError("");
         try {
@@ -159,16 +140,6 @@ export default function Tenant() {
                 codigo_prefijo: normalizedCodigoPrefijo,
                 activo,
                 operating_mode: operatingMode || "full",
-                kommo_enabled: Boolean(kommoEnabled),
-                kommo_subdomain: kommoEnabled ? (kommoSubdomain.trim().toLowerCase() || null) : null,
-                kommo_account_id:
-                    kommoEnabled && kommoAccountId.trim() !== ""
-                        ? Number(kommoAccountId.trim())
-                        : null,
-                ...(kommoEnabled && kommoAccessToken.trim() ? { kommo_access_token: kommoAccessToken.trim() } : {}),
-                ...(kommoEnabled && kommoWebhookSecret.trim() ? { kommo_webhook_secret: kommoWebhookSecret.trim() } : {}),
-                ...(!kommoEnabled ? { kommo_access_token: "" } : {}),
-                ...(!kommoEnabled ? { kommo_webhook_secret: "" } : {}),
                 ...(isSuperuser ? { organizacion: Number(organizacionId) } : {}),
             };
             if (selected) {
@@ -405,9 +376,6 @@ export default function Tenant() {
                                         <div className="text-[11px] text-white/50">
                                             Prefijo codigo: {empresa.codigo_prefijo || deriveEmpresaCodePrefix(empresa.nombre)}
                                         </div>
-                                        <div className="text-[11px] text-white/50">
-                                            Kommo: {empresa.kommo_enabled ? "Integrado" : "No integrado"}
-                                        </div>
                                         <div className="mt-1 text-[11px] text-white/50">
                                             KPI sync: {empresa.kpi_sync_last_run_at ? new Date(empresa.kpi_sync_last_run_at).toLocaleString("es-AR") : "-"} ({empresa.kpi_sync_last_status || "n/a"})
                                         </div>
@@ -453,11 +421,6 @@ export default function Tenant() {
                         showOrganizacionField={isSuperuser}
                         activo={activo}
                         operatingMode={operatingMode}
-                        kommoEnabled={kommoEnabled}
-                        kommoSubdomain={kommoSubdomain}
-                        kommoAccountId={kommoAccountId}
-                        kommoAccessToken={kommoAccessToken}
-                        kommoWebhookSecret={kommoWebhookSecret}
                         error={error}
                         saving={saving}
                         onNombreChange={setNombre}
@@ -465,11 +428,6 @@ export default function Tenant() {
                         onOrganizacionIdChange={setOrganizacionId}
                         onActivoChange={setActivo}
                         onOperatingModeChange={setOperatingMode}
-                        onKommoEnabledChange={setKommoEnabled}
-                        onKommoSubdomainChange={setKommoSubdomain}
-                        onKommoAccountIdChange={setKommoAccountId}
-                        onKommoAccessTokenChange={setKommoAccessToken}
-                        onKommoWebhookSecretChange={setKommoWebhookSecret}
                         onSave={handleSave}
                         onClear={handleClear}
                     />

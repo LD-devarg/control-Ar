@@ -33,6 +33,7 @@ function Sidebar() {
         { path: "/home", label: "Inicio", Icon: OtherHousesOutlinedIcon },
         { path: "/stats", label: "Analisis", Icon: QueryStatsOutlinedIcon },
         { path: "/contacts", label: "Agenda", Icon: ContactPageOutlinedIcon },
+        { path: "/crm", label: "CRM", Icon: WhatsAppIcon },
       ],
     },
     {

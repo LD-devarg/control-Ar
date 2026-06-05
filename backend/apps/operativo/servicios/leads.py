@@ -147,13 +147,6 @@ def crear_cliente_desde_viewset(*, viewset, request, deps: dict):
         resultado=resultado,
         motivo=motivo,
     )
-    try:
-        deps["enviar_evento_meta"](evento, request=request)
-    except Exception as exc:
-        evento.estado_envio = "fallido"
-        evento.respuesta_meta = {"error": str(exc)}
-        evento.save(update_fields=["estado_envio", "respuesta_meta"])
-
     deps["safe_publish_empresa_event"](
         empresa_id=landing.empresa_id,
         event_type="lead_created",

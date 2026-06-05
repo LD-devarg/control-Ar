@@ -112,6 +112,7 @@ class MetaEventBuilder:
             else:
                 event_time_int = int(time.time())
         first_name, last_name = _split_name(payload.get("nombre"))
+        action_source = payload.get("action_source", "website")
 
         # -------------------------
         # user_data
@@ -124,6 +125,8 @@ class MetaEventBuilder:
             "external_id": _sha256(payload.get("external_id").strip().lower() if payload.get("external_id") else None),
             "fbp": payload.get("fbp"),
             "fbc": payload.get("fbc"),
+            "ctwa_clid": payload.get("ctwa_clid"),
+            "whatsapp_business_account_id": payload.get("waba_id"),
             "client_ip_address": _normalize_ip(payload.get("ip_address")) or _extract_request_ip(request),
             "client_user_agent": payload.get("user_agent") or (request.META.get("HTTP_USER_AGENT") if request else None),
         })
@@ -142,14 +145,20 @@ class MetaEventBuilder:
         # payload final
         # -------------------------
         event_source_url = payload.get("event_source_url") or (request.build_absolute_uri() if request else None)
-        data = _clean_dict({
+        data_dict = {
             "event_name": EVENT_NAME_MAP[tipo],
             "event_time": event_time_int,
             "event_id": str(event_id),
-            "action_source": "website",
+            "action_source": action_source,
             "event_source_url": event_source_url,
             "user_data": user_data,
             "custom_data": custom_data,
-        })
+        }
+
+        if action_source == "business_messaging":
+            data_dict["messaging_channel"] = payload.get("messaging_channel", "whatsapp")
+            data_dict.pop("event_source_url", None)
+
+        data = _clean_dict(data_dict)
 
         return data, event_id

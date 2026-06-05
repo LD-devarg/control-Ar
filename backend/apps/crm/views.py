@@ -1,0 +1,110 @@
+from django.utils import timezone
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from apps.empresas.permissions import RoleBasedPermission, is_admin, is_operador, is_pauta
+from apps.empresas.scope import filter_queryset_by_empresa
+
+from .models import Conversation, Message, WhatsAppConfig
+from .serializers import ConversationSerializer, MessageSerializer, WhatsAppConfigSerializer
+from .servicios.wa_client import (
+    conversacion_en_ventana_24h,
+    enviar_mensaje_texto,
+    extract_outbound_message_id,
+)
+
+
+class WhatsAppConfigViewSet(viewsets.ModelViewSet):
+    queryset = WhatsAppConfig.objects.select_related("empresa").all()
+    serializer_class = WhatsAppConfigSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        return request.user.is_superuser or is_admin(request.user)
+
+    def get_queryset(self):
+        return filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
+
+
+class ConversationViewSet(viewsets.ModelViewSet):
+    queryset = Conversation.objects.select_related("empresa", "cliente").prefetch_related("mensajes").all()
+    serializer_class = ConversationSerializer
+    http_method_names = ["get", "patch"]
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        return request.user.is_superuser or is_admin(request.user) or is_operador(request.user) or is_pauta(request.user)
+
+    def get_queryset(self):
+        qs = filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")
+        estado = self.request.query_params.get("estado")
+        if estado:
+            qs = qs.filter(estado=estado)
+        return qs
+
+    @action(detail=True, methods=["post"], url_path="responder")
+    def responder(self, request, pk=None):
+        conversation = self.get_object()
+        body = str(request.data.get("body") or "").strip()
+        if not body:
+            raise ValidationError({"body": "El mensaje no puede estar vacio."})
+        if not conversacion_en_ventana_24h(conversation):
+            raise ValidationError(
+                "La ventana de 24h esta cerrada. Para responder se necesita una plantilla aprobada."
+            )
+
+        config = (
+            WhatsAppConfig.objects.filter(empresa_id=conversation.empresa_id, activo=True)
+            .order_by("id")
+            .first()
+        )
+        if not config:
+            raise ValidationError("No hay configuracion WhatsApp activa para esta empresa.")
+
+        response_payload = enviar_mensaje_texto(
+            config=config,
+            to_phone=conversation.wa_phone,
+            body=body,
+        )
+        message_id = extract_outbound_message_id(response_payload)
+        message = Message.objects.create(
+            conversation=conversation,
+            direction=Message.DIRECTION_OUT,
+            wa_message_id=message_id,
+            body=body,
+            tipo="text",
+            estado="sent",
+            timestamp=timezone.now(),
+            raw=response_payload,
+        )
+        conversation.last_outbound_at = message.timestamp
+        if conversation.estado == "nuevo":
+            conversation.estado = "en_conversacion"
+            conversation.save(update_fields=["last_outbound_at", "estado", "actualizado_en"])
+        else:
+            conversation.save(update_fields=["last_outbound_at", "actualizado_en"])
+
+        return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
+
+
+class MessageViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Message.objects.select_related("conversation", "conversation__empresa").all()
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated, RoleBasedPermission]
+
+    def has_role_permission(self, request, view):
+        return request.user.is_superuser or is_admin(request.user) or is_operador(request.user) or is_pauta(request.user)
+
+    def get_queryset(self):
+        qs = filter_queryset_by_empresa(
+            super().get_queryset(),
+            self.request,
+            field_name="conversation__empresa_id",
+        )
+        conversation_id = self.request.query_params.get("conversation")
+        if conversation_id:
+            qs = qs.filter(conversation_id=conversation_id)
+        return qs.order_by("timestamp", "id")

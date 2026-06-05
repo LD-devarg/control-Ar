@@ -5,7 +5,6 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import Snackbar from "@mui/material/Snackbar";
-import Alert from "@mui/material/Alert";
 import "../assets/css/Form.css";
 import { useTheme } from '@mui/material/styles';
 import { apiClient } from '../services/auth';
@@ -28,7 +27,7 @@ export default function FormContacto() {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
-  const { tenantId: empresaId, kommoEnabled } = useTenant();
+  const { tenantId: empresaId } = useTenant();
   const fieldSx = {
     '& .MuiInputBase-input': { color },
     '& .MuiInputLabel-root': {
@@ -212,11 +211,6 @@ export default function FormContacto() {
 
   return (
     <Stack spacing={2} className="form-stack">
-      {kommoEnabled ? (
-        <Alert severity="info" variant="outlined">
-          Integracion Kommo activa. Este guardado manual queda como fallback si no llegara el webhook.
-        </Alert>
-      ) : null}
         <Autocomplete
         disablePortal
         id="combo-box-demo"

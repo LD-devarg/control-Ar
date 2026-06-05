@@ -18,6 +18,7 @@ import Tenant from './pages/Tenant.jsx'
 import Users from './pages/Users.jsx'
 import Organizaciones from './pages/Organizaciones.jsx'
 import MetaEvents from './pages/MetaEvents.jsx'
+import CRMWhatsApp from './pages/CRMWhatsApp.jsx'
 import DemoApp from './pages/DemoApp.jsx'
 import { canAccessPath, getDefaultPath } from './services/access'
 import { getCurrentUser, initializeAuthSession } from './services/auth'
@@ -94,6 +95,7 @@ function App() {
             <Route path="/home" element={<GuardedRoute path="/home" element={<Home />} />} />
             <Route path="/stats" element={<GuardedRoute path="/stats" element={<Stats />} />} />
             <Route path="/whatsapp" element={<GuardedRoute path="/whatsapp" element={<WhatsApp />} />} />
+            <Route path="/crm" element={<GuardedRoute path="/crm" element={<CRMWhatsApp />} />} />
             <Route path="/contacts" element={<GuardedRoute path="/contacts" element={<Agenda />} />} />
             <Route path="/landing-config" element={<GuardedRoute path="/landing-config" element={<LandingConfig />} />} />
             <Route path="/tipo-cambio" element={<GuardedRoute path="/tipo-cambio" element={<TipoCambio />} />} />

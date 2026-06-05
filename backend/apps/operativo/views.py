@@ -1,8 +1,6 @@
-import uuid
 import logging
 from collections import defaultdict
 from datetime import timedelta
-import requests
 
 from django.db import models, transaction
 from django.db.models import Sum, Min, Subquery, Count, Value, DecimalField, IntegerField, Q
@@ -45,8 +43,6 @@ from .serializers import (
     ClienteSerializer,
     EventosMetaCreateSerializer,
     EventosMetaReadSerializer,
-    KommoContactWebhookSerializer,
-    KommoLeadWebhookSerializer,
     LandingSerializer,
     CompraSerializer,
     RetiroSerializer,
@@ -64,14 +60,8 @@ from .servicios.fechas import (
     get_datetime_range as _get_datetime_range,
 )
 from .servicios.enviador import enviar_evento_meta
+from .servicios.eventos import crear_y_enviar_evento
 from .servicios.leads import crear_cliente_desde_viewset
-from .servicios.kommo import (
-    as_dict as kommo_as_dict,
-    extract_kommo_custom_fields,
-    first_kommo_entity,
-    normalize_phone,
-    phone_candidates,
-)
 from apps.pauta.servicios.insights import fetch_meta_page_views
 from apps.pauta.servicios.credenciales import credencial_aplica_a_empresa
 from apps.pauta.servicios.telegram_alerts import send_lead_queue_alert
@@ -494,29 +484,23 @@ def _create_lead_event(
     )
     if existing_duplicate:
         return existing_duplicate
-    evento = EventosMeta.objects.create(
-        id_evento=uuid.uuid4(),
+    return crear_y_enviar_evento(
         cliente=cliente,
         empresa=landing.empresa,
         landing=landing,
         operador=None,
         tipo="lead",
-        data=payload,
+        fuente="landing",
+        data_payload=payload,
         ocurrido_en=timezone.now(),
-        fbp=request.data.get("fbp"),
-        fbc=request.data.get("fbc"),
-        ip_address=_client_first_ip(request, cliente),
-        user_agent=_client_first_user_agent(request, cliente),
-    )
-    if payload["meta_skipped"]:
-        evento.estado_envio = "enviado"
-        evento.respuesta_meta = {
+        request=request,
+        enviar=not payload["meta_skipped"],
+        respuesta_skip={
             "skipped": True,
             "reason": motivo,
             "resultado": resultado,
-        }
-        evento.save(update_fields=["estado_envio", "respuesta_meta"])
-    return evento
+        },
+    )
 
 
 class ClienteViewSet(viewsets.ModelViewSet):
@@ -606,7 +590,6 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 "find_recent_lead_event": _find_recent_lead_event,
                 "merge_cliente_missing_fields": _merge_cliente_missing_fields,
                 "create_lead_event": _create_lead_event,
-                "enviar_evento_meta": enviar_evento_meta,
                 "safe_publish_empresa_event": _safe_publish_empresa_event,
             },
         )
@@ -648,452 +631,6 @@ class ClienteViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_200_OK,
         )
-
-
-class KommoWebhookViewSet(viewsets.ViewSet):
-    permission_classes = [AllowAny]
-
-    def _normalize_phone(self, value):
-        return normalize_phone(value)
-
-    def _resolve_landing(self, landing_token):
-        if not landing_token:
-            return None
-        return get_object_or_404(Landing, token=landing_token, activo=True)
-
-    def _phone_candidates(self, value):
-        return phone_candidates(value)
-
-    def _resolve_cliente(self, data, landing=None):
-        cliente_id = data.get("cliente_id")
-        if cliente_id:
-            return Cliente.objects.filter(id=cliente_id).first()
-
-        cliente_uuid = data.get("cliente_uuid")
-        if cliente_uuid:
-            return Cliente.objects.filter(uuid=cliente_uuid).first()
-
-        phone_candidates = self._phone_candidates(data.get("contacto") or data.get("phone"))
-        if not phone_candidates:
-            return None
-
-        filters = {}
-        empresa_id = data.get("empresa_id")
-        if empresa_id:
-            filters["empresa_id"] = empresa_id
-        elif landing:
-            filters["empresa_id"] = landing.empresa_id
-
-        base_qs = Cliente.objects.filter(**filters)
-        by_exact = base_qs.filter(contacto__in=phone_candidates).order_by("-id").first()
-        if by_exact:
-            return by_exact
-
-        # fallback: match by suffix in case Kommo phone carries country/mobile prefixes
-        q = models.Q()
-        for candidate in phone_candidates:
-            q |= models.Q(contacto__endswith=candidate)
-        return base_qs.filter(q).order_by("-id").first()
-
-    def _event_payload(self, cliente, data, include_value=False):
-        payload = {
-            "phone": self._normalize_phone(data.get("phone") or data.get("contacto")) or cliente.contacto,
-            "email": data.get("email"),
-            "external_id": str(cliente.uuid),
-            "nombre": cliente.nombre,
-            "event_source_url": data.get("event_source_url") or cliente.event_source_url,
-        }
-        if include_value:
-            payload["value"] = data.get("value")
-            payload["currency"] = data.get("currency")
-        return payload
-
-    def _is_deduped(self, dedup_key):
-        if not dedup_key:
-            return False
-        cache_key = f"kommo_webhook_dedup:{dedup_key}"
-        if cache.get(cache_key):
-            return True
-        cache.set(cache_key, True, timeout=24 * 60 * 60)
-        return False
-
-    def _contact_dedup_days(self):
-        try:
-            return max(int(getattr(settings, "KOMMO_CONTACT_DEDUP_DAYS", 7) or 7), 0)
-        except (TypeError, ValueError):
-            return 7
-
-    def _has_recent_contact(self, cliente):
-        days = self._contact_dedup_days()
-        if days <= 0:
-            return False
-        since = timezone.now() - timedelta(days=days)
-        return EventosMeta.objects.filter(
-            cliente=cliente,
-            tipo="contact",
-            creado_en__gte=since,
-        ).exists()
-
-    def _as_dict(self, value):
-        return kommo_as_dict(value)
-
-    def _first_kommo_entity(self, block):
-        return first_kommo_entity(block)
-
-    def _extract_kommo_custom_fields(self, entity):
-        return extract_kommo_custom_fields(entity)
-
-    def _resolve_kommo_empresa(self, data):
-        account_id = data.get("kommo_account_id")
-        subdomain = str(data.get("kommo_subdomain") or "").strip().lower()
-
-        empresa = None
-        if account_id:
-            try:
-                empresa = Empresa.objects.filter(kommo_account_id=int(account_id), activo=True).only(
-                    "id",
-                    "kommo_enabled",
-                    "kommo_access_token",
-                    "kommo_webhook_secret",
-                    "kommo_subdomain",
-                    "kommo_account_id",
-                ).first()
-            except (TypeError, ValueError):
-                empresa = None
-        if not empresa and subdomain:
-            empresa = Empresa.objects.filter(kommo_subdomain=subdomain, activo=True).only(
-                "id",
-                "kommo_enabled",
-                "kommo_access_token",
-                "kommo_webhook_secret",
-                "kommo_subdomain",
-                "kommo_account_id",
-            ).first()
-        return empresa
-
-    def _kommo_headers(self, empresa=None):
-        token = ""
-        if empresa and empresa.kommo_access_token:
-            token = str(empresa.kommo_access_token).strip()
-        if not token:
-            token = getattr(settings, "KOMMO_ACCESS_TOKEN", "")
-        if not token:
-            return None
-        return {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/json",
-        }
-
-    def _kommo_base_url(self, subdomain):
-        if not subdomain:
-            return None
-        return f"https://{subdomain}.amocrm.com/api/v4"
-
-    def _kommo_get(self, base_url, path, empresa=None):
-        headers = self._kommo_headers(empresa=empresa)
-        if not headers or not base_url:
-            return None
-        try:
-            response = requests.get(f"{base_url}{path}", headers=headers, timeout=8)
-            if response.status_code >= 400:
-                return None
-            return response.json()
-        except Exception:
-            return None
-
-    def _extract_phone_email_from_kommo_entity(self, entity):
-        result = {}
-        extracted = self._extract_kommo_custom_fields(entity or {})
-        if extracted.get("phone"):
-            result["phone"] = extracted["phone"]
-        if extracted.get("email"):
-            result["email"] = extracted["email"]
-        return result
-
-    def _kommo_lookup_details(self, kind, data, empresa=None):
-        subdomain = data.get("kommo_subdomain")
-        base_url = self._kommo_base_url(subdomain)
-        if not base_url:
-            return {}
-
-        if kind == "lead":
-            lead_id = data.get("kommo_entity_id")
-            if not lead_id:
-                return {}
-            lead = self._kommo_get(base_url, f"/leads/{lead_id}?with=contacts", empresa=empresa)
-            if not isinstance(lead, dict):
-                return {}
-
-            result = self._extract_phone_email_from_kommo_entity(lead)
-            if result.get("phone"):
-                return result
-
-            contacts_embedded = ((lead.get("_embedded") or {}).get("contacts") or [])
-            for contact_ref in contacts_embedded:
-                contact_id = contact_ref.get("id")
-                if not contact_id:
-                    continue
-                contact = self._kommo_get(base_url, f"/contacts/{contact_id}", empresa=empresa)
-                if not isinstance(contact, dict):
-                    continue
-                cdata = self._extract_phone_email_from_kommo_entity(contact)
-                if cdata.get("phone"):
-                    return cdata
-            return result
-
-        contact_id = data.get("kommo_entity_id")
-        if not contact_id:
-            return {}
-        contact = self._kommo_get(base_url, f"/contacts/{contact_id}", empresa=empresa)
-        if not isinstance(contact, dict):
-            return {}
-        return self._extract_phone_email_from_kommo_entity(contact)
-
-    def _extract_kommo_payload(self, request, kind):
-        request_data = request.data
-        account = self._as_dict(request_data.get("account"))
-        leads = self._as_dict(request_data.get("leads"))
-        contacts = self._as_dict(request_data.get("contacts"))
-        if not account and not leads and not contacts:
-            return None
-
-        entity = self._first_kommo_entity(leads if kind == "lead" else contacts)
-        if entity is None:
-            entity = self._first_kommo_entity(contacts if kind == "lead" else leads)
-        if entity is None:
-            return None
-
-        account_id = account.get("id")
-        account_subdomain = account.get("subdomain")
-        entity_id = entity.get("id")
-        modified_at = entity.get("updated_at") or entity.get("last_modified") or ""
-        request_id = request.headers.get("X-AmoCRM-RequestId") or request.headers.get("x-amocrm-requestid")
-        dedup_key = request_id or f"kommo:{account_id}:{kind}:{entity_id}:{modified_at}"
-
-        extracted = self._extract_kommo_custom_fields(entity)
-        payload = {
-            "dedup_key": dedup_key,
-            "cliente_id": extracted.get("cliente_id"),
-            "cliente_uuid": extracted.get("cliente_uuid"),
-            "landing_token": extracted.get("landing_token"),
-            "contacto": extracted.get("phone"),
-            "phone": extracted.get("phone"),
-            "email": extracted.get("email"),
-            "nombre": entity.get("name"),
-            "kommo_account_id": account_id,
-            "kommo_subdomain": account_subdomain,
-            "kommo_entity_id": entity_id,
-        }
-        return payload
-
-    def _validate_secret(self, request, tenant_empresa=None):
-        expected = ""
-        if tenant_empresa and str(getattr(tenant_empresa, "kommo_webhook_secret", "")).strip():
-            expected = str(tenant_empresa.kommo_webhook_secret).strip()
-        if not expected:
-            expected = getattr(settings, "KOMMO_WEBHOOK_SECRET", "")
-        if not expected:
-            return
-        provided = (
-            request.headers.get("X-Kommo-Secret")
-            or request.query_params.get("secret")
-            or request.data.get("secret")
-            or ""
-        )
-        if provided != expected:
-            raise ValidationError("Webhook secret invalido.")
-
-    @action(detail=False, methods=["post"], url_path="lead-confirm")
-    def lead_confirm(self, request):
-        kommo_data = self._extract_kommo_payload(request, kind="lead")
-        tenant_empresa = None
-        if kommo_data is not None:
-            data = kommo_data
-            tenant_empresa = self._resolve_kommo_empresa(data)
-            self._validate_secret(request, tenant_empresa=tenant_empresa)
-            if not tenant_empresa:
-                return Response(
-                    {"ok": False, "ignored": True, "detail": "Empresa tenant no mapeada para esta cuenta Kommo."},
-                    status=status.HTTP_202_ACCEPTED,
-                )
-            if not bool(getattr(tenant_empresa, "kommo_enabled", False)):
-                return Response(
-                    {"ok": False, "ignored": True, "detail": "Empresa con integracion Kommo desactivada."},
-                    status=status.HTTP_202_ACCEPTED,
-                )
-            data["empresa_id"] = tenant_empresa.id
-        else:
-            self._validate_secret(request)
-            serializer = KommoLeadWebhookSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            data = serializer.validated_data
-
-        if self._is_deduped(data.get("dedup_key")):
-            return Response({"ok": True, "deduped": True}, status=status.HTTP_200_OK)
-
-        landing = self._resolve_landing(data.get("landing_token"))
-        if landing and data.get("empresa_id") and landing.empresa_id != int(data["empresa_id"]):
-            return Response(
-                {"ok": False, "ignored": True, "detail": "Landing no coincide con empresa tenant."},
-                status=status.HTTP_202_ACCEPTED,
-            )
-        cliente = self._resolve_cliente(data, landing=landing)
-        if not cliente and data.get("kommo_entity_id"):
-            details = self._kommo_lookup_details("lead", data, empresa=tenant_empresa)
-            if details.get("phone") and not data.get("phone"):
-                data["phone"] = details["phone"]
-                data["contacto"] = details["phone"]
-            if details.get("email") and not data.get("email"):
-                data["email"] = details["email"]
-            cliente = self._resolve_cliente(data, landing=landing)
-        if not cliente:
-            return Response(
-                {
-                    "ok": False,
-                    "ignored": True,
-                    "detail": "Cliente no encontrado para confirmar lead.",
-                },
-                status=status.HTTP_202_ACCEPTED,
-            )
-
-        if self._has_recent_contact(cliente):
-            return Response(
-                {
-                    "ok": True,
-                    "deduped_window": True,
-                    "detail": f"Contacto ya registrado en la ventana de {self._contact_dedup_days()} dias.",
-                    "cliente_id": cliente.id,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        # En Kommo, "Lead agregado" representa el primer mensaje/contacto.
-        # Lo mapeamos a evento "contact" en ControlAR.
-        evento = EventosMeta.objects.create(
-            id_evento=uuid.uuid4(),
-            cliente=cliente,
-            empresa=cliente.empresa,
-            landing=landing,
-            operador=None,
-            tipo="contact",
-            data=self._event_payload(cliente, data),
-            ocurrido_en=timezone.now(),
-            fbp=data.get("fbp") or cliente.fbp,
-            fbc=data.get("fbc") or cliente.fbc,
-            ip_address=_client_first_ip(request, cliente),
-            user_agent=_client_first_user_agent(request, cliente),
-        )
-        try:
-            enviar_evento_meta(evento, request=request)
-        except Exception as exc:
-            evento.estado_envio = "fallido"
-            evento.respuesta_meta = {"error": str(exc)}
-            evento.save(update_fields=["estado_envio", "respuesta_meta"])
-
-        _safe_publish_empresa_event(
-            empresa_id=cliente.empresa_id,
-            event_type="contact_created",
-            payload={
-                "id": evento.id,
-                "cliente": cliente.id,
-                "cliente_nombre": cliente.nombre,
-                "cliente_username": cliente.username,
-                "cliente_contacto": cliente.contacto,
-                "creado_en": evento.creado_en.isoformat(),
-            },
-        )
-        return Response({"ok": True, "evento_id": evento.id, "cliente_id": cliente.id}, status=status.HTTP_201_CREATED)
-
-    @action(detail=False, methods=["post"], url_path="contact")
-    def contact(self, request):
-        kommo_data = self._extract_kommo_payload(request, kind="contact")
-        tenant_empresa = None
-        if kommo_data is not None:
-            data = kommo_data
-            tenant_empresa = self._resolve_kommo_empresa(data)
-            self._validate_secret(request, tenant_empresa=tenant_empresa)
-            if not tenant_empresa:
-                return Response(
-                    {"ok": False, "ignored": True, "detail": "Empresa tenant no mapeada para esta cuenta Kommo."},
-                    status=status.HTTP_202_ACCEPTED,
-                )
-            if not bool(getattr(tenant_empresa, "kommo_enabled", False)):
-                return Response(
-                    {"ok": False, "ignored": True, "detail": "Empresa con integracion Kommo desactivada."},
-                    status=status.HTTP_202_ACCEPTED,
-                )
-            data["empresa_id"] = tenant_empresa.id
-        else:
-            self._validate_secret(request)
-            serializer = KommoContactWebhookSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            data = serializer.validated_data
-
-        if self._is_deduped(data.get("dedup_key")):
-            return Response({"ok": True, "deduped": True}, status=status.HTTP_200_OK)
-
-        landing = self._resolve_landing(data.get("landing_token"))
-        if landing and data.get("empresa_id") and landing.empresa_id != int(data["empresa_id"]):
-            return Response(
-                {"ok": False, "ignored": True, "detail": "Landing no coincide con empresa tenant."},
-                status=status.HTTP_202_ACCEPTED,
-            )
-        cliente = self._resolve_cliente(data, landing=landing)
-        if not cliente and data.get("kommo_entity_id"):
-            details = self._kommo_lookup_details("contact", data, empresa=tenant_empresa)
-            if details.get("phone") and not data.get("phone"):
-                data["phone"] = details["phone"]
-                data["contacto"] = details["phone"]
-            if details.get("email") and not data.get("email"):
-                data["email"] = details["email"]
-            cliente = self._resolve_cliente(data, landing=landing)
-        if not cliente:
-            return Response(
-                {
-                    "ok": False,
-                    "ignored": True,
-                    "detail": "Cliente no encontrado para crear contacto.",
-                },
-                status=status.HTTP_202_ACCEPTED,
-            )
-
-        if not landing:
-            landing = _resolve_latest_lead_landing(cliente_id=cliente.id)
-
-        evento = EventosMeta.objects.create(
-            id_evento=uuid.uuid4(),
-            cliente=cliente,
-            empresa=cliente.empresa,
-            landing=landing,
-            operador=None,
-            tipo="contact",
-            data=self._event_payload(cliente, data),
-            ocurrido_en=timezone.now(),
-            fbp=data.get("fbp") or cliente.fbp,
-            fbc=data.get("fbc") or cliente.fbc,
-            ip_address=_client_first_ip(request, cliente),
-            user_agent=_client_first_user_agent(request, cliente),
-        )
-        try:
-            enviar_evento_meta(evento, request=request)
-        except Exception as exc:
-            evento.estado_envio = "fallido"
-            evento.respuesta_meta = {"error": str(exc)}
-            evento.save(update_fields=["estado_envio", "respuesta_meta"])
-
-        _safe_publish_empresa_event(
-            empresa_id=cliente.empresa_id,
-            event_type="contact_created",
-            payload={
-                "id": evento.id,
-                "cliente": cliente.id,
-                "cliente_nombre": cliente.nombre,
-                "cliente_username": cliente.username,
-                "cliente_contacto": cliente.contacto,
-                "creado_en": evento.creado_en.isoformat(),
-            },
-        )
-        return Response({"ok": True, "evento_id": evento.id, "cliente_id": cliente.id}, status=status.HTTP_201_CREATED)
 
 
 class LandingViewSet(viewsets.ModelViewSet):
@@ -1344,6 +881,8 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 "tipo",
                 "data",
                 "ocurrido_en",
+                "fuente",
+                "ctwa_clid",
                 "fbp",
                 "fbc",
                 "ip_address",
@@ -1415,11 +954,25 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         cliente = (
             Cliente.objects
             .filter(id=serializer.validated_data["cliente_id"])
-            .only("id", "uuid", "fbp", "fbc", "contacto", "nombre", "ip_address", "user_agent")
+            .only(
+                "id",
+                "uuid",
+                "fbp",
+                "fbc",
+                "ctwa_clid",
+                "origen",
+                "contacto",
+                "nombre",
+                "event_source_url",
+                "ip_address",
+                "user_agent",
+            )
             .first()
         )
         if not landing and tipo in {"contact", "purchase"} and cliente:
             landing = _resolve_latest_lead_landing(cliente_id=cliente.id)
+        if not cliente:
+            raise ValidationError("El cliente no pertenece a la empresa.")
         payload = {
             "value": value,
             "currency": serializer.validated_data.get("currency"),
@@ -1431,27 +984,16 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
             payload["external_id"] = str(cliente.uuid)
             payload["event_source_url"] = cliente.event_source_url
 
-        evento = EventosMeta.objects.create(
-            id_evento=uuid.uuid4(),
-            cliente_id=serializer.validated_data["cliente_id"],
-            empresa_id=empresa_id,
+        evento = crear_y_enviar_evento(
+            cliente=cliente,
+            empresa=cliente.empresa,
             landing=landing,
             operador=operador,
             tipo=tipo,
-            data=payload,
+            data_payload=payload,
             ocurrido_en=serializer.validated_data["ocurrido_en"],
-            fbp=serializer.validated_data.get("fbp") or (cliente.fbp if cliente else None),
-            fbc=serializer.validated_data.get("fbc") or (cliente.fbc if cliente else None),
-            ip_address=_client_first_ip(request, cliente),
-            user_agent=_client_first_user_agent(request, cliente),
+            request=request,
         )
-
-        try:
-            enviar_evento_meta(evento, request=request)
-        except Exception as exc:
-            evento.estado_envio = "fallido"
-            evento.respuesta_meta = {"error": str(exc)}
-            evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
         output = EventosMetaReadSerializer(evento)
         return Response(output.data, status=status.HTTP_201_CREATED)
@@ -1573,18 +1115,17 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 "external_id": str(cliente.uuid),
                 "event_source_url": request.data.get("event_source_url") or landing.url,
             }
-            evento = EventosMeta.objects.create(
-                tipo="lead",
-                data=payload,
+            evento = crear_y_enviar_evento(
                 cliente=cliente,
                 empresa=landing.empresa,
+                tipo="lead",
                 operador=request.user,
                 landing=landing,
+                fuente="landing",
+                data_payload=payload,
                 ocurrido_en=timezone.now(),
-                fbp=request.data.get("fbp"),
-                fbc=request.data.get("fbc"),
-                ip_address=_client_first_ip(request, cliente),
-                user_agent=_client_first_user_agent(request, cliente),
+                request=request,
+                test_event_code=test_event_code,
             )
         else:
             cliente_id = request.data.get("cliente_id")
@@ -1616,26 +1157,18 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
                 "external_id": str(cliente.uuid),
                 "event_source_url": cliente.event_source_url or request.data.get("event_source_url"),
             }
-            evento = EventosMeta.objects.create(
-                tipo=tipo,
-                data=payload,
+            evento = crear_y_enviar_evento(
                 cliente=cliente,
                 empresa=cliente.empresa,
+                tipo=tipo,
                 operador=request.user,
                 landing=landing,
+                data_payload=payload,
                 ocurrido_en=timezone.now(),
-                fbp=request.data.get("fbp"),
-                fbc=request.data.get("fbc"),
-                ip_address=_client_first_ip(request, cliente),
-                user_agent=_client_first_user_agent(request, cliente),
+                request=request,
+                test_event_code=test_event_code,
             )
-        try:
-            respuesta = enviar_evento_meta(evento, request=request, test_event_code=test_event_code)
-        except Exception as exc:
-            evento.estado_envio = "fallido"
-            evento.respuesta_meta = {"error": str(exc)}
-            evento.save(update_fields=["estado_envio", "respuesta_meta"])
-            raise ValidationError(str(exc))
+        respuesta = evento.respuesta_meta
 
         output = EventosMetaReadSerializer(evento)
         return Response({"evento": output.data, "meta": respuesta}, status=status.HTTP_201_CREATED)
@@ -1745,26 +1278,16 @@ class CompraViewSet(viewsets.ModelViewSet):
                 "external_id": str(cliente.uuid),
                 "event_source_url": cliente.event_source_url,
             }
-            evento = EventosMeta.objects.create(
-                id_evento=uuid.uuid4(),
+            crear_y_enviar_evento(
                 cliente=cliente,
                 empresa=cliente.empresa,
                 landing=_resolve_latest_lead_landing(cliente_id=cliente.id),
                 operador=request.user,
                 tipo="purchase",
-                data=payload,
+                data_payload=payload,
                 ocurrido_en=compra.ocurrido_en,
-                fbp=cliente.fbp,
-                fbc=cliente.fbc,
-                ip_address=_client_first_ip(request, cliente),
-                user_agent=_client_first_user_agent(request, cliente),
+                request=request,
             )
-            try:
-                enviar_evento_meta(evento, request=request)
-            except Exception as exc:
-                evento.estado_envio = "fallido"
-                evento.respuesta_meta = {"error": str(exc)}
-                evento.save(update_fields=["estado_envio", "respuesta_meta"])
 
         output = self.get_serializer(compra)
         _safe_publish_empresa_event(

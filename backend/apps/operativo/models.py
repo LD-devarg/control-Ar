@@ -12,6 +12,13 @@ TIPO_EVENTO_CHOICES = [
     ("purchase", "Purchase"),
 ]
 
+FUENTE_EVENTO_CHOICES = [
+    ("landing", "Landing"),
+    ("whatsapp", "WhatsApp"),
+    ("manual", "Manual"),
+    ("ecommerce", "Ecommerce"),
+]
+
 BONO_CHOICES = [
     ("100%", "100%"),
     ("50%", "50%"),
@@ -85,6 +92,10 @@ class Cliente(models.Model):
     fbc = models.CharField(max_length=255, null=True, blank=True)
     fbp = models.CharField(max_length=255, null=True, blank=True)
     fbclid = models.CharField(max_length=255, null=True, blank=True)
+    ctwa_clid = models.CharField(max_length=512, null=True, blank=True)
+    wa_phone = models.CharField(max_length=20, null=True, blank=True)
+    source_ad_id = models.CharField(max_length=100, null=True, blank=True)
+    origen = models.CharField(max_length=20, choices=FUENTE_EVENTO_CHOICES, default="landing")
     utm_source = models.CharField(max_length=255, null=True, blank=True)
     utm_medium = models.CharField(max_length=255, null=True, blank=True)
     utm_campaign = models.CharField(max_length=255, null=True, blank=True)
@@ -259,6 +270,8 @@ class EventosMeta(models.Model):
     )
     reintentos = models.IntegerField(default=0)
     respuesta_meta = models.JSONField(null=True, blank=True)
+    fuente = models.CharField(max_length=20, choices=FUENTE_EVENTO_CHOICES, default="landing")
+    ctwa_clid = models.CharField(max_length=512, null=True, blank=True)
     fbc = models.CharField(max_length=255, null=True, blank=True)
     fbp = models.CharField(max_length=255, null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)

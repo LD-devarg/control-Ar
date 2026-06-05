@@ -34,11 +34,6 @@ export default function EmpresaForm({
     showOrganizacionField = false,
     activo,
     operatingMode = "full",
-    kommoEnabled = false,
-    kommoSubdomain = "",
-    kommoAccountId = "",
-    kommoAccessToken = "",
-    kommoWebhookSecret = "",
     error,
     saving,
     onNombreChange,
@@ -46,11 +41,6 @@ export default function EmpresaForm({
     onOrganizacionIdChange,
     onActivoChange,
     onOperatingModeChange,
-    onKommoEnabledChange,
-    onKommoSubdomainChange,
-    onKommoAccountIdChange,
-    onKommoAccessTokenChange,
-    onKommoWebhookSecretChange,
     onSave,
     onClear,
 }) {
@@ -114,58 +104,7 @@ export default function EmpresaForm({
                     />
                     <span className="text-sm">Activo</span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <Checkbox
-                        checked={kommoEnabled}
-                        onChange={(e) => onKommoEnabledChange?.(e.target.checked)}
-                        sx={checkboxSx}
-                    />
-                    <span className="text-sm">Integración Kommo</span>
-                </div>
             </div>
-            {kommoEnabled ? (
-                <>
-                <div className="flex flex-row px-2 py-2 gap-2">
-                    <TextField
-                        label="Kommo Subdominio"
-                        value={kommoSubdomain}
-                        onChange={(e) => onKommoSubdomainChange?.(e.target.value)}
-                        fullWidth
-                        size="small"
-                        sx={{ ...textFieldSx, mt:1 }}
-                        placeholder="lddevarg"
-                    />
-                    <TextField
-                        label="Kommo ID"
-                        value={kommoAccountId}
-                        onChange={(e) => onKommoAccountIdChange?.(e.target.value)}
-                        fullWidth
-                        size="small"
-                        sx={{ ...textFieldSx, mt:1 }}
-                    />
-                </div>
-                    <TextField
-                        label="Kommo Token de acceso"
-                        value={kommoAccessToken}
-                        onChange={(e) => onKommoAccessTokenChange?.(e.target.value)}
-                        fullWidth
-                        size="small"
-                        type="password"
-                        sx={{ ...textFieldSx, mt:1 }}
-                        helperText="Si lo dejas vacio en edicion, conserva el token actual."
-                    />
-                    <TextField
-                        label="Kommo Webhook Key"
-                        value={kommoWebhookSecret}
-                        onChange={(e) => onKommoWebhookSecretChange?.(e.target.value)}
-                        fullWidth
-                        size="small"
-                        type="password"
-                        sx={{ ...textFieldSx, mt:1 }}
-                        helperText="Si lo dejas vacio en edicion, conserva el secret actual."
-                    />
-                </>
-            ) : null}
             {error ? <div className="text-red-400 text-sm">{error}</div> : null}
             <div className="flex flex-wrap gap-2 mt-4">
                 <Button

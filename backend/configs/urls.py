@@ -12,7 +12,7 @@ from apps.empresas.views import (
     NotificacionEstructuralViewSet,
 )
 from apps.empresas.auth_views import LoggedTokenObtainPairView
-from apps.operativo.views import ClienteViewSet, EventosMetaViewSet, LandingViewSet, CompraViewSet, RetiroViewSet, LandingVisitViewSet, StatsViewSet, KommoWebhookViewSet
+from apps.operativo.views import ClienteViewSet, EventosMetaViewSet, LandingViewSet, CompraViewSet, RetiroViewSet, LandingVisitViewSet, StatsViewSet
 from apps.operativo.health import HealthView, TelegramBotView, TelegramTestView
 from apps.recursos.views import WhatsAppViewSet, TipoCambioViewSet
 from apps.pauta.views import (
@@ -31,6 +31,8 @@ from apps.pauta.views import (
     KPIObjetivoViewSet,
     PautaProvisioningViewSet,
 )
+from apps.crm.views import ConversationViewSet, MessageViewSet, WhatsAppConfigViewSet
+from apps.crm.webhooks import WhatsAppWebhookView
 
 router = DefaultRouter()
 router.register(r"organizaciones", OrganizacionViewSet, basename="organizacion")
@@ -46,7 +48,6 @@ router.register(r"compras", CompraViewSet, basename="compra")
 router.register(r"retiros", RetiroViewSet, basename="retiro")
 router.register(r"landing-visits", LandingVisitViewSet, basename="landing-visit")
 router.register(r"stats", StatsViewSet, basename="stats")
-router.register(r"kommo-webhooks", KommoWebhookViewSet, basename="kommo-webhook")
 router.register(r"whatsapps", WhatsAppViewSet, basename="whatsapp")
 router.register(r"tipos-cambio", TipoCambioViewSet, basename="tipo-cambio")
 router.register(r"bms", BMViewSet, basename="bm")
@@ -65,6 +66,9 @@ router.register(r"creatives", CreativeViewSet, basename="creative")
 router.register(r"pauta-kpi", PautaKPIViewSet, basename="pauta-kpi")
 router.register(r"kpi-objetivos", KPIObjetivoViewSet, basename="kpi-objetivo")
 router.register(r"pauta-provisioning", PautaProvisioningViewSet, basename="pauta-provisioning")
+router.register(r"crm/whatsapp-configs", WhatsAppConfigViewSet, basename="crm-whatsapp-config")
+router.register(r"crm/conversations", ConversationViewSet, basename="crm-conversation")
+router.register(r"crm/messages", MessageViewSet, basename="crm-message")
 
 urlpatterns = [
     path("api/token/", LoggedTokenObtainPairView.as_view(), name="token_obtain_pair"),
@@ -73,5 +77,6 @@ urlpatterns = [
     path("health/", HealthView.as_view(), name="health"),
     path("health/telegram-bots/", TelegramBotView.as_view(), name="health-telegram-bots"),
     path("health/telegram-test/", TelegramTestView.as_view(), name="health-telegram-test"),
+    path("webhook/whatsapp/", WhatsAppWebhookView.as_view(), name="wa-webhook"),
     path("", include(router.urls)),
 ]

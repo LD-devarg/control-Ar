@@ -266,3 +266,49 @@ class WhatsAppInboundFlowTests(TestCase):
         self.assertEqual(Conversation.objects.filter(empresa=self.empresa, wa_phone="5491122334455").count(), 1)
         self.assertEqual(Message.objects.filter(wa_message_id="wamid.1").count(), 1)
         self.assertEqual(EventosMeta.objects.filter(tipo="lead", fuente="whatsapp").count(), 1)
+
+
+from rest_framework.test import APITestCase
+from apps.empresas.models import Usuario
+
+class ConversationApiTests(APITestCase):
+    def setUp(self):
+        self.empresa = crear_empresa("Test Company")
+        self.user = Usuario.objects.create_user(
+            username="test_user",
+            password="test_password123",
+            empresa=self.empresa,
+        )
+        self.user.is_superuser = True
+        self.user.save()
+        self.client.force_authenticate(user=self.user)
+        self.conversation = Conversation.objects.create(
+            empresa=self.empresa,
+            wa_phone="5491122334455",
+            contact_name="Juan Perez",
+            last_inbound_at=timezone.now(),
+        )
+
+    def test_responder_post_endpoint_is_allowed(self):
+        config = WhatsAppConfig.objects.create(
+            empresa=self.empresa,
+            phone_number_id="phone-1",
+            waba_id="waba-1",
+            access_token_encrypted="fake_encrypted_token",
+            activo=True,
+        )
+        with patch("apps.crm.views.enviar_mensaje_texto", return_value={"messages": [{"id": "wamid.outbound1"}], "fake": True}) as mock_send:
+            url = f"/crm/conversations/{self.conversation.id}/responder/"
+            response = self.client.post(url, {"body": "Test message reply"})
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["body"], "Test message reply")
+        mock_send.assert_called_once()
+
+    def test_create_post_endpoint_is_not_allowed(self):
+        url = "/crm/conversations/"
+        response = self.client.post(url, {
+            "empresa": self.empresa.id,
+            "wa_phone": "5491122334466",
+        })
+        self.assertEqual(response.status_code, 405)

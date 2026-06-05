@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import MethodNotAllowed, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -32,11 +32,14 @@ class WhatsAppConfigViewSet(viewsets.ModelViewSet):
 class ConversationViewSet(viewsets.ModelViewSet):
     queryset = Conversation.objects.select_related("empresa", "cliente").prefetch_related("mensajes").all()
     serializer_class = ConversationSerializer
-    http_method_names = ["get", "patch"]
+    http_method_names = ["get", "post", "patch"]
     permission_classes = [IsAuthenticated, RoleBasedPermission]
 
     def has_role_permission(self, request, view):
         return request.user.is_superuser or is_admin(request.user) or is_operador(request.user) or is_pauta(request.user)
+
+    def create(self, request, *args, **kwargs):
+        raise MethodNotAllowed("POST")
 
     def get_queryset(self):
         qs = filter_queryset_by_empresa(super().get_queryset(), self.request, field_name="empresa_id")

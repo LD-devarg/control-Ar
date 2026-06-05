@@ -300,7 +300,6 @@ CHANNEL_LAYERS = {
                 {
                     "address": CHANNEL_REDIS_URL,
                     "socket_keepalive": True,
-                    "socket_keepalive_interval": 30,
                     "health_check_interval": 30,
                     "retry_on_timeout": True,
                     "connection_kwargs": {

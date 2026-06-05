@@ -81,7 +81,7 @@ def crear_cliente_desde_whatsapp(*, empresa, msg: dict):
             },
         )
 
-    if creado:
+    if creado and msg.get("ctwa_clid"):
         evento = crear_y_enviar_evento(
             cliente=cliente,
             empresa=empresa,

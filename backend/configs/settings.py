@@ -261,8 +261,19 @@ if AWS_STORAGE_BUCKET_NAME:
 
 
 # Celery
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL") or os.getenv("REDIS_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or os.getenv("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = os.getenv("REDIS_URL") or os.getenv("REDISURL") or os.getenv("REDIS_PRIVATE_URL") or "redis://localhost:6379/0"
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL") or REDIS_URL
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND") or REDIS_URL
+
+if CELERY_BROKER_URL.startswith("rediss://"):
+    import ssl
+    CELERY_BROKER_USE_SSL = {
+        "ssl_cert_reqs": ssl.CERT_NONE
+    }
+    CELERY_REDIS_BACKEND_USE_SSL = {
+        "ssl_cert_reqs": ssl.CERT_NONE
+    }
+
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
@@ -280,12 +291,19 @@ CELERY_WORKER_SEND_TASK_EVENTS = env_bool("CELERY_WORKER_SEND_TASK_EVENTS", Fals
 CELERY_TASK_SEND_SENT_EVENT = env_bool("CELERY_TASK_SEND_SENT_EVENT", False)
 
 # Realtime / Channels
-CHANNEL_REDIS_URL = os.getenv("CHANNEL_REDIS_URL") or os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CHANNEL_REDIS_URL = os.getenv("CHANNEL_REDIS_URL") or REDIS_URL
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [CHANNEL_REDIS_URL],
+            "hosts": [
+                {
+                    "address": CHANNEL_REDIS_URL,
+                    "socket_keepalive": True,
+                    "health_check_interval": 30,
+                    "retry_on_timeout": True,
+                }
+            ],
         },
     },
 }

@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import logging
 
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse
@@ -8,6 +9,8 @@ from rest_framework.views import APIView
 
 from .models import WhatsAppConfig
 from .tasks import procesar_evento_whatsapp
+
+logger = logging.getLogger("apps.crm.webhooks")
 
 
 def _settings_whatsapp(name: str, default: str = "") -> str:
@@ -58,7 +61,9 @@ class WhatsAppWebhookView(APIView):
         return False
 
     def post(self, request):
+        logger.info("WhatsApp Webhook POST received payload: %s", request.data)
         if not self._validate_signature(request):
+            logger.warning("WhatsApp Webhook signature validation failed")
             return JsonResponse({"detail": "invalid signature"}, status=403)
         procesar_evento_whatsapp.delay(request.data)
         return JsonResponse({"status": "received"}, status=200)

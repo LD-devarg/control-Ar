@@ -302,11 +302,8 @@ CHANNEL_LAYERS = {
                     "socket_keepalive": True,
                     "health_check_interval": 30,
                     "retry_on_timeout": True,
-                    "connection_kwargs": {
-                        "socket_connect_timeout": 10,
-                        "socket_timeout": 10,
-                        "retry_on_timeout": True,
-                    },
+                    "socket_connect_timeout": 10,
+                    "socket_timeout": 10,
                 }
             ],
             "capacity": 1500,

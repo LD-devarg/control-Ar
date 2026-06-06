@@ -832,7 +832,15 @@ export default function CRMWhatsApp() {
 
                         {/* snippet text */}
                         <p className="mt-1 truncate text-[11px] text-zinc-400">
-                          {conversation.ultimo_mensaje?.body || `[Mensaje ${conversation.ultimo_mensaje?.tipo || "nuevo"}]` || "Sin mensajes"}
+                          {(() => {
+                            const lastMsg = conversation.ultimo_mensaje;
+                            if (!lastMsg) return "Sin mensajes";
+                            if (lastMsg.tipo === "image") return `📷 Foto${lastMsg.body ? `: ${lastMsg.body}` : ""}`;
+                            if (lastMsg.tipo === "audio" || lastMsg.tipo === "voice") return `🎵 Audio`;
+                            if (lastMsg.tipo === "video") return `🎥 Video${lastMsg.body ? `: ${lastMsg.body}` : ""}`;
+                            if (lastMsg.tipo === "document") return `📄 Archivo: ${lastMsg.file_name || lastMsg.body || "Documento.pdf"}`;
+                            return lastMsg.body || `[Mensaje: ${lastMsg.tipo}]`;
+                          })()}
                         </p>
 
                         <div className="mt-2 flex flex-wrap items-center gap-1">
@@ -972,17 +980,71 @@ export default function CRMWhatsApp() {
                                     <div className="flex items-center gap-2 bg-zinc-900/30 p-2 rounded-xl">
                                       <InsertDriveFileIcon fontSize="medium" className={outbound ? "text-zinc-950" : "text-[#a3e635]"} />
                                       <div className="min-w-0">
-                                        <p className="truncate font-bold text-xs">{message.body || "Documento.pdf"}</p>
-                                        <p className="text-[9px] opacity-70">1.2 MB • PDF</p>
+                                        <p className="truncate font-bold text-xs">{message.file_name || message.body || "Documento.pdf"}</p>
+                                        <p className="text-[9px] opacity-70">
+                                          {message.file_size ? `${(message.file_size / (1024 * 1024)).toFixed(2)} MB` : "Archivo"} • {message.mime_type ? message.mime_type.split("/")[1].toUpperCase() : "Documento"}
+                                        </p>
                                       </div>
                                     </div>
-                                    <button className={`w-full py-1 text-[10px] font-bold rounded-lg border text-center transition ${
-                                      outbound 
-                                        ? "border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-[#a3e635]" 
-                                        : "border-[#a3e635]/30 text-[#a3e635] hover:bg-[#a3e635] hover:text-black"
-                                    }`}>
-                                      Abrir archivo
-                                    </button>
+                                    {message.file_url && (
+                                      <button 
+                                        onClick={() => window.open(message.file_url, "_blank")}
+                                        className={`w-full py-1 text-[10px] font-bold rounded-lg border text-center transition ${
+                                          outbound 
+                                            ? "border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-[#a3e635]" 
+                                            : "border-[#a3e635]/30 text-[#a3e635] hover:bg-[#a3e635] hover:text-black"
+                                        }`}
+                                      >
+                                        Abrir archivo
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : message.tipo === "image" ? (
+                                  <div className="flex flex-col gap-1.5">
+                                    {message.file_url ? (
+                                      <img 
+                                        src={message.file_url} 
+                                        alt={message.file_name || "Imagen"} 
+                                        onClick={() => window.open(message.file_url, "_blank")}
+                                        className="rounded-xl max-w-full max-h-72 object-contain cursor-pointer hover:opacity-90 transition duration-200" 
+                                      />
+                                    ) : (
+                                      <div className="text-xs italic opacity-70">[Imagen no disponible]</div>
+                                    )}
+                                    {message.body && (
+                                      <div className="whitespace-pre-wrap break-words mt-1 text-xs">
+                                        {message.body}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (message.tipo === "audio" || message.tipo === "voice") ? (
+                                  <div className="flex flex-col gap-1">
+                                    {message.file_url ? (
+                                      <audio 
+                                        controls 
+                                        src={message.file_url} 
+                                        className="mt-1 min-w-[200px] max-w-full h-8 text-black" 
+                                      />
+                                    ) : (
+                                      <div className="text-xs italic opacity-70">[Audio no disponible]</div>
+                                    )}
+                                  </div>
+                                ) : message.tipo === "video" ? (
+                                  <div className="flex flex-col gap-1.5">
+                                    {message.file_url ? (
+                                      <video 
+                                        controls 
+                                        src={message.file_url} 
+                                        className="max-w-full max-h-72 rounded-xl mt-1 object-contain" 
+                                      />
+                                    ) : (
+                                      <div className="text-xs italic opacity-70">[Video no disponible]</div>
+                                    )}
+                                    {message.body && (
+                                      <div className="whitespace-pre-wrap break-words mt-1 text-xs">
+                                        {message.body}
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <div className="whitespace-pre-wrap break-words">

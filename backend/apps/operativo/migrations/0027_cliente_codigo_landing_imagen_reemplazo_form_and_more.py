@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='cliente',
             name='codigo',
-            field=models.CharField(blank=True, default=apps.operativo.models.generar_codigo_corto, max_length=6, null=True),
+            field=models.CharField(blank=True, default=apps.operativo.models.generar_codigo_corto, max_length=10, null=True),
         ),
         migrations.AddField(
             model_name='landing',

@@ -69,16 +69,46 @@ def crear_cliente_desde_whatsapp(*, empresa, msg: dict):
     conv.save(update_fields=conv_updates)
 
     if msg.get("wa_message_id"):
+        defaults = {
+            "conversation": conv,
+            "direction": Message.DIRECTION_IN,
+            "body": msg.get("body", ""),
+            "tipo": msg.get("tipo", "text"),
+            "timestamp": msg.get("timestamp") or timezone.now(),
+            "raw": msg.get("raw"),
+        }
+
+        media_id = msg.get("media_id")
+        if media_id:
+            try:
+                from .media import descargar_y_guardar_media_whatsapp
+                from ..models import WhatsAppConfig
+                config = (
+                    WhatsAppConfig.objects.filter(empresa=empresa, activo=True)
+                    .order_by("id")
+                    .first()
+                )
+                if config:
+                    file_url, file_name, file_size, mime_type = descargar_y_guardar_media_whatsapp(
+                        config=config,
+                        media_id=media_id,
+                        user_filename=msg.get("user_filename")
+                    )
+                    if file_url:
+                        defaults.update({
+                            "file_url": file_url,
+                            "file_name": file_name,
+                            "file_size": file_size,
+                            "mime_type": mime_type,
+                        })
+            except Exception as e:
+                import logging
+                logger = logging.getLogger("apps.crm.lead")
+                logger.error(f"Error handling WhatsApp media download: {e}")
+
         _, message_created = Message.objects.get_or_create(
             wa_message_id=msg["wa_message_id"],
-            defaults={
-                "conversation": conv,
-                "direction": Message.DIRECTION_IN,
-                "body": msg.get("body", ""),
-                "tipo": msg.get("tipo", "text"),
-                "timestamp": msg.get("timestamp") or timezone.now(),
-                "raw": msg.get("raw"),
-            },
+            defaults=defaults,
         )
         if message_created:
             try:

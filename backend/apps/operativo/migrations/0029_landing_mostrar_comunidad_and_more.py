@@ -39,6 +39,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='cliente',
             name='codigo',
-            field=models.CharField(default=apps.operativo.models.generar_codigo_corto, max_length=6, unique=True),
+            field=models.CharField(default=apps.operativo.models.generar_codigo_corto, max_length=10, unique=True),
         ),
     ]

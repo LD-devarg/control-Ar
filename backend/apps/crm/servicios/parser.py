@@ -9,6 +9,12 @@ def _extract_body(message: dict) -> str:
         return str((message.get("text") or {}).get("body") or "")
     if msg_type in {"button", "interactive"}:
         return str(message.get(msg_type) or "")
+    if msg_type in {"image", "video", "document"}:
+        media_obj = message.get(msg_type) or {}
+        caption = media_obj.get("caption") or ""
+        if not caption and msg_type == "document":
+            caption = media_obj.get("filename") or ""
+        return str(caption)
     return ""
 
 
@@ -32,14 +38,26 @@ def parse_inbound(payload: dict) -> list[dict]:
                     continue
                 contact = contacts.get(wa_id, {})
                 referral = msg.get("referral", {}) or {}
+                
+                msg_type = msg.get("type")
+                media_id = None
+                user_filename = None
+                if msg_type in {"image", "audio", "voice", "video", "document"}:
+                    media_obj = msg.get(msg_type) or {}
+                    media_id = media_obj.get("id")
+                    if msg_type == "document":
+                        user_filename = media_obj.get("filename")
+
                 resultados.append(
                     {
                         "wa_phone": wa_id,
                         "contact_name": (contact.get("profile") or {}).get("name"),
                         "wa_message_id": msg.get("id"),
                         "timestamp": _ts(msg.get("timestamp")),
-                        "tipo": msg.get("type") or "unknown",
+                        "tipo": msg_type or "unknown",
                         "body": _extract_body(msg),
+                        "media_id": media_id,
+                        "user_filename": user_filename,
                         "ctwa_clid": referral.get("ctwa_clid"),
                         "source_ad_id": referral.get("source_id"),
                         "phone_number_id": metadata.get("phone_number_id"),

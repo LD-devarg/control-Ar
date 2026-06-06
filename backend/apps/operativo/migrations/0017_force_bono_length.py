@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(
-            sql="ALTER TABLE control_ar.operativo_landing ALTER COLUMN bono TYPE varchar(50);",
-            reverse_sql="ALTER TABLE control_ar.operativo_landing ALTER COLUMN bono TYPE varchar(4);",
+            sql="ALTER TABLE operativo_landing ALTER COLUMN bono TYPE varchar(50);",
+            reverse_sql="ALTER TABLE operativo_landing ALTER COLUMN bono TYPE varchar(4);",
         ),
     ]

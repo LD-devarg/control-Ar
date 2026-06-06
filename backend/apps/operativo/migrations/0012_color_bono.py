@@ -1,4 +1,4 @@
-﻿from django.db import migrations, models
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
@@ -8,9 +8,4 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name="landing",
-            name="color_bono",
-            field=models.CharField(default="#ffe600", max_length=20),
-        ),
     ]

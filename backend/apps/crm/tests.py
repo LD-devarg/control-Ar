@@ -312,3 +312,93 @@ class ConversationApiTests(APITestCase):
             "wa_phone": "5491122334466",
         })
         self.assertEqual(response.status_code, 405)
+
+
+class WhatsAppMediaTests(TestCase):
+    def test_parse_inbound_extracts_media_info(self):
+        payload = {
+            "entry": [
+                {
+                    "changes": [
+                        {
+                            "value": {
+                                "metadata": {"phone_number_id": "phone-1"},
+                                "contacts": [{"wa_id": "5491122334455", "profile": {"name": "Juan"}}],
+                                "messages": [
+                                    {
+                                        "from": "5491122334455",
+                                        "id": "wamid.media1",
+                                        "timestamp": "1760000000",
+                                        "type": "image",
+                                        "image": {
+                                            "id": "media-id-123",
+                                            "mime_type": "image/jpeg",
+                                            "caption": "Foto de prueba"
+                                        }
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+        mensajes = parse_inbound(payload)
+        self.assertEqual(len(mensajes), 1)
+        self.assertEqual(mensajes[0]["tipo"], "image")
+        self.assertEqual(mensajes[0]["body"], "Foto de prueba")
+        self.assertEqual(mensajes[0]["media_id"], "media-id-123")
+
+    @patch("apps.crm.servicios.media.descargar_y_guardar_media_whatsapp")
+    def test_procesar_inbound_saves_media_fields(self, mock_download):
+        mock_download.return_value = (
+            "https://test-s3-bucket.s3.amazonaws.com/whatsapp_media/test-file.jpg",
+            "test-file.jpg",
+            2048,
+            "image/jpeg"
+        )
+        empresa = crear_empresa("Media Company")
+        WhatsAppConfig.objects.create(
+            empresa=empresa,
+            phone_number_id="phone-1",
+            waba_id="waba-1",
+            activo=True,
+        )
+        payload = {
+            "entry": [
+                {
+                    "changes": [
+                        {
+                            "value": {
+                                "metadata": {"phone_number_id": "phone-1"},
+                                "contacts": [{"wa_id": "5491122334455", "profile": {"name": "Juan"}}],
+                                "messages": [
+                                    {
+                                        "from": "5491122334455",
+                                        "id": "wamid.media2",
+                                        "timestamp": "1760000000",
+                                        "type": "image",
+                                        "image": {
+                                            "id": "media-id-123",
+                                            "mime_type": "image/jpeg",
+                                            "caption": "Foto de prueba"
+                                        }
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        with patch("apps.operativo.servicios.eventos.enviar_evento_meta", return_value={"ok": True}):
+            procesar_evento_whatsapp.run(payload)
+
+        message = Message.objects.get(wa_message_id="wamid.media2")
+        self.assertEqual(message.tipo, "image")
+        self.assertEqual(message.body, "Foto de prueba")
+        self.assertEqual(message.file_url, "https://test-s3-bucket.s3.amazonaws.com/whatsapp_media/test-file.jpg")
+        self.assertEqual(message.file_name, "test-file.jpg")
+        self.assertEqual(message.file_size, 2048)
+        self.assertEqual(message.mime_type, "image/jpeg")

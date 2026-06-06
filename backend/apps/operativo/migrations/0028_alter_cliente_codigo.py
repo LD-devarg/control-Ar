@@ -48,6 +48,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='cliente',
             name='codigo',
-            field=models.CharField(max_length=6, unique=True),
+            field=models.CharField(max_length=10, unique=True),
         ),
     ]

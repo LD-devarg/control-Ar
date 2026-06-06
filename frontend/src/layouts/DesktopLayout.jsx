@@ -10,10 +10,10 @@ import React from "react";
 function DesktopLayout() {
   const location = useLocation();
   const showNuevosLeads = location.pathname === "/home";
-  const showEventos = location.pathname === "/stats";
+  const showEventos = false;
 
   return (
-    <div className="flex h-screen w-full bg-neutral-100 dark:bg-zinc-800 overflow-hidden">
+    <div className="flex h-screen w-full bg-[#090a0c] overflow-hidden">
         <Sidebar />
         <div className="flex grow flex-col min-w-0">
             <header className="flex justify-end items-center gap-3 px-10 pt-5">

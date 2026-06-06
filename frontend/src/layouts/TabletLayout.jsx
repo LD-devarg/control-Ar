@@ -11,10 +11,10 @@ import React from "react";
 function TabletLayout() {
   const location = useLocation();
   const showNuevosLeads = location.pathname === "/home";
-  const showEventos = location.pathname === "/stats";
+  const showEventos = false;
 
   return (
-    <div className="flex w-full h-full h-dvh bg-neutral-100 dark:bg-zinc-800 min-h-svh overflow-hidden">
+    <div className="flex w-full h-full h-dvh bg-[#090a0c] min-h-svh overflow-hidden">
         <Sidebar />
         <div className="flex grow flex-col min-w-0">
             <header className="flex justify-end items-center gap-3 px-4 pb-1 pt-5">

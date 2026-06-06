@@ -31,7 +31,7 @@ from apps.pauta.views import (
     KPIObjetivoViewSet,
     PautaProvisioningViewSet,
 )
-from apps.crm.views import ConversationViewSet, MessageViewSet, WhatsAppConfigViewSet
+from apps.crm.views import ConversationViewSet, MessageViewSet, WhatsAppConfigViewSet, WebPushSubscriptionViewSet
 from apps.crm.webhooks import WhatsAppWebhookView
 
 router = DefaultRouter()
@@ -69,6 +69,7 @@ router.register(r"pauta-provisioning", PautaProvisioningViewSet, basename="pauta
 router.register(r"crm/whatsapp-configs", WhatsAppConfigViewSet, basename="crm-whatsapp-config")
 router.register(r"crm/conversations", ConversationViewSet, basename="crm-conversation")
 router.register(r"crm/messages", MessageViewSet, basename="crm-message")
+router.register(r"crm/push-subscriptions", WebPushSubscriptionViewSet, basename="crm-webpush-subscription")
 
 urlpatterns = [
     path("api/token/", LoggedTokenObtainPairView.as_view(), name="token_obtain_pair"),

@@ -37,7 +37,7 @@ function MobileLayout() {
   const currentUser = getCurrentUser();
 
   const showNuevosLeads = location.pathname === "/home";
-  const showEventos = location.pathname === "/stats";
+  const showEventos = false;
 
   const sections = useMemo(() => {
     const allSections = [
@@ -47,6 +47,7 @@ function MobileLayout() {
           { label: "Inicio", icon: <OtherHousesOutlinedIcon />, path: "/home" },
           { label: "Analisis", icon: <QueryStatsOutlinedIcon />, path: "/stats" },
           { label: "Agenda", icon: <ContactPageOutlinedIcon />, path: "/contacts" },
+          { label: "CRM", icon: <WhatsAppIcon />, path: "/crm" },
         ],
       },
       {
@@ -90,7 +91,7 @@ function MobileLayout() {
   };
 
   return (
-    <div className="flex h-dvh w-full flex-col overflow-hidden bg-neutral-100 dark:bg-zinc-800">
+    <div className="flex h-dvh w-full flex-col overflow-hidden bg-[#090a0c]">
       <header className="flex items-center justify-between border-b border-black/10 dark:border-white/10 px-3 py-2">
         <div className="flex items-center gap-2">
           <IconButton

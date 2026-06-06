@@ -55,7 +55,7 @@ function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
     const amount = Number(value || 0);
     if (amount < 5) return "text-rose-200 drop-shadow-[0_0_10px_rgba(251,113,133,0.45)]";
     if (amount < 10) return "text-amber-200 drop-shadow-[0_0_10px_rgba(251,191,36,0.42)]";
-    return "text-emerald-200 drop-shadow-[0_0_10px_rgba(52,211,153,0.42)]";
+    return "text-[#a3e635] drop-shadow-[0_0_10px_rgba(163,230,53,0.45)]";
   };
 
   const loadRecent = useCallback(
@@ -163,21 +163,21 @@ function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
   }, [triggerRefresh]);
 
   return (
-    <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-white/8 bg-[#101012] p-4 text-white">
+    <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-[#1f2128] bg-[#111216] p-4 text-white">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <h3 className="text-base font-semibold">Nuevas compras</h3>
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-300">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#a3e635]/10 px-2 py-1 text-[11px] font-semibold text-[#a3e635]">
+            <span className="h-2 w-2 rounded-full bg-[#a3e635]" />
             LIVE
           </span>
         </div>
         <span className="text-xs text-white/50">{loading ? "Actualizando..." : "Tiempo real"}</span>
       </div>
-      <div className="recent-compras-scroll overflow-x-auto overflow-y-auto rounded-xl border border-white/6">
+      <div className="recent-compras-scroll overflow-x-auto overflow-y-auto rounded-xl border border-[#1f2128]">
         <table className="w-full min-w-[680px] text-sm">
           <thead>
-            <tr className="border-b border-white/10 bg-[#111214] text-white/55 sticky top-0 z-10">
+            <tr className="border-b border-[#1f2128] bg-[#1b1c21] text-zinc-400 sticky top-0 z-10">
               <th className="text-left py-2 pl-2 pr-3">Codigo</th>
               <th className="text-left py-2 pr-3">Contacto</th>
               <th className="text-left py-2 pr-3">Hora</th>
@@ -189,8 +189,8 @@ function RecentPurchasesTableComponent({ usePeriod, period, desde, hasta }) {
             {rows.map((compra) => (
               <tr
                 key={compra.id}
-                className={`border-b border-white/5 transition-colors duration-700 hover:bg-white/[0.03] ${
-                  highlightedIds.includes(compra.id) ? "bg-emerald-500/10" : ""
+                className={`border-b border-[#1f2128]/50 transition-colors duration-700 hover:bg-zinc-800/10 ${
+                  highlightedIds.includes(compra.id) ? "bg-[#a3e635]/10" : ""
                 }`}
               >
                 <td className="py-3 pl-3 pr-3 font-medium text-white">{compra.cliente_codigo || compra.username || "-"}</td>

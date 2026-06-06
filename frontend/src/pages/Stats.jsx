@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs from "dayjs";
 import Page from "../layouts/Page.jsx";
 import Filter from "../components/Filter";
@@ -114,9 +114,9 @@ function deltaMeta(current, previous) {
 }
 
 function deltaClass(direction) {
-  if (direction === "up") return "text-emerald-300";
-  if (direction === "down") return "text-rose-300";
-  return "text-white/45";
+  if (direction === "up") return "text-[#a3e635]";
+  if (direction === "down") return "text-rose-400";
+  return "text-zinc-500";
 }
 
 function DeltaPill({ meta }) {
@@ -142,10 +142,10 @@ function DashboardCard({
   large = false,
 }) {
   return (
-    <div className={`min-w-0 overflow-hidden rounded-2xl border border-white/8 bg-[#101012] ${large ? "p-5" : "p-4"}`}>
+    <div className={`min-w-0 overflow-hidden rounded-2xl border border-[#1f2128] bg-[#111216] ${large ? "p-5" : "p-4"}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="mb-2 flex items-center gap-2 text-white/72">
+          <div className="mb-2 flex items-center gap-2 text-zinc-400">
             {icon}
             <span className="text-xs font-semibold uppercase tracking-[0.16em]">{title}</span>
           </div>
@@ -154,7 +154,7 @@ function DashboardCard({
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
             {delta ? <DeltaPill meta={delta} /> : null}
-            {subtitle ? <span className="text-sm text-white/60">{subtitle}</span> : null}
+            {subtitle ? <span className="text-sm text-zinc-500">{subtitle}</span> : null}
           </div>
         </div>
         <div className="shrink-0 self-end">
@@ -775,9 +775,9 @@ function Stats() {
         </Popover>
         <div className="mt-2 flex w-full min-h-0 flex-1 flex-col md:w-[95%] lg:w-full">
           <section className="recent-compras-scroll min-w-0 flex-1 space-y-4 overflow-y-auto pr-1">
-            <div className="rounded-2xl border border-white/8 bg-[#111214] px-4 py-3">
+            <div className="rounded-2xl border border-[#1f2128] bg-[#111216] px-4 py-3">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="min-w-0 text-sm text-white/80">
+                <div className="min-w-0 text-sm text-zinc-300">
                   <span className="font-medium">{insightSummary}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -793,8 +793,8 @@ function Stats() {
                         onClick={() => handleQuickRange(item.key)}
                         className={`rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
                           isActive
-                            ? "bg-sky-500/12 text-sky-300 ring-1 ring-sky-400/35"
-                            : "bg-white/5 text-white/65 hover:bg-white/8 hover:text-white"
+                            ? "bg-[#a3e635]/10 text-[#a3e635] ring-1 ring-[#a3e635]/35"
+                            : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-[#1f2128]"
                         }`}
                       >
                         {item.label}
@@ -806,8 +806,8 @@ function Stats() {
                     onClick={() => setUsePeriod(false)}
                     className={`rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
                       !usePeriod
-                        ? "bg-white/10 text-white ring-1 ring-white/10"
-                        : "bg-white/5 text-white/65 hover:bg-white/8 hover:text-white"
+                        ? "bg-zinc-800 text-white border border-zinc-700"
+                        : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-[#1f2128]"
                     }`}
                   >
                     Custom
@@ -823,7 +823,7 @@ function Stats() {
                 value={loading ? "..." : formatMoney({ arsValue: ftdMontoArs, usdValue: ftdMontoUsd })}
                 subtitle={loading ? "..." : `${formatNumber(ftdCount)} FTD`}
                 delta={kpiDeltas.ftdUsd}
-                accentClass="text-emerald-200"
+                accentClass="text-[#a3e635]"
                 sparkSeed={ftdMontoUsd || ftdCount || 1}
                 large
               />
@@ -833,7 +833,7 @@ function Stats() {
                 value={loading ? "..." : safeNumber(showNetMetrics ? roasNeto : roasFtd).toFixed(2)}
                 subtitle={showNetMetrics ? "Rentabilidad actual" : "Retorno sobre FTD"}
                 delta={kpiDeltas.roas}
-                accentClass="text-white"
+                accentClass="text-zinc-100"
                 sparkSeed={roasFtd * 10 || 1}
               />
               <DashboardCard
@@ -842,17 +842,17 @@ function Stats() {
                 value={loading ? "..." : formatMoney({ arsValue: gastoArs, usdValue: gastoUsd })}
                 subtitle="Inversión publicitaria"
                 delta={kpiDeltas.gastoUsd}
-                accentClass="text-rose-200"
+                accentClass="text-rose-400"
                 sparkSeed={gastoUsd || 1}
               />
             </div>
 
             <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-[1.8fr_1fr]">
-              <div className="min-w-0 overflow-hidden rounded-2xl border border-white/8 bg-[#101012] p-4">
+              <div className="min-w-0 overflow-hidden rounded-2xl border border-[#1f2128] bg-[#111216] p-4">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/45">Funnel</p>
-                    <p className="mt-1 text-sm text-white/60">Gasto → Leads → Contactos → FTD</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">Funnel</p>
+                    <p className="mt-1 text-sm text-zinc-400 font-medium">Gasto → Leads → Contactos → FTD</p>
                   </div>
                 </div>
                 <div className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
@@ -862,32 +862,32 @@ function Stats() {
                       icon: <PreviewOutlinedIcon sx={{ fontSize: 14 }} />,
                       value: loading ? "..." : formatNumber(webVisitors),
                       delta: kpiDeltas.webVisitors,
-                      accent: "text-white",
+                      accent: "text-zinc-100",
                     },
                     {
                       title: "Leads",
                       icon: <PendingActionsOutlinedIcon sx={{ fontSize: 14 }} />,
                       value: loading ? "..." : formatNumber(leads),
                       delta: kpiDeltas.leads,
-                      accent: "text-sky-200",
+                      accent: "text-sky-400",
                     },
                     {
                       title: "Contactos",
                       icon: <ChatBubbleOutlineOutlinedIcon sx={{ fontSize: 14 }} />,
                       value: loading ? "..." : formatNumber(contactos),
                       delta: kpiDeltas.contactos,
-                      accent: "text-yellow-200",
+                      accent: "text-amber-400",
                     },
                     {
                       title: "FTD",
                       icon: <ShoppingCartOutlinedIcon sx={{ fontSize: 14 }} />,
                       value: loading ? "..." : formatNumber(ftdCount),
                       delta: kpiDeltas.ftdCount,
-                      accent: "text-emerald-200",
+                      accent: "text-[#a3e635]",
                     },
                   ].map((item) => (
-                    <div key={item.title} className="min-w-0 rounded-xl border border-white/7 bg-white/[0.02] px-4 py-4">
-                      <div className="mb-2 flex items-center gap-2 text-white/55">
+                    <div key={item.title} className="min-w-0 rounded-xl border border-[#1f2128] bg-[#1b1c21] px-4 py-4">
+                      <div className="mb-2 flex items-center gap-2 text-zinc-500">
                         {item.icon}
                         <span className="text-[10px] font-semibold uppercase tracking-[0.14em]">{item.title}</span>
                       </div>
@@ -896,7 +896,7 @@ function Stats() {
                       </div>
                       <div className="mt-3 flex items-center gap-2">
                         <DeltaPill meta={item.delta} />
-                        <div className="h-px flex-1 bg-white/8" />
+                        <div className="h-px flex-1 bg-zinc-800" />
                       </div>
                     </div>
                   ))}
@@ -910,7 +910,7 @@ function Stats() {
                   value={loading ? "..." : formatPct(conversionPct)}
                   subtitle="Leads que convierten"
                   delta={kpiDeltas.conversion}
-                  accentClass="text-sky-200"
+                  accentClass="text-[#a3e635]"
                   sparkSeed={conversionPct || 1}
                 />
                 <DashboardCard
@@ -919,7 +919,7 @@ function Stats() {
                   value={loading ? "..." : formatMoney({ arsValue: valorCompraPromArs, usdValue: valorCompraPromUsd })}
                   subtitle="Valor por compra"
                   delta={null}
-                  accentClass="text-white"
+                  accentClass="text-zinc-100"
                   sparkSeed={valorCompraPromUsd || valorCompraPromArs || 1}
                 />
               </div>

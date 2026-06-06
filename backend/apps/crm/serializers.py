@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.pauta.servicios.crypto import encrypt_token
 
-from .models import Conversation, Message, WhatsAppConfig
+from .models import Conversation, Message, WhatsAppConfig, WebPushSubscription
 
 
 class WhatsAppConfigSerializer(serializers.ModelSerializer):
@@ -138,3 +138,11 @@ class ConversationSerializer(serializers.ModelSerializer):
         if not message:
             message = obj.mensajes.order_by("-timestamp", "-id").first()
         return MessageSerializer(message).data if message else None
+
+
+class WebPushSubscriptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WebPushSubscription
+        fields = ["id", "endpoint", "p256dh", "auth", "creado_en"]
+        read_only_fields = ["id", "creado_en"]
+

@@ -69,7 +69,7 @@ def crear_cliente_desde_whatsapp(*, empresa, msg: dict):
     conv.save(update_fields=conv_updates)
 
     if msg.get("wa_message_id"):
-        Message.objects.get_or_create(
+        _, message_created = Message.objects.get_or_create(
             wa_message_id=msg["wa_message_id"],
             defaults={
                 "conversation": conv,
@@ -80,6 +80,35 @@ def crear_cliente_desde_whatsapp(*, empresa, msg: dict):
                 "raw": msg.get("raw"),
             },
         )
+        if message_created:
+            try:
+                from ..tasks import enviar_push_notification_whatsapp_task
+                sender_name = msg.get("contact_name") or conv.contact_name or conv.wa_phone
+                enviar_push_notification_whatsapp_task.delay(
+                    empresa_id=empresa.id,
+                    conversation_id=conv.id,
+                    message_body=msg.get("body", ""),
+                    sender_name=sender_name,
+                )
+            except Exception as e:
+                import logging
+                logger = logging.getLogger("apps.crm.lead")
+                logger.error(f"Error calling push notification task: {e}")
+
+            # WebSocket broadcast for real-time frontend updates
+            try:
+                publish_empresa_event(
+                    empresa_id=empresa.id,
+                    event_type="crm_message_received",
+                    payload={
+                        "conversation_id": conv.id,
+                        "phone": wa_phone,
+                    }
+                )
+            except Exception as e:
+                import logging
+                logger = logging.getLogger("apps.crm.lead")
+                logger.error(f"Error publishing crm_message_received event: {e}")
 
     if creado and msg.get("ctwa_clid"):
         evento = crear_y_enviar_evento(

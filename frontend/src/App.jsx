@@ -95,7 +95,6 @@ function App() {
             <Route path="/home" element={<GuardedRoute path="/home" element={<Home />} />} />
             <Route path="/stats" element={<GuardedRoute path="/stats" element={<Stats />} />} />
             <Route path="/whatsapp" element={<GuardedRoute path="/whatsapp" element={<WhatsApp />} />} />
-            <Route path="/crm" element={<GuardedRoute path="/crm" element={<CRMWhatsApp />} />} />
             <Route path="/contacts" element={<GuardedRoute path="/contacts" element={<Agenda />} />} />
             <Route path="/landing-config" element={<GuardedRoute path="/landing-config" element={<LandingConfig />} />} />
             <Route path="/tipo-cambio" element={<GuardedRoute path="/tipo-cambio" element={<TipoCambio />} />} />
@@ -107,6 +106,7 @@ function App() {
             <Route path="/usuarios" element={<GuardedRoute path="/usuarios" element={<Users />} />} />
             <Route path="/meta-events" element={<GuardedRoute path="/meta-events" element={<MetaEvents />} />} />
           </Route>
+          <Route path="/crm" element={<GuardedRoute path="/crm" element={<CRMWhatsApp />} />} />
           <Route path="/landing" element={<Landing />} />
           <Route path="/demo/*" element={<DemoApp />} />
         </Routes>

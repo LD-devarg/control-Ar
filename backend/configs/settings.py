@@ -365,3 +365,45 @@ REST_FRAMEWORK = {
     ],
 }
 
+# Web Push Notifications VAPID config
+VAPID_PUBLIC_KEY = (os.getenv("VAPID_PUBLIC_KEY") or "").strip()
+VAPID_PRIVATE_KEY = (os.getenv("VAPID_PRIVATE_KEY") or "").strip()
+VAPID_ADMIN_EMAIL = (os.getenv("VAPID_ADMIN_EMAIL") or "mailto:admin@control-ar.com").strip()
+
+if not VAPID_PUBLIC_KEY or not VAPID_PRIVATE_KEY:
+    import logging
+    logger = logging.getLogger("django")
+    logger.warning("VAPID keys not configured in environment. Generating keys...")
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives import serialization
+        import base64
+
+        # Generate EC private key
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        private_value = private_key.private_numbers().private_value
+        private_bytes = private_value.to_bytes(32, byteorder='big')
+        temp_private = base64.urlsafe_b64encode(private_bytes).decode('utf-8').rstrip('=')
+
+        # Get public key in uncompressed format (65 bytes)
+        public_key = private_key.public_key()
+        public_bytes = public_key.public_bytes(
+            encoding=serialization.Encoding.X962,
+            format=serialization.PublicFormat.UncompressedPoint
+        )
+        temp_public = base64.urlsafe_b64encode(public_bytes).decode('utf-8').rstrip('=')
+
+        # Write to .env to make them persistent and shared across Django and Celery
+        env_path = BASE_DIR / ".env"
+        if env_path.exists():
+            with open(env_path, "a") as f:
+                f.write(f"\n# Web Push VAPID Keys\nVAPID_PUBLIC_KEY={temp_public}\nVAPID_PRIVATE_KEY={temp_private}\n")
+            logger.info("Persistent VAPID Keys written successfully to .env")
+        else:
+            logger.warning(".env file not found, generated temporary keys for this session.")
+
+        VAPID_PUBLIC_KEY = temp_public
+        VAPID_PRIVATE_KEY = temp_private
+    except Exception as e:
+        logger.error(f"Error generating VAPID keys: {e}")
+

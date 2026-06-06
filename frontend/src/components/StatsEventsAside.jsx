@@ -368,7 +368,7 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
 
   return (
     <aside
-      className={`w-full rounded-[28px] border border-white/10 shadow-xl shadow-black bg-[#121214] p-4 text-white ${
+      className={`w-full rounded-2xl border border-[#1f2128] bg-[#111216] p-4 text-white ${
         fullHeight ? "h-full flex flex-col" : ""
       }`}
     >
@@ -390,8 +390,8 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
             onClick={() => setActiveFilter(item.key)}
             className={`rounded-xl px-3 py-2 text-[10px] font-semibold transition-colors ${
               activeFilter === item.key
-                ? "bg-sky-500/12 text-sky-300 ring-1 ring-sky-400/30"
-                : "bg-white/5 text-white/65 hover:bg-white/8 hover:text-white"
+                ? "bg-[#a3e635]/10 text-[#a3e635] ring-1 ring-[#a3e635]/30"
+                : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-[#1f2128]"
             }`}
           >
             {item.label}
@@ -399,20 +399,20 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
         ))}
       </div>
 
-      <div className="mb-5 rounded-2xl border border-white/6 bg-white/[0.03] px-2 py-3">
-        <div className="mb-1 pl-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/40">Hoy</div>
+      <div className="mb-5 rounded-2xl border border-[#1f2128] bg-[#1b1c21] px-2 py-3">
+        <div className="mb-1 pl-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-500">Hoy</div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
-          <div className="inline-flex items-center gap-1 text-emerald-200">
+          <div className="inline-flex items-center gap-1 text-[#a3e635]">
             <PaidOutlinedIcon sx={{ fontSize: 14 }} />
             <span className="text-[14px] font-semibold">{formatUsd(todayMetrics.totalUsd)}</span>
           </div>
           <span className="text-white/20">|</span>
-          <div className="inline-flex items-center gap-1 text-yellow-200">
+          <div className="inline-flex items-center gap-1 text-amber-400">
             <MailOutlineOutlinedIcon sx={{ fontSize: 14 }} />
             <span className="text-[14px] font-semibold">{todayMetrics.contactos} contactos</span>
           </div>
           <span className="text-white/20">|</span>
-          <div className="inline-flex items-center gap-1 text-sky-200">
+          <div className="inline-flex items-center gap-1 text-sky-400">
             <WhatshotOutlinedIcon sx={{ fontSize: 14 }} />
             <span className="text-[14px] font-semibold">{todayMetrics.leads} leads</span>
           </div>
@@ -425,7 +425,7 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
         }`}
       >
         {!loading && filteredEvents.length === 0 ? (
-          <div className="rounded-xl bg-white/[0.03] px-3 py-4 text-sm text-white/55">
+          <div className="rounded-xl border border-[#1f2128] bg-[#1b1c21] px-3 py-4 text-sm text-zinc-400">
             Sin eventos para este rango.
           </div>
         ) : null}
@@ -434,10 +434,10 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
           {groupedEvents.map((group) => (
             <section key={group.label}>
               <div className="mb-2 flex items-center gap-3">
-                <span className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/45">
+                <span className="text-[12px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
                   {group.label}
                 </span>
-                <div className="h-px flex-1 bg-white/8" />
+                <div className="h-px flex-1 bg-zinc-800" />
               </div>
 
               <div>
@@ -450,13 +450,13 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
                       key={item.id}
                       type="button"
                       onClick={() => setSelectedEvent(item)}
-                      className={`group grid w-full grid-cols-[44px_minmax(0,1fr)_96px] items-start gap-2 border-b border-white/7 py-3 text-left transition-colors ${
+                      className={`group grid w-full grid-cols-[44px_minmax(0,1fr)_96px] items-start gap-2 border-b border-[#1f2128]/50 py-3 text-left transition-colors ${
                         highlightedIds.includes(item.id)
-                          ? "bg-emerald-400/6"
-                          : "hover:bg-white/[0.03]"
+                          ? "bg-[#a3e635]/10"
+                          : "hover:bg-zinc-800/10"
                       }`}
                     >
-                      <div className="pt-1 text-[13px] font-medium tabular-nums text-white/45">
+                      <div className="pt-1 text-[13px] font-medium tabular-nums text-zinc-500">
                         {formatClock(item.fecha_hora)}
                       </div>
 
@@ -467,14 +467,14 @@ function StatsEventsAsideComponent({ usePeriod, period, desde, hasta, fullHeight
                             {buildEventDisplayName(item)}
                           </span>
                         </div>
-                        <div className="mt-1 pl-6 text-[12px] text-white/52">
+                        <div className="mt-1 pl-6 text-[12px] text-zinc-400">
                           {getEventLabel(item.evento)} {" • "} {formatClock(item.fecha_hora)}
                         </div>
                       </div>
 
                       <div className="pt-0.5 text-right">
                         {isCompra ? (
-                          <span className="block whitespace-nowrap text-[16px] font-semibold tracking-[0.01em] text-emerald-200">
+                          <span className="block whitespace-nowrap text-[16px] font-semibold tracking-[0.01em] text-[#a3e635]">
                             {formatUsd(item.monto_usd)}
                           </span>
                         ) : null}

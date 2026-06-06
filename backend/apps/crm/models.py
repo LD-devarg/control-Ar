@@ -94,3 +94,22 @@ class Message(models.Model):
 
     def __str__(self):
         return f"{self.direction} {self.tipo} {self.timestamp}"
+
+
+class WebPushSubscription(models.Model):
+    usuario = models.ForeignKey(
+        "empresas.Usuario",
+        on_delete=models.CASCADE,
+        related_name="webpush_subscriptions",
+    )
+    endpoint = models.TextField(unique=True)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "crm_webpush_subscription"
+        ordering = ["-creado_en"]
+
+    def __str__(self):
+        return f"{self.usuario.username} - {self.endpoint[:30]}..."

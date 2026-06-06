@@ -36,3 +36,23 @@ export async function updateWhatsappConfig(configId, payload) {
   const { data } = await apiClient.patch(`/crm/whatsapp-configs/${configId}/`, payload);
   return data;
 }
+
+export async function getVapidPublicKey() {
+  const { data } = await apiClient.get("/crm/push-subscriptions/vapid-key/");
+  return data.public_key;
+}
+
+export async function subscribeToPush(subscription) {
+  const { data } = await apiClient.post("/crm/push-subscriptions/", subscription);
+  return data;
+}
+
+export async function unsubscribeFromPush(endpoint) {
+  const { data } = await apiClient.post("/crm/push-subscriptions/unsubscribe/", { endpoint });
+  return data;
+}
+
+export async function testPushNotification() {
+  const { data } = await apiClient.post("/crm/push-subscriptions/test-push/");
+  return data;
+}

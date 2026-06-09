@@ -12,6 +12,10 @@ import "../assets/css/Login.css";
 import { useTheme } from "@mui/material/styles";
 import { login } from "../services/auth";
 import { getDefaultPath } from "../services/access";
+import FacebookIcon from '@mui/icons-material/Facebook';
+import InstagramIcon from '@mui/icons-material/Instagram';
+import TwitterIcon from '@mui/icons-material/Twitter';
+import { motion } from "motion/react";
 
 function Login() {
   const navigate = useNavigate();
@@ -45,6 +49,7 @@ function Login() {
   };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [loginMode, setLoginMode] = useState("erp"); // 'erp' o 'crm'
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -55,8 +60,17 @@ function Login() {
     setLoading(true);
     setError("");
     try {
+      if (loginMode === "crm") {
+        sessionStorage.setItem("redirect_after_login", "/crm");
+      } else {
+        sessionStorage.removeItem("redirect_after_login");
+      }
       const user = await login(username, password);
-      navigate(getDefaultPath(user));
+      if (loginMode === "crm") {
+        navigate("/crm");
+      } else {
+        navigate(getDefaultPath(user));
+      }
     } catch (err) {
       setError("Usuario o contraseña inválidos.");
     } finally {
@@ -65,20 +79,75 @@ function Login() {
   };
 
   return (
-    <div className='flex flex-col justify-start items-center min-h-screen h-full bg-white dark:bg-black'>
-      <img src={isDarkMode ? LogoLight : LogoDark} className='text-center mb-5 h-50 w-50' alt="Logo Control-AR" />
-      <div className='form-login flex flex-col justify-center items-center bg-neutral-100 dark:bg-zinc-900 p-6 rounded-2xl shadow-lg w-80'>
+    <div className='relative flex flex-col justify-center items-center min-h-screen w-full px-4 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-950 dark:to-black transition-colors duration-500'>
+      {/* Decorative background glows */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] bg-blue-500/10 dark:bg-blue-600/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2 translate-y-1/2 w-[350px] h-[350px] bg-indigo-500/10 dark:bg-indigo-600/10 rounded-full blur-3xl -z-10 pointer-events-none" />
+
+      {/* Main card container */}
+      <div className="w-full max-w-[400px] bg-white/80 dark:bg-zinc-900/60 backdrop-blur-xl border border-slate-200/80 dark:border-zinc-800/80 rounded-3xl p-8 shadow-2xl flex flex-col items-center">
+        {/* Logo */}
+        <img
+          src={isDarkMode ? LogoLight : LogoDark}
+          className='h-20 w-auto mb-6 object-contain rounded-xl'
+          alt="Logo Control-AR"
+        />
+
+        {/* Tab Switcher */}
+        <div className="relative flex p-1 bg-slate-100 dark:bg-zinc-800/50 rounded-full w-full mb-6 border border-slate-200/50 dark:border-zinc-700/50">
+          <button
+            type="button"
+            onClick={() => setLoginMode("erp")}
+            className="relative z-10 w-1/2 py-2 text-sm font-bold rounded-full transition-colors duration-300 cursor-pointer text-center"
+            style={{ color: loginMode === "erp" ? "#ffffff" : (isDarkMode ? "#a1a1aa" : "#4b5563") }}
+          >
+            {loginMode === "erp" && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute inset-0 bg-[#1976d2] rounded-full -z-10"
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+            ERP
+          </button>
+          <button
+            type="button"
+            onClick={() => setLoginMode("crm")}
+            className="relative z-10 w-1/2 py-2 text-sm font-bold rounded-full transition-colors duration-300 cursor-pointer text-center"
+            style={{ color: loginMode === "crm" ? "#ffffff" : (isDarkMode ? "#a1a1aa" : "#4b5563") }}
+          >
+            {loginMode === "crm" && (
+              <motion.div
+                layoutId="activeTab"
+                className="absolute inset-0 bg-[#1976d2] rounded-full -z-10"
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+            CRM
+          </button>
+        </div>
+
+        {/* Dynamic description */}
+        <div className="text-center mb-6 h-12 flex items-center justify-center">
+          <motion.p
+            key={loginMode}
+            initial={{ opacity: 0, y: -5 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-xs text-slate-500 dark:text-zinc-400 font-medium px-4"
+          >
+            {loginMode === "erp"
+              ? "Inicia sesión en la plataforma de gestión empresarial (ERP)"
+              : "Inicia sesión y accede directamente al panel de CRM y WhatsApp"}
+          </motion.p>
+        </div>
+
+        {/* Login Form */}
         <Box
           component="form"
-          sx={{
-            '& .MuiTextField-root': {
-              m: 1,
-              width: '25ch',
-            },
-          }}
           noValidate
           autoComplete="off"
           onSubmit={handleSubmit}
+          className="w-full flex flex-col gap-4"
         >
           <TextField
             required
@@ -88,17 +157,19 @@ function Login() {
             variant="standard"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            fullWidth
           />
           <TextField
             required
             sx={fieldSx}
             id="standard-password-input"
-            label="Ingrese su contrasena"
+            label="Ingrese su contraseña"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
             variant="standard"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            fullWidth
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
@@ -114,22 +185,38 @@ function Login() {
               ),
             }}
           />
-          {error ? (
-            <span className="text-xs text-red-600 mt-2">{error}</span>
-          ) : null}
+
+          {error && (
+            <motion.span
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="text-xs text-red-500 font-medium mt-1 text-center"
+            >
+              {error}
+            </motion.span>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || !username || !password}
+            className="w-full py-3 px-4 rounded-xl bg-[#1976d2] hover:bg-[#1565c0] active:scale-[0.98] text-white font-semibold transition-all duration-200 shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:pointer-events-none disabled:scale-100 cursor-pointer mt-4"
+          >
+            {loading ? "Ingresando..." : "Iniciar sesión"}
+          </button>
         </Box>
       </div>
-      <Stack spacing={2} direction="row" sx={{ mt: 2 }}>
-        <Button variant="outlined" onClick={handleSubmit} disabled={loading || !username || !password}>
-          {loading ? "Ingresando..." : "Iniciar sesion"}
-        </Button>
-      </Stack>
-      <footer className='absolute bottom-2 w-full text-center flex flex-col gap-1 items-center'>
-        <p className='text-sm text-zinc-700 dark:text-gray-500'>&copy; 2026 Control-AR. Todos los derechos reservados.</p>
-        <span className='text-sm text-zinc-700 dark:text-gray-500'>Desarrollado por LD.dev</span>
+
+      {/* Footer */}
+      <footer className='absolute bottom-6 w-full text-center flex flex-col gap-2 items-center px-4'>
+        <p className='text-xs text-slate-500 dark:text-zinc-600 font-medium'>
+          &copy; 2026 Control-AR. Todos los derechos reservados.
+        </p>
+        <span className='text-[10px] text-slate-400 dark:text-zinc-700 font-medium uppercase tracking-wider'>
+          Desarrollado por LD.dev
+        </span>
       </footer>
     </div>
-  )
+  );
 }
 
-export default Login
+export default Login;

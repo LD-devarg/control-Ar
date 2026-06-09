@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
@@ -162,7 +163,12 @@ function renderMessageStatusIcon(estado) {
 export default function CRMWhatsApp() {
   const { tenantId, tenantOptions, canSelectTenant, setTenantId } = useTenant();
   const canManageConfig = CONFIG_ROLES.has(resolveUserRole(getCurrentUser()));
-  
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const phoneParam = searchParams.get("phone");
+  const conversationIdParam = searchParams.get("conversation_id");
+  const paramsConsumedRef = useRef(false);
+
   // Responsive / View management states
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" ? window.innerWidth < 1024 : false);
   const [activeMobileView, setActiveMobileView] = useState("list"); // "list" or "chat"
@@ -226,7 +232,7 @@ export default function CRMWhatsApp() {
         if (!vapidKey) {
           throw new Error("No se pudo obtener la clave pública VAPID del servidor.");
         }
-        
+
         const convertedKey = urlBase64ToUint8Array(vapidKey);
         const newSubscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
@@ -242,7 +248,7 @@ export default function CRMWhatsApp() {
 
         setIsSubscribed(true);
         console.log("Subscribed to push notifications successfully.");
-        
+
         // Trigger local test push
         try {
           await testPushNotification();
@@ -257,10 +263,10 @@ export default function CRMWhatsApp() {
       setPushLoading(false);
     }
   };
-  
+
   // Local Search state
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const [estado, setEstado] = useState("");
   const [conversations, setConversations] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -348,10 +354,42 @@ export default function CRMWhatsApp() {
     try {
       const data = await fetchConversations(estado ? { estado } : {});
       setConversations(data);
+
+      let targetId = null;
+      let consumed = false;
+      if (!paramsConsumedRef.current) {
+        if (conversationIdParam) {
+          const matched = data.find((item) => Number(item.id) === Number(conversationIdParam));
+          if (matched) {
+            targetId = matched.id;
+            consumed = true;
+          }
+        } else if (phoneParam) {
+          const matched = data.find(
+            (item) =>
+              String(item.wa_phone) === String(phoneParam) ||
+              String(item.cliente_contacto) === String(phoneParam)
+          );
+          if (matched) {
+            targetId = matched.id;
+            consumed = true;
+          }
+        }
+      }
+
       setSelectedId((current) => {
+        if (targetId) return targetId;
         if (current && data.some((item) => Number(item.id) === Number(current))) return current;
         return data[0]?.id || null;
       });
+
+      if (consumed) {
+        paramsConsumedRef.current = true;
+        if (isMobile) {
+          setActiveMobileView("chat");
+        }
+        setSearchParams({}, { replace: true });
+      }
     } catch (err) {
       setError(extractApiErrorMessage(err, "No se pudieron cargar conversaciones."));
     } finally {
@@ -360,9 +398,12 @@ export default function CRMWhatsApp() {
   };
 
   useEffect(() => {
+    if (phoneParam || conversationIdParam) {
+      paramsConsumedRef.current = false;
+    }
     loadConversations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantId, estado]);
+  }, [tenantId, estado, phoneParam, conversationIdParam]);
 
   useEffect(() => {
     if (configOpen) loadConfigs();
@@ -416,6 +457,19 @@ export default function CRMWhatsApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const handleToggleConfig = () => setConfigOpen((open) => !open);
+    const handleRefreshChats = () => loadConversations();
+
+    window.addEventListener("crm:toggle-config", handleToggleConfig);
+    window.addEventListener("crm:refresh-chats", handleRefreshChats);
+
+    return () => {
+      window.removeEventListener("crm:toggle-config", handleToggleConfig);
+      window.removeEventListener("crm:refresh-chats", handleRefreshChats);
+    };
+  }, []);
+
 
   const handleSend = async () => {
     const trimmed = body.trim();
@@ -430,11 +484,11 @@ export default function CRMWhatsApp() {
         prev.map((item) =>
           Number(item.id) === Number(selected.id)
             ? {
-                ...item,
-                estado: item.estado === "nuevo" ? "en_conversacion" : item.estado,
-                last_outbound_at: sent.timestamp,
-                ultimo_mensaje: sent,
-              }
+              ...item,
+              estado: item.estado === "nuevo" ? "en_conversacion" : item.estado,
+              last_outbound_at: sent.timestamp,
+              ultimo_mensaje: sent,
+            }
             : item,
         ),
       );
@@ -492,744 +546,663 @@ export default function CRMWhatsApp() {
   };
 
   return (
-    <div className="flex h-screen w-screen bg-[#090a0c] text-white overflow-hidden font-sans" id="waba-crm-root">
-      
-      {/* 1. Far-Left Navigation Icon Bar (Hidden on Mobile) */}
-      {!isMobile && (
-        <aside className="w-16 shrink-0 bg-[#090a0c] border-r border-[#1f2128] flex flex-col items-center py-4 justify-between" id="waba-aside-nav">
-          <div className="flex flex-col items-center gap-6 w-full">
-            {/* Hexagonal brand logo with CA */}
-            <div className="p-0.5 cursor-pointer" title="Control-Ar Messenger">
-              <svg className="h-9 w-9 text-[#a3e635] hover:scale-105 transition-transform" viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="6">
-                <polygon points="50,5 95,25 95,75 50,95 5,75 5,25" />
-                <text x="50%" y="55%" dominantBaseline="middle" textAnchor="middle" fill="currentColor" fontSize="24" fontWeight="bold">CA</text>
-              </svg>
-            </div>
+    <>
 
-            {/* Navigation Icons list */}
-            <div className="flex flex-col gap-3 w-full items-center">
-              <button type="button" className="p-3 rounded-xl bg-zinc-800/60 text-[#a3e635] transition-all" title="Chats">
-                <ChatIcon fontSize="small" />
-              </button>
-              <button type="button" onClick={() => window.location.href = "/contacts"} className="p-3 rounded-xl text-zinc-500 hover:text-zinc-300 transition-all hover:bg-zinc-800/20" title="Contactos">
-                <PeopleIcon fontSize="small" />
-              </button>
-              <button type="button" className="p-3 rounded-xl text-zinc-500 hover:text-zinc-300 transition-all hover:bg-zinc-800/20" title="Bots">
-                <AndroidIcon fontSize="small" />
-              </button>
-              <button type="button" onClick={() => window.location.href = "/stats"} className="p-3 rounded-xl text-zinc-500 hover:text-zinc-300 transition-all hover:bg-zinc-800/20" title="Estadísticas">
-                <BarChartIcon fontSize="small" />
-              </button>
+      {/* Collapsible config */}
+      {canManageConfig && (
+        <Collapse className="w-full shrink-0" in={configOpen} timeout="auto" unmountOnExit>
+          <section className="w-full border-b border-[#1f2128] bg-[#111216] px-6 py-4 text-zinc-100">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">WhatsApp Cloud API</div>
+                <div className="truncate text-sm text-zinc-300">
+                  {activeConfig?.id ? `Configuración activa #${activeConfig.id}` : "Completa las credenciales para habilitar el canal"}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {configLoading ? <CircularProgress size={18} /> : null}
+                <Chip
+                  size="small"
+                  label={activeConfig?.has_access_token ? "Token OK" : "Token falta"}
+                  color={activeConfig?.has_access_token ? "success" : "default"}
+                  variant="outlined"
+                  sx={{ color: "white", borderColor: "rgba(255,255,255,0.15)" }}
+                />
+                <Chip
+                  size="small"
+                  label={activeConfig?.has_verify_token ? "Verify OK" : "Verify falta"}
+                  color={activeConfig?.has_verify_token ? "success" : "default"}
+                  variant="outlined"
+                  sx={{ color: "white", borderColor: "rgba(255,255,255,0.15)" }}
+                />
+                <Chip
+                  size="small"
+                  label={activeConfig?.has_app_secret ? "Secret OK" : "Secret falta"}
+                  color={activeConfig?.has_app_secret ? "success" : "default"}
+                  variant="outlined"
+                  sx={{ color: "white", borderColor: "rgba(255,255,255,0.15)" }}
+                />
+              </div>
             </div>
-          </div>
-
-          <div className="flex flex-col items-center gap-4 w-full">
-            {/* Toggle Config */}
-            {canManageConfig && (
-              <IconButton
-                color={configOpen ? "primary" : "inherit"}
-                onClick={() => setConfigOpen((open) => !open)}
+            {configError ? (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {configError}
+              </Alert>
+            ) : null}
+            <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-2 xl:grid-cols-[1.2fr_1.2fr_1.5fr_1.2fr_1.2fr_auto_auto]">
+              <TextField
                 size="small"
-                id="btn-settings-aside"
-                sx={{ 
-                  color: configOpen ? "#a3e635" : "rgba(255,255,255,0.4)",
-                  "&:hover": { color: "white", backgroundColor: "rgba(255,255,255,0.05)" }
-                }}
-                title="Configuración de Credenciales WABA"
-              >
-                <SettingsIcon fontSize="small" />
-              </IconButton>
-            )}
-
-            {/* Refresh */}
-            <IconButton
-              color="inherit"
-              onClick={loadConversations}
-              disabled={loadingConversations}
-              size="small"
-              sx={{ 
-                color: "rgba(255,255,255,0.4)",
-                "&:hover": { color: "white", backgroundColor: "rgba(255,255,255,0.05)" }
-              }}
-              title="Actualizar chats"
-            >
-              <RefreshIcon fontSize="small" />
-            </IconButton>
-
-            {/* User Initials Circle */}
-            <div 
-              onClick={() => window.location.href = "/home"}
-              className="h-8 w-8 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-600 flex items-center justify-center text-[10px] font-bold text-white cursor-pointer hover:ring-2 hover:ring-[#a3e635] transition" 
-              title="Volver a Control-Ar Dashboard"
-            >
-              LD
+                label="Phone number ID"
+                value={configForm.phone_number_id}
+                onChange={(event) => handleConfigChange("phone_number_id", event.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                size="small"
+                label="WABA ID"
+                value={configForm.waba_id}
+                onChange={(event) => handleConfigChange("waba_id", event.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                size="small"
+                label={activeConfig?.has_access_token ? "Access token nuevo" : "Access token"}
+                type="password"
+                value={configForm.access_token}
+                onChange={(event) => handleConfigChange("access_token", event.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                size="small"
+                label={activeConfig?.has_verify_token ? "Verify token nuevo" : "Verify token"}
+                type="password"
+                value={configForm.verify_token}
+                onChange={(event) => handleConfigChange("verify_token", event.target.value)}
+                sx={fieldSx}
+              />
+              <TextField
+                size="small"
+                label={activeConfig?.has_app_secret ? "App secret nuevo" : "App secret"}
+                type="password"
+                value={configForm.app_secret}
+                onChange={(event) => handleConfigChange("app_secret", event.target.value)}
+                sx={fieldSx}
+              />
+              <div className="flex h-10 items-center">
+                <FormControlLabel
+                  sx={{ m: 0, whiteSpace: "nowrap", color: "rgba(255,255,255,0.7)" }}
+                  control={
+                    <Switch
+                      size="small"
+                      checked={configForm.activo}
+                      onChange={(event) => handleConfigChange("activo", event.target.checked)}
+                    />
+                  }
+                  label="Activa"
+                />
+              </div>
+              <div className="flex h-10 justify-end">
+                <Button
+                  variant="contained"
+                  startIcon={<SaveIcon />}
+                  onClick={handleSaveConfig}
+                  disabled={configSaving || !configForm.phone_number_id.trim() || !configForm.waba_id.trim()}
+                  sx={{
+                    minWidth: 120,
+                    backgroundColor: "#a3e635",
+                    color: "black",
+                    fontWeight: "bold",
+                    "&:hover": { backgroundColor: "#84cc16" },
+                    "&.Mui-disabled": { backgroundColor: "rgba(163,230,53,0.3)", color: "rgba(0,0,0,0.4)" }
+                  }}
+                >
+                  Guardar
+                </Button>
+              </div>
             </div>
-          </div>
-        </aside>
+          </section>
+        </Collapse>
       )}
 
-      {/* Main Container Wrapper */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden" id="waba-main-viewport">
-        
-        {/* Collapsible config */}
-        {canManageConfig && (
-          <Collapse className="w-full shrink-0" in={configOpen} timeout="auto" unmountOnExit>
-            <section className="w-full border-b border-[#1f2128] bg-[#111216] px-6 py-4 text-zinc-100">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500">WhatsApp Cloud API</div>
-                  <div className="truncate text-sm text-zinc-300">
-                    {activeConfig?.id ? `Configuración activa #${activeConfig.id}` : "Completa las credenciales para habilitar el canal"}
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {configLoading ? <CircularProgress size={18} /> : null}
-                  <Chip
+      {/* 3-Pane Responsive Layout Body */}
+      <div className="flex flex-1 min-h-0 w-full overflow-hidden" id="waba-split-panels">
+
+        {/* A. Conversations Column (Panel 1) */}
+        {(!isMobile || activeMobileView === "list") && (
+          <section className="flex h-full w-full flex-col overflow-hidden bg-[#111216] border-r border-[#1f2128] lg:w-[320px] lg:shrink-0" id="waba-list-panel">
+            <div className="p-4 flex flex-col shrink-0">
+              <div className="flex items-center justify-between mb-3.5">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold tracking-tight text-white">Conversaciones</h2>
+                  <IconButton
                     size="small"
-                    label={activeConfig?.has_access_token ? "Token OK" : "Token falta"}
-                    color={activeConfig?.has_access_token ? "success" : "default"}
-                    variant="outlined"
-                    sx={{ color: "white", borderColor: "rgba(255,255,255,0.15)" }}
-                  />
-                  <Chip
-                    size="small"
-                    label={activeConfig?.has_verify_token ? "Verify OK" : "Verify falta"}
-                    color={activeConfig?.has_verify_token ? "success" : "default"}
-                    variant="outlined"
-                    sx={{ color: "white", borderColor: "rgba(255,255,255,0.15)" }}
-                  />
-                  <Chip
-                    size="small"
-                    label={activeConfig?.has_app_secret ? "Secret OK" : "Secret falta"}
-                    color={activeConfig?.has_app_secret ? "success" : "default"}
-                    variant="outlined"
-                    sx={{ color: "white", borderColor: "rgba(255,255,255,0.15)" }}
-                  />
+                    onClick={toggleNotifications}
+                    disabled={pushLoading}
+                    title={isSubscribed ? "Desactivar notificaciones" : "Activar notificaciones"}
+                    sx={{
+                      color: isSubscribed ? "#a3e635" : "rgba(255,255,255,0.3)",
+                      "&:hover": { color: isSubscribed ? "#bef264" : "white" },
+                      padding: 0.5
+                    }}
+                    id="btn-toggle-notifications"
+                  >
+                    {pushLoading ? (
+                      <CircularProgress size={16} sx={{ color: isSubscribed ? "#a3e635" : "white" }} />
+                    ) : isSubscribed ? (
+                      <NotificationsActiveIcon sx={{ fontSize: 18 }} />
+                    ) : (
+                      <NotificationsOffIcon sx={{ fontSize: 18 }} />
+                    )}
+                  </IconButton>
                 </div>
-              </div>
-              {configError ? (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {configError}
-                </Alert>
-              ) : null}
-              <div className="grid grid-cols-1 items-center gap-3 md:grid-cols-2 xl:grid-cols-[1.2fr_1.2fr_1.5fr_1.2fr_1.2fr_auto_auto]">
-                <TextField
-                  size="small"
-                  label="Phone number ID"
-                  value={configForm.phone_number_id}
-                  onChange={(event) => handleConfigChange("phone_number_id", event.target.value)}
-                  sx={fieldSx}
-                />
-                <TextField
-                  size="small"
-                  label="WABA ID"
-                  value={configForm.waba_id}
-                  onChange={(event) => handleConfigChange("waba_id", event.target.value)}
-                  sx={fieldSx}
-                />
-                <TextField
-                  size="small"
-                  label={activeConfig?.has_access_token ? "Access token nuevo" : "Access token"}
-                  type="password"
-                  value={configForm.access_token}
-                  onChange={(event) => handleConfigChange("access_token", event.target.value)}
-                  sx={fieldSx}
-                />
-                <TextField
-                  size="small"
-                  label={activeConfig?.has_verify_token ? "Verify token nuevo" : "Verify token"}
-                  type="password"
-                  value={configForm.verify_token}
-                  onChange={(event) => handleConfigChange("verify_token", event.target.value)}
-                  sx={fieldSx}
-                />
-                <TextField
-                  size="small"
-                  label={activeConfig?.has_app_secret ? "App secret nuevo" : "App secret"}
-                  type="password"
-                  value={configForm.app_secret}
-                  onChange={(event) => handleConfigChange("app_secret", event.target.value)}
-                  sx={fieldSx}
-                />
-                <div className="flex h-10 items-center">
-                  <FormControlLabel
-                    sx={{ m: 0, whiteSpace: "nowrap", color: "rgba(255,255,255,0.7)" }}
-                    control={
-                      <Switch
-                        size="small"
-                        checked={configForm.activo}
-                        onChange={(event) => handleConfigChange("activo", event.target.checked)}
-                      />
-                    }
-                    label="Activa"
-                  />
-                </div>
-                <div className="flex h-10 justify-end">
-                  <Button
-                    variant="contained"
-                    startIcon={<SaveIcon />}
-                    onClick={handleSaveConfig}
-                    disabled={configSaving || !configForm.phone_number_id.trim() || !configForm.waba_id.trim()}
-                    sx={{ 
-                      minWidth: 120, 
-                      backgroundColor: "#a3e635", 
-                      color: "black",
-                      fontWeight: "bold",
-                      "&:hover": { backgroundColor: "#84cc16" },
-                      "&.Mui-disabled": { backgroundColor: "rgba(163,230,53,0.3)", color: "rgba(0,0,0,0.4)" }
+
+                {/* Small mobile logo or tenant dropdown */}
+                {isMobile && canSelectTenant && tenantOptions.length > 0 && (
+                  <TextField
+                    select
+                    size="small"
+                    value={tenantId || ""}
+                    onChange={(e) => setTenantId(e.target.value)}
+                    sx={{
+                      minWidth: 110,
+                      "& .MuiInputBase-root": { height: 26, fontSize: "10px", color: "white" },
+                      "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.15)" },
+                      "& .MuiSvgIcon-root": { color: "rgba(255,255,255,0.7)" },
                     }}
                   >
-                    Guardar
-                  </Button>
-                </div>
-              </div>
-            </section>
-          </Collapse>
-        )}
+                    {tenantOptions.map((item) => (
+                      <MenuItem key={item.id} value={item.id} sx={{ fontSize: "11px" }}>
+                        {item.nombre}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
 
-        {/* 3-Pane Responsive Layout Body */}
-        <div className="flex flex-1 min-h-0 w-full overflow-hidden" id="waba-split-panels">
-          
-          {/* A. Conversations Column (Panel 1) */}
-          {(!isMobile || activeMobileView === "list") && (
-            <section className="flex h-full w-full flex-col overflow-hidden bg-[#111216] border-r border-[#1f2128] lg:w-[320px] lg:shrink-0" id="waba-list-panel">
-              <div className="p-4 flex flex-col shrink-0">
-                <div className="flex items-center justify-between mb-3.5">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-bold tracking-tight text-white">Conversaciones</h2>
-                    <IconButton 
-                      size="small" 
-                      onClick={toggleNotifications} 
-                      disabled={pushLoading}
-                      title={isSubscribed ? "Desactivar notificaciones" : "Activar notificaciones"}
-                      sx={{ 
-                        color: isSubscribed ? "#a3e635" : "rgba(255,255,255,0.3)",
-                        "&:hover": { color: isSubscribed ? "#bef264" : "white" },
-                        padding: 0.5
-                      }}
-                      id="btn-toggle-notifications"
-                    >
-                      {pushLoading ? (
-                        <CircularProgress size={16} sx={{ color: isSubscribed ? "#a3e635" : "white" }} />
-                      ) : isSubscribed ? (
-                        <NotificationsActiveIcon sx={{ fontSize: 18 }} />
-                      ) : (
-                        <NotificationsOffIcon sx={{ fontSize: 18 }} />
-                      )}
-                    </IconButton>
+                {/* Desktop Organization info status */}
+                {!isMobile && canSelectTenant && tenantOptions.length > 0 && (
+                  <div className="text-[10px] text-zinc-500 font-medium font-mono uppercase bg-zinc-900/60 px-2 py-0.5 rounded">
+                    {tenantOptions.find(o => Number(o.id) === Number(tenantId))?.nombre || "CA"}
                   </div>
-                  
-                  {/* Small mobile logo or tenant dropdown */}
-                  {isMobile && canSelectTenant && tenantOptions.length > 0 && (
-                    <TextField
-                      select
-                      size="small"
-                      value={tenantId || ""}
-                      onChange={(e) => setTenantId(e.target.value)}
-                      sx={{
-                        minWidth: 110,
-                        "& .MuiInputBase-root": { height: 26, fontSize: "10px", color: "white" },
-                        "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.15)" },
-                        "& .MuiSvgIcon-root": { color: "rgba(255,255,255,0.7)" },
-                      }}
-                    >
-                      {tenantOptions.map((item) => (
-                        <MenuItem key={item.id} value={item.id} sx={{ fontSize: "11px" }}>
-                          {item.nombre}
-                        </MenuItem>
-                      ))}
-                    </TextField>
-                  )}
-
-                  {/* Desktop Organization info status */}
-                  {!isMobile && canSelectTenant && tenantOptions.length > 0 && (
-                    <div className="text-[10px] text-zinc-500 font-medium font-mono uppercase bg-zinc-900/60 px-2 py-0.5 rounded">
-                      {tenantOptions.find(o => Number(o.id) === Number(tenantId))?.nombre || "CA"}
-                    </div>
-                  )}
-                </div>
-
-                {/* Local search bar */}
-                <div className="relative mb-3">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500">
-                    <SearchIcon fontSize="small" />
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Buscar conversaciones..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-[#1b1c21] border border-[#2d3039] rounded-full py-1.5 pl-9 pr-4 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#a3e635] transition-colors"
-                  />
-                </div>
-
-                {/* Horizontal scrollable status filter tabs */}
-                <div className="flex gap-4 overflow-x-auto whitespace-nowrap pb-2 mb-1 scrollbar-none border-b border-[#1f2128]">
-                  {ESTADOS.map((tab) => {
-                    const active = estado === tab.value;
-                    return (
-                      <button
-                        key={tab.value}
-                        type="button"
-                        onClick={() => setEstado(tab.value)}
-                        className={[
-                          "text-[10px] pb-1 transition-all duration-200 uppercase tracking-wider font-semibold",
-                          active 
-                            ? "text-[#a3e635] border-b-2 border-[#a3e635]" 
-                            : "text-zinc-500 hover:text-zinc-300"
-                        ].join(" ")}
-                      >
-                        {tab.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                )}
               </div>
 
-              {/* Chat list items */}
-              <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-zinc-800/30 px-2">
-                {filteredConversations.map((conversation) => {
-                  const active = Number(conversation.id) === Number(selectedId);
-                  const openWindow = in24hWindow(conversation);
-                  const isAdLead = Boolean(conversation.ctwa_clid || conversation.source_ad_id);
+              {/* Local search bar */}
+              <div className="relative mb-3">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500">
+                  <SearchIcon fontSize="small" />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Buscar conversaciones..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#1b1c21] border border-[#2d3039] rounded-full py-1.5 pl-9 pr-4 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#a3e635] transition-colors"
+                />
+              </div>
+
+              {/* Horizontal scrollable status filter tabs */}
+              <div className="flex gap-4 overflow-x-auto whitespace-nowrap pb-2 mb-1 scrollbar-none border-b border-[#1f2128]">
+                {ESTADOS.map((tab) => {
+                  const active = estado === tab.value;
                   return (
                     <button
-                      key={conversation.id}
+                      key={tab.value}
                       type="button"
-                      onClick={() => {
-                        setSelectedId(conversation.id);
-                        if (isMobile) {
-                          setActiveMobileView("chat");
-                        }
-                      }}
-                      id={`chat-item-${conversation.id}`}
+                      onClick={() => setEstado(tab.value)}
                       className={[
-                        "flex w-full items-start gap-3 px-3 py-3.5 rounded-xl transition-all duration-150 mb-1 border-l-2",
-                        active 
-                          ? "bg-zinc-800/30 border-[#a3e635]" 
-                          : "hover:bg-zinc-800/10 border-transparent",
+                        "text-[10px] pb-1 transition-all duration-200 uppercase tracking-wider font-semibold",
+                        active
+                          ? "text-[#a3e635] border-b-2 border-[#a3e635]"
+                          : "text-zinc-500 hover:text-zinc-300"
                       ].join(" ")}
                     >
-                      {/* Avatar with online dot */}
-                      <div className="relative shrink-0">
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${getAvatarGradient(conversation.wa_phone)} text-sm font-bold text-white shadow-sm`}>
-                          {getInitials(conversation.contact_name || conversation.cliente_nombre, conversation.wa_phone)}
-                        </div>
-                        {/* online dot indicator */}
-                        <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#111216]" />
-                      </div>
-
-                      {/* Details */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-1.5">
-                          <span className="truncate text-xs font-semibold text-zinc-100">
-                            {conversation.contact_name || conversation.cliente_nombre || conversation.wa_phone}
-                          </span>
-                          <span className="shrink-0 text-[9px] text-zinc-500 font-mono">
-                            {formatDateTime(conversation.actualizado_en)}
-                          </span>
-                        </div>
-
-                        {/* snippet text */}
-                        <p className="mt-1 truncate text-[11px] text-zinc-400">
-                          {(() => {
-                            const lastMsg = conversation.ultimo_mensaje;
-                            if (!lastMsg) return "Sin mensajes";
-                            if (lastMsg.tipo === "image") return `📷 Foto${lastMsg.body ? `: ${lastMsg.body}` : ""}`;
-                            if (lastMsg.tipo === "audio" || lastMsg.tipo === "voice") return `🎵 Audio`;
-                            if (lastMsg.tipo === "video") return `🎥 Video${lastMsg.body ? `: ${lastMsg.body}` : ""}`;
-                            if (lastMsg.tipo === "document") return `📄 Archivo: ${lastMsg.file_name || lastMsg.body || "Documento.pdf"}`;
-                            return lastMsg.body || `[Mensaje: ${lastMsg.tipo}]`;
-                          })()}
-                        </p>
-
-                        <div className="mt-2 flex flex-wrap items-center gap-1">
-                          {isAdLead && (
-                            <span className="inline-flex items-center gap-0.5 rounded-full bg-[#a3e635]/15 px-2 py-0.2 text-[8px] font-bold tracking-wider text-[#a3e635] uppercase">
-                              📣 pauta
-                            </span>
-                          )}
-                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.2 text-[8px] font-bold ${
-                            openWindow 
-                              ? "bg-emerald-950/40 text-emerald-400" 
-                              : "bg-zinc-800 text-zinc-400"
-                          }`}>
-                            {openWindow ? "24h ok" : "24h off"}
-                          </span>
-                        </div>
-                      </div>
+                      {tab.label}
                     </button>
                   );
                 })}
-                {!loadingConversations && filteredConversations.length === 0 ? (
-                  <div className="px-4 py-8 text-center text-xs text-zinc-500">
-                    Sin conversaciones.
-                  </div>
-                ) : null}
               </div>
+            </div>
 
-              {/* Bottom Nueva conversación button */}
-              <div className="p-3 border-t border-[#1f2128] shrink-0">
-                <button 
-                  type="button" 
-                  onClick={loadConversations}
-                  className="w-full border border-dashed border-zinc-800 hover:border-[#a3e635] hover:text-[#a3e635] rounded-xl py-2.5 text-xs flex justify-center items-center font-bold text-zinc-400 gap-2 transition"
-                >
-                  <span>+ Nueva conversación</span>
-                </button>
-              </div>
-            </section>
-          )}
-
-          {/* B. Active Chat Column (Panel 2) */}
-          {(!isMobile || activeMobileView === "chat") && (
-            <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-[#0d0e12]" id="waba-chat-panel">
-              {selected ? (
-                <>
-                  {/* Chat Header */}
-                  <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#1f2128] px-4 bg-[#0d0e12]" id="crm-chat-header">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {isMobile && (
-                        <IconButton
-                          onClick={() => setActiveMobileView("list")}
-                          size="small"
-                          sx={{ color: "rgba(255,255,255,0.5)", mr: 0.5 }}
-                          id="btn-back-to-list"
-                        >
-                          <ArrowBackIcon fontSize="small" />
-                        </IconButton>
-                      )}
-
-                      <div className="relative shrink-0">
-                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${getAvatarGradient(selected.wa_phone)} text-xs font-bold text-white shadow-sm`}>
-                          {getInitials(selected.contact_name || selected.cliente_nombre, selected.wa_phone)}
-                        </div>
-                        <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-[#0d0e12]" />
+            {/* Chat list items */}
+            <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-zinc-800/30 px-2">
+              {filteredConversations.map((conversation) => {
+                const active = Number(conversation.id) === Number(selectedId);
+                const openWindow = in24hWindow(conversation);
+                const isAdLead = Boolean(conversation.ctwa_clid || conversation.source_ad_id);
+                return (
+                  <button
+                    key={conversation.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedId(conversation.id);
+                      if (isMobile) {
+                        setActiveMobileView("chat");
+                      }
+                    }}
+                    id={`chat-item-${conversation.id}`}
+                    className={[
+                      "flex w-full items-start gap-3 px-3 py-3.5 rounded-xl transition-all duration-150 mb-1 border-l-2",
+                      active
+                        ? "bg-zinc-800/30 border-[#a3e635]"
+                        : "hover:bg-zinc-800/10 border-transparent",
+                    ].join(" ")}
+                  >
+                    {/* Avatar with online dot */}
+                    <div className="relative shrink-0">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br ${getAvatarGradient(conversation.wa_phone)} text-sm font-bold text-white shadow-sm`}>
+                        {getInitials(conversation.contact_name || conversation.cliente_nombre, conversation.wa_phone)}
                       </div>
-                      
-                      <div className="min-w-0 leading-tight">
-                        <span className="truncate text-xs font-bold text-zinc-100 flex items-center gap-1.5">
-                          {selected.contact_name || selected.cliente_nombre || selected.wa_phone}
-                          {Boolean(selected.ctwa_clid || selected.source_ad_id) && (
-                            <span className="inline-flex items-center gap-0.5 rounded-full bg-[#a3e635]/15 px-1.5 py-0.2 text-[7px] font-bold tracking-wider text-[#a3e635] uppercase">
-                              📣 pauta
-                            </span>
-                          )}
+                      {/* online dot indicator */}
+                      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-[#111216]" />
+                    </div>
+
+                    {/* Details */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-1.5">
+                        <span className="truncate text-xs font-semibold text-zinc-100">
+                          {conversation.contact_name || conversation.cliente_nombre || conversation.wa_phone}
                         </span>
-                        <p className="text-[10px] text-zinc-400 font-medium truncate flex items-center gap-1 mt-0.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#a3e635]" />
-                          En línea
-                        </p>
+                        <span className="shrink-0 text-[9px] text-zinc-500 font-mono">
+                          {formatDateTime(conversation.actualizado_en)}
+                        </span>
+                      </div>
+
+                      {/* snippet text */}
+                      <p className="mt-1 text-left truncate text-[11px] text-zinc-400">
+                        {(() => {
+                          const lastMsg = conversation.ultimo_mensaje;
+                          if (!lastMsg) return "Sin mensajes";
+                          if (lastMsg.tipo === "image") return `📷 Foto${lastMsg.body ? `: ${lastMsg.body}` : ""}`;
+                          if (lastMsg.tipo === "audio" || lastMsg.tipo === "voice") return `🎵 Audio`;
+                          if (lastMsg.tipo === "video") return `🎥 Video${lastMsg.body ? `: ${lastMsg.body}` : ""}`;
+                          if (lastMsg.tipo === "document") return `📄 Archivo: ${lastMsg.file_name || lastMsg.body || "Documento.pdf"}`;
+                          return lastMsg.body || `[Mensaje: ${lastMsg.tipo}]`;
+                        })()}
+                      </p>
+
+                      <div className="mt-2 flex flex-wrap items-center gap-1">
+                        {isAdLead && (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-[#a3e635]/15 px-2 py-0.2 text-[8px] font-bold tracking-wider text-[#a3e635] uppercase">
+                            📣 pauta
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center rounded-full px-1.5 py-0.2 text-[8px] font-bold ${openWindow
+                            ? "bg-emerald-950/40 text-emerald-400"
+                            : "bg-zinc-800 text-zinc-400"
+                          }`}>
+                          {openWindow ? "24h ok" : "24h off"}
+                        </span>
                       </div>
                     </div>
+                  </button>
+                );
+              })}
+              {!loadingConversations && filteredConversations.length === 0 ? (
+                <div className="px-4 py-8 text-center text-xs text-zinc-500">
+                  Sin conversaciones.
+                </div>
+              ) : null}
+            </div>
 
-                    <div className="flex items-center gap-2">
-                      {/* State selector dropdown */}
-                      <TextField
-                        select
+            {/* Bottom Nueva conversación button */}
+            <div className="p-3 border-t border-[#1f2128] shrink-0">
+              <button
+                type="button"
+                onClick={loadConversations}
+                className="w-full border border-dashed border-zinc-800 hover:border-[#a3e635] hover:text-[#a3e635] rounded-xl py-2.5 text-xs flex justify-center items-center font-bold text-zinc-400 gap-2 transition"
+              >
+                <span>+ Nueva conversación</span>
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* B. Active Chat Column (Panel 2) */}
+        {(!isMobile || activeMobileView === "chat") && (
+          <section className="flex h-full min-w-0 flex-1 flex-col overflow-hidden bg-[#0d0e12]" id="waba-chat-panel">
+            {selected ? (
+              <>
+                {/* Chat Header */}
+                <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#1f2128] px-4 bg-[#0d0e12]" id="crm-chat-header">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {isMobile && (
+                      <IconButton
+                        onClick={() => setActiveMobileView("list")}
                         size="small"
-                        label="Estado Lead"
-                        value={selected.estado || "nuevo"}
-                        onChange={(event) => handleEstadoChange(event.target.value)}
-                        id="select-estado-chat"
-                        sx={{ 
-                          ...fieldSx, 
-                          minWidth: 120,
-                          "& .MuiInputBase-root": { height: 32, fontSize: "11px" },
-                          "& .MuiInputLabel-root": { fontSize: "11px", transform: "translate(14px, 8px) scale(1)" },
-                          "& .MuiInputLabel-shrink": { transform: "translate(14px, -6px) scale(0.75)" },
-                        }}
+                        sx={{ color: "rgba(255,255,255,0.5)", mr: 0.5 }}
+                        id="btn-back-to-list"
                       >
-                        {ESTADOS.filter((item) => item.value).map((item) => (
-                          <MenuItem key={item.value} value={item.value} sx={{ fontSize: "11px" }}>
-                            {item.label}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                      <IconButton size="small" sx={{ color: "rgba(255,255,255,0.4)" }}>
-                        <SearchIcon fontSize="small" />
+                        <ArrowBackIcon fontSize="small" />
                       </IconButton>
-                      <IconButton size="small" sx={{ color: "rgba(255,255,255,0.4)" }}>
-                        <MoreVertIcon fontSize="small" />
-                      </IconButton>
+                    )}
+
+                    <div className="relative shrink-0">
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${getAvatarGradient(selected.wa_phone)} text-xs font-bold text-white shadow-sm`}>
+                        {getInitials(selected.contact_name || selected.cliente_nombre, selected.wa_phone)}
+                      </div>
+                      <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full bg-emerald-500 ring-2 ring-[#0d0e12]" />
+                    </div>
+
+                    <div className="min-w-0 leading-tight">
+                      <span className="truncate text-xs font-bold text-zinc-100 flex items-center gap-1.5">
+                        {selected.contact_name || selected.cliente_nombre || selected.wa_phone}
+                        {Boolean(selected.ctwa_clid || selected.source_ad_id) && (
+                          <span className="inline-flex items-center gap-0.5 rounded-full bg-[#a3e635]/15 px-1.5 py-0.2 text-[7px] font-bold tracking-wider text-[#a3e635] uppercase">
+                            📣 pauta
+                          </span>
+                        )}
+                      </span>
+                      <p className="text-[10px] text-zinc-400 font-medium truncate flex items-center gap-1 mt-0.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#a3e635]" />
+                        En línea
+                      </p>
                     </div>
                   </div>
 
-                  {/* Bubbles Scroll Box */}
-                  <div className="min-h-0 flex-1 overflow-y-auto bg-[#0d0e12] px-6 py-5">
-                    {loadingMessages ? (
-                      <div className="flex h-full items-center justify-center">
-                        <CircularProgress size={24} sx={{ color: "#a3e635" }} />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-3.5">
-                        {messages.map((message) => {
-                          const outbound = message.direction === "outbound";
-                          return (
-                            <div key={message.id} className={["flex w-full", outbound ? "justify-end" : "justify-start"].join(" ")}>
-                              <div
-                                className={[
-                                  "max-w-[85%] sm:max-w-[65%] px-4 py-2.5 rounded-2xl shadow-sm text-[12px] leading-relaxed",
-                                  outbound
-                                    ? "rounded-tr-none bg-[#a3e635] text-zinc-950 font-medium"
-                                    : "rounded-tl-none bg-[#1b1c21] text-zinc-100 border border-[#23252d]",
-                                ].join(" ")}
-                              >
-                                {message.tipo === "document" ? (
-                                  <div className="flex flex-col gap-2">
-                                    <div className="flex items-center gap-2 bg-zinc-900/30 p-2 rounded-xl">
-                                      <InsertDriveFileIcon fontSize="medium" className={outbound ? "text-zinc-950" : "text-[#a3e635]"} />
-                                      <div className="min-w-0">
-                                        <p className="truncate font-bold text-xs">{message.file_name || message.body || "Documento.pdf"}</p>
-                                        <p className="text-[9px] opacity-70">
-                                          {message.file_size ? `${(message.file_size / (1024 * 1024)).toFixed(2)} MB` : "Archivo"} • {message.mime_type ? message.mime_type.split("/")[1].toUpperCase() : "Documento"}
-                                        </p>
-                                      </div>
+                  <div className="flex items-center gap-2">
+                    {/* State selector dropdown */}
+                    <TextField
+                      select
+                      size="small"
+                      label="Estado Lead"
+                      value={selected.estado || "nuevo"}
+                      onChange={(event) => handleEstadoChange(event.target.value)}
+                      id="select-estado-chat"
+                      sx={{
+                        ...fieldSx,
+                        minWidth: 120,
+                        "& .MuiInputBase-root": { height: 32, fontSize: "11px" },
+                        "& .MuiInputLabel-root": { fontSize: "11px", transform: "translate(14px, 8px) scale(1)" },
+                        "& .MuiInputLabel-shrink": { transform: "translate(14px, -6px) scale(0.75)" },
+                      }}
+                    >
+                      {ESTADOS.filter((item) => item.value).map((item) => (
+                        <MenuItem key={item.value} value={item.value} sx={{ fontSize: "11px" }}>
+                          {item.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                    <IconButton size="small" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                      <SearchIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" sx={{ color: "rgba(255,255,255,0.4)" }}>
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                  </div>
+                </div>
+
+                {/* Bubbles Scroll Box */}
+                <div className="min-h-0 flex-1 overflow-y-auto bg-[#0d0e12] px-6 py-5">
+                  {loadingMessages ? (
+                    <div className="flex h-full items-center justify-center">
+                      <CircularProgress size={24} sx={{ color: "#a3e635" }} />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-3.5">
+                      {messages.map((message) => {
+                        const outbound = message.direction === "outbound";
+                        return (
+                          <div key={message.id} className={["flex w-full", outbound ? "justify-end" : "justify-start"].join(" ")}>
+                            <div
+                              className={[
+                                "max-w-[85%] sm:max-w-[65%] px-4 py-2.5 rounded-2xl shadow-sm text-[12px] leading-relaxed",
+                                outbound
+                                  ? "rounded-tr-none bg-[#a3e635] text-zinc-950 font-medium"
+                                  : "rounded-tl-none bg-[#1b1c21] text-zinc-100 border border-[#23252d]",
+                              ].join(" ")}
+                            >
+                              {message.tipo === "document" ? (
+                                <div className="flex flex-col gap-2">
+                                  <div className="flex items-center gap-2 bg-zinc-900/30 p-2 rounded-xl">
+                                    <InsertDriveFileIcon fontSize="medium" className={outbound ? "text-zinc-950" : "text-[#a3e635]"} />
+                                    <div className="min-w-0">
+                                      <p className="truncate font-bold text-xs">{message.file_name || message.body || "Documento.pdf"}</p>
+                                      <p className="text-[9px] opacity-70">
+                                        {message.file_size ? `${(message.file_size / (1024 * 1024)).toFixed(2)} MB` : "Archivo"} • {message.mime_type ? message.mime_type.split("/")[1].toUpperCase() : "Documento"}
+                                      </p>
                                     </div>
-                                    {message.file_url && (
-                                      <button 
-                                        onClick={() => window.open(message.file_url, "_blank")}
-                                        className={`w-full py-1 text-[10px] font-bold rounded-lg border text-center transition ${
-                                          outbound 
-                                            ? "border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-[#a3e635]" 
-                                            : "border-[#a3e635]/30 text-[#a3e635] hover:bg-[#a3e635] hover:text-black"
+                                  </div>
+                                  {message.file_url && (
+                                    <button
+                                      onClick={() => window.open(message.file_url, "_blank")}
+                                      className={`w-full py-1 text-[10px] font-bold rounded-lg border text-center transition ${outbound
+                                          ? "border-zinc-950 text-zinc-950 hover:bg-zinc-950 hover:text-[#a3e635]"
+                                          : "border-[#a3e635]/30 text-[#a3e635] hover:bg-[#a3e635] hover:text-black"
                                         }`}
-                                      >
-                                        Abrir archivo
-                                      </button>
-                                    )}
-                                  </div>
-                                ) : message.tipo === "image" ? (
-                                  <div className="flex flex-col gap-1.5">
-                                    {message.file_url ? (
-                                      <img 
-                                        src={message.file_url} 
-                                        alt={message.file_name || "Imagen"} 
-                                        onClick={() => window.open(message.file_url, "_blank")}
-                                        className="rounded-xl max-w-full max-h-72 object-contain cursor-pointer hover:opacity-90 transition duration-200" 
-                                      />
-                                    ) : (
-                                      <div className="text-xs italic opacity-70">[Imagen no disponible]</div>
-                                    )}
-                                    {message.body && (
-                                      <div className="whitespace-pre-wrap break-words mt-1 text-xs">
-                                        {message.body}
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (message.tipo === "audio" || message.tipo === "voice") ? (
-                                  <div className="flex flex-col gap-1">
-                                    {message.file_url ? (
-                                      <audio 
-                                        controls 
-                                        src={message.file_url} 
-                                        className="mt-1 min-w-[200px] max-w-full h-8 text-black" 
-                                      />
-                                    ) : (
-                                      <div className="text-xs italic opacity-70">[Audio no disponible]</div>
-                                    )}
-                                  </div>
-                                ) : message.tipo === "video" ? (
-                                  <div className="flex flex-col gap-1.5">
-                                    {message.file_url ? (
-                                      <video 
-                                        controls 
-                                        src={message.file_url} 
-                                        className="max-w-full max-h-72 rounded-xl mt-1 object-contain" 
-                                      />
-                                    ) : (
-                                      <div className="text-xs italic opacity-70">[Video no disponible]</div>
-                                    )}
-                                    {message.body && (
-                                      <div className="whitespace-pre-wrap break-words mt-1 text-xs">
-                                        {message.body}
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="whitespace-pre-wrap break-words">
-                                    {message.body || `[Mensaje: ${message.tipo}]`}
-                                  </div>
-                                )}
-                                
-                                <div className={["mt-1.5 flex items-center justify-end gap-1 text-[9px]", outbound ? "text-zinc-900/80" : "text-zinc-500 font-mono"].join(" ")}>
-                                  <span>{formatDateTime(message.timestamp)}</span>
-                                  {outbound && renderMessageStatusIcon(message.estado)}
+                                    >
+                                      Abrir archivo
+                                    </button>
+                                  )}
                                 </div>
+                              ) : message.tipo === "image" ? (
+                                <div className="flex flex-col gap-1.5">
+                                  {message.file_url ? (
+                                    <img
+                                      src={message.file_url}
+                                      alt={message.file_name || "Imagen"}
+                                      onClick={() => window.open(message.file_url, "_blank")}
+                                      className="rounded-xl max-w-full max-h-72 object-contain cursor-pointer hover:opacity-90 transition duration-200"
+                                    />
+                                  ) : (
+                                    <div className="text-xs italic opacity-70">[Imagen no disponible]</div>
+                                  )}
+                                  {message.body && (
+                                    <div className="whitespace-pre-wrap break-words mt-1 text-xs">
+                                      {message.body}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (message.tipo === "audio" || message.tipo === "voice") ? (
+                                <div className="flex flex-col gap-1">
+                                  {message.file_url ? (
+                                    <audio
+                                      controls
+                                      src={message.file_url}
+                                      className="mt-1 min-w-[200px] max-w-full h-8 text-black"
+                                    />
+                                  ) : (
+                                    <div className="text-xs italic opacity-70">[Audio no disponible]</div>
+                                  )}
+                                </div>
+                              ) : message.tipo === "video" ? (
+                                <div className="flex flex-col gap-1.5">
+                                  {message.file_url ? (
+                                    <video
+                                      controls
+                                      src={message.file_url}
+                                      className="max-w-full max-h-72 rounded-xl mt-1 object-contain"
+                                    />
+                                  ) : (
+                                    <div className="text-xs italic opacity-70">[Video no disponible]</div>
+                                  )}
+                                  {message.body && (
+                                    <div className="whitespace-pre-wrap break-words mt-1 text-xs">
+                                      {message.body}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="whitespace-pre-wrap break-words">
+                                  {message.body || `[Mensaje: ${message.tipo}]`}
+                                </div>
+                              )}
+
+                              <div className={["mt-1.5 flex items-center justify-end gap-1 text-[9px]", outbound ? "text-zinc-900/80" : "text-zinc-500 font-mono"].join(" ")}>
+                                <span>{formatDateTime(message.timestamp)}</span>
+                                {outbound && renderMessageStatusIcon(message.estado)}
                               </div>
                             </div>
-                          );
-                        })}
-                        {messages.length === 0 ? (
-                          <div className="text-center text-xs text-zinc-500 py-12">
-                            Sin mensajes en esta conversación.
                           </div>
-                        ) : null}
-                        <div ref={messagesEndRef} />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Input controls footer */}
-                  <div className="shrink-0 border-t border-[#1f2128] bg-[#0d0e12] p-4">
-                    {error ? <div className="mb-2 text-xs font-semibold text-red-500">{error}</div> : null}
-                    
-                    {!in24hWindow(selected) ? (
-                      <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-[11px] leading-relaxed text-amber-300">
-                        <div className="flex items-start gap-2">
-                          <span className="text-sm shrink-0">⚠️</span>
-                          <div>
-                            <p className="font-bold text-amber-200">Ventana de 24 horas vencida</p>
-                            <p className="mt-0.5">La ventana de conversación libre de WhatsApp está cerrada. Envía una plantilla aprobada por Meta para contactar al cliente.</p>
-                          </div>
+                        );
+                      })}
+                      {messages.length === 0 ? (
+                        <div className="text-center text-xs text-zinc-500 py-12">
+                          Sin mensajes en esta conversación.
                         </div>
-                      </div>
-                    ) : null}
-
-                    {/* Chat field styling matching image */}
-                    <div className="flex items-center gap-2.5 bg-[#1b1c21] border border-[#23252d] rounded-full px-4 py-2">
-                      <IconButton size="small" sx={{ color: "rgba(255,255,255,0.4)", p: 0.5 }}>
-                        <EmojiEmotionsIcon fontSize="small" />
-                      </IconButton>
-                      <IconButton size="small" sx={{ color: "rgba(255,255,255,0.4)", p: 0.5 }}>
-                        <AttachFileIcon fontSize="small" className="-rotate-45" />
-                      </IconButton>
-                      
-                      <input
-                        type="text"
-                        placeholder="Escribe un mensaje..."
-                        value={body}
-                        onChange={(event) => setBody(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" && !event.shiftKey) {
-                            event.preventDefault();
-                            handleSend();
-                          }
-                        }}
-                        disabled={!canReply}
-                        className="flex-1 bg-transparent border-none focus:outline-none text-xs text-white placeholder-zinc-500 disabled:cursor-not-allowed"
-                      />
-
-                      <IconButton
-                        onClick={handleSend}
-                        disabled={!canReply || !body.trim()}
-                        id="btn-send-waba"
-                        sx={{ 
-                          height: 30, 
-                          width: 30, 
-                          backgroundColor: canReply && body.trim() ? "#a3e635" : "rgba(255,255,255,0.05)",
-                          color: canReply && body.trim() ? "black" : "rgba(255,255,255,0.2)",
-                          "&:hover": {
-                            backgroundColor: canReply && body.trim() ? "#84cc16" : "rgba(255,255,255,0.05)",
-                          }
-                        }}
-                      >
-                        <SendIcon sx={{ fontSize: 14 }} />
-                      </IconButton>
+                      ) : null}
+                      <div ref={messagesEndRef} />
                     </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center text-center p-6 text-zinc-500 bg-[#0d0e12]">
-                  <span className="text-4xl mb-2">💬</span>
-                  <p className="text-xs font-semibold">Selecciona una conversación para chatear</p>
-                </div>
-              )}
-            </section>
-          )}
-
-          {/* C. Client Profile Details Column (Panel 3 - Desktop Only) */}
-          {!isMobile && selected && (
-            <section className="hidden xl:flex h-full w-[280px] shrink-0 flex-col overflow-hidden bg-[#111216] border-l border-[#1f2128]" id="waba-profile-panel">
-              <div className="p-5 flex flex-col gap-5 overflow-y-auto h-full text-zinc-100">
-                <div className="text-center pt-2">
-                  {/* Large avatar with dynamic gradient */}
-                  <div className={`flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br ${getAvatarGradient(selected.wa_phone)} text-2xl font-bold text-white shadow-md mx-auto relative`}>
-                    {getInitials(selected.contact_name || selected.cliente_nombre, selected.wa_phone)}
-                    <span className="absolute bottom-0 right-1 h-5 w-5 rounded-full bg-emerald-500 ring-4 ring-[#111216] flex items-center justify-center text-[10px]">
-                      ✓
-                    </span>
-                  </div>
-                  <h2 className="text-sm font-bold text-white mt-3.5 truncate">{selected.contact_name || selected.cliente_nombre || selected.wa_phone}</h2>
-                  <p className="text-[11px] text-zinc-500 font-mono mt-0.5">{selected.wa_phone}</p>
+                  )}
                 </div>
 
-                <div className="border-t border-[#1f2128] pt-4">
-                  <h3 className="text-[10px] font-bold text-[#a3e635] uppercase tracking-wider mb-2.5">Información de contacto</h3>
-                  <div className="flex flex-col gap-2.5 text-xs text-zinc-300">
-                    <div className="flex items-center gap-2">
-                      <PhoneIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.4)" }} />
-                      <span className="font-mono">{selected.wa_phone}</span>
-                    </div>
-                    {selected.cliente_codigo && (
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-zinc-500 text-[10px]">COD:</span>
-                        <span>{selected.cliente_codigo}</span>
-                      </div>
-                    )}
-                    <div className="mt-1">
-                      {Boolean(selected.ctwa_clid || selected.source_ad_id) ? (
-                        <span className="inline-flex items-center rounded-full bg-[#a3e635]/10 px-2 py-0.5 text-[9px] font-bold text-[#a3e635] uppercase tracking-wide">
-                          Cliente VIP Pauta
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-[9px] font-bold text-zinc-400 uppercase tracking-wide">
-                          Contacto Orgánico
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                {/* Input controls footer */}
+                <div className="shrink-0 border-t border-[#1f2128] bg-[#0d0e12] p-4">
+                  {error ? <div className="mb-2 text-xs font-semibold text-red-500">{error}</div> : null}
 
-                {/* Ads campaign properties */}
-                {(selected.ctwa_clid || selected.source_ad_id) && (
-                  <div className="border-t border-[#1f2128] pt-4">
-                    <h3 className="text-[10px] font-bold text-[#a3e635] uppercase tracking-wider mb-2.5">Detalles de Campaña Meta</h3>
-                    <div className="flex flex-col gap-2 text-xs text-zinc-300 font-mono">
-                      {selected.source_ad_id && (
+                  {!in24hWindow(selected) ? (
+                    <div className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-[11px] leading-relaxed text-amber-300">
+                      <div className="flex items-start gap-2">
+                        <span className="text-sm shrink-0">⚠️</span>
                         <div>
-                          <p className="text-[9px] text-zinc-500 uppercase tracking-wider">ID de Anuncio</p>
-                          <p className="break-all mt-1 text-[10px] bg-zinc-900/60 p-2 rounded border border-zinc-800/40 text-zinc-400">{selected.source_ad_id}</p>
+                          <p className="font-bold text-amber-200">Ventana de 24 horas vencida</p>
+                          <p className="mt-0.5">La ventana de conversación libre de WhatsApp está cerrada. Envía una plantilla aprobada por Meta para contactar al cliente.</p>
                         </div>
-                      )}
-                      {selected.ctwa_clid && (
-                        <div className="mt-2.5">
-                          <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Click clid</p>
-                          <p className="break-all mt-1 text-[10px] bg-zinc-900/60 p-2 rounded border border-zinc-800/40 text-zinc-400">{selected.ctwa_clid}</p>
-                        </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ) : null}
 
-                {/* WABA verify properties */}
-                <div className="border-t border-[#1f2128] pt-4 mt-auto">
-                  <h3 className="text-[10px] font-bold text-[#a3e635] uppercase tracking-wider mb-2.5">Información WABA</h3>
-                  <div className="flex flex-col gap-2.5 text-xs text-zinc-400">
-                    <div>
-                      <p className="text-[9px] text-zinc-500 uppercase">Número asignado</p>
-                      <p className="text-zinc-200 font-semibold mt-0.5 font-mono">{selected.wa_phone}</p>
+                  {/* Chat field styling matching image */}
+                  <div className="flex items-center gap-2.5 bg-[#1b1c21] border border-[#23252d] rounded-full px-4 py-2">
+                    <IconButton size="small" sx={{ color: "rgba(255,255,255,0.4)", p: 0.5 }}>
+                      <EmojiEmotionsIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" sx={{ color: "rgba(255,255,255,0.4)", p: 0.5 }}>
+                      <AttachFileIcon fontSize="small" className="-rotate-45" />
+                    </IconButton>
+
+                    <input
+                      type="text"
+                      placeholder="Escribe un mensaje..."
+                      value={body}
+                      onChange={(event) => setBody(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          handleSend();
+                        }
+                      }}
+                      disabled={!canReply}
+                      className="flex-1 bg-transparent border-none focus:outline-none text-xs text-white placeholder-zinc-500 disabled:cursor-not-allowed"
+                    />
+
+                    <IconButton
+                      onClick={handleSend}
+                      disabled={!canReply || !body.trim()}
+                      id="btn-send-waba"
+                      sx={{
+                        height: 30,
+                        width: 30,
+                        backgroundColor: canReply && body.trim() ? "#a3e635" : "rgba(255,255,255,0.05)",
+                        color: canReply && body.trim() ? "black" : "rgba(255,255,255,0.2)",
+                        "&:hover": {
+                          backgroundColor: canReply && body.trim() ? "#84cc16" : "rgba(255,255,255,0.05)",
+                        }
+                      }}
+                    >
+                      <SendIcon sx={{ fontSize: 14 }} />
+                    </IconButton>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center text-center p-6 text-zinc-500 bg-[#0d0e12]">
+                <span className="text-4xl mb-2">💬</span>
+                <p className="text-xs font-semibold">Selecciona una conversación para chatear</p>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* C. Client Profile Details Column (Panel 3 - Desktop Only) */}
+        {!isMobile && selected && (
+          <section className="hidden xl:flex h-full w-[280px] shrink-0 flex-col overflow-hidden bg-[#111216] border-l border-[#1f2128]" id="waba-profile-panel">
+            <div className="p-5 flex flex-col gap-5 overflow-y-auto h-full text-zinc-100">
+              <div className="text-center pt-2">
+                {/* Large avatar with dynamic gradient */}
+                <div className={`flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br ${getAvatarGradient(selected.wa_phone)} text-2xl font-bold text-white shadow-md mx-auto relative`}>
+                  {getInitials(selected.contact_name || selected.cliente_nombre, selected.wa_phone)}
+                  <span className="absolute bottom-0 right-1 h-5 w-5 rounded-full bg-emerald-500 ring-4 ring-[#111216] flex items-center justify-center text-[10px]">
+                    ✓
+                  </span>
+                </div>
+                <h2 className="text-sm font-bold text-white mt-3.5 truncate">{selected.contact_name || selected.cliente_nombre || selected.wa_phone}</h2>
+                <p className="text-[11px] text-zinc-500 font-mono mt-0.5">{selected.wa_phone}</p>
+              </div>
+
+              <div className="border-t border-[#1f2128] pt-4">
+                <h3 className="text-[10px] font-bold text-[#a3e635] uppercase tracking-wider mb-2.5">Información de contacto</h3>
+                <div className="flex flex-col gap-2.5 text-xs text-zinc-300">
+                  <div className="flex items-center gap-2">
+                    <PhoneIcon sx={{ fontSize: 14, color: "rgba(255,255,255,0.4)" }} />
+                    <span className="font-mono">{selected.wa_phone}</span>
+                  </div>
+                  {selected.cliente_codigo && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-zinc-500 text-[10px]">COD:</span>
+                      <span>{selected.cliente_codigo}</span>
                     </div>
-                    <div className="flex items-center justify-between border-t border-zinc-900 pt-2">
-                      <span className="text-[9px] text-zinc-500">Estado</span>
-                      <span className="inline-flex items-center gap-1 font-bold text-[10px] text-[#a3e635]">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#a3e635]" />
-                        CONECTADO
+                  )}
+                  <div className="mt-1">
+                    {Boolean(selected.ctwa_clid || selected.source_ad_id) ? (
+                      <span className="inline-flex items-center rounded-full bg-[#a3e635]/10 px-2 py-0.5 text-[9px] font-bold text-[#a3e635] uppercase tracking-wide">
+                        Cliente VIP Pauta
                       </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] text-zinc-500">Calificación</span>
-                      <span className="text-zinc-200 text-[10px] font-bold">ALTA</span>
-                    </div>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-[9px] font-bold text-zinc-400 uppercase tracking-wide">
+                        Contacto Orgánico
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
-            </section>
-          )}
 
-        </div>
+              {/* Ads campaign properties */}
+              {(selected.ctwa_clid || selected.source_ad_id) && (
+                <div className="border-t border-[#1f2128] pt-4">
+                  <h3 className="text-[10px] font-bold text-[#a3e635] uppercase tracking-wider mb-2.5">Detalles de Campaña Meta</h3>
+                  <div className="flex flex-col gap-2 text-xs text-zinc-300 font-mono">
+                    {selected.source_ad_id && (
+                      <div>
+                        <p className="text-[9px] text-zinc-500 uppercase tracking-wider">ID de Anuncio</p>
+                        <p className="break-all mt-1 text-[10px] bg-zinc-900/60 p-2 rounded border border-zinc-800/40 text-zinc-400">{selected.source_ad_id}</p>
+                      </div>
+                    )}
+                    {selected.ctwa_clid && (
+                      <div className="mt-2.5">
+                        <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Click clid</p>
+                        <p className="break-all mt-1 text-[10px] bg-zinc-900/60 p-2 rounded border border-zinc-800/40 text-zinc-400">{selected.ctwa_clid}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* WABA verify properties */}
+              <div className="border-t border-[#1f2128] pt-4 mt-auto">
+                <h3 className="text-[10px] font-bold text-[#a3e635] uppercase tracking-wider mb-2.5">Información WABA</h3>
+                <div className="flex flex-col gap-2.5 text-xs text-zinc-400">
+                  <div>
+                    <p className="text-[9px] text-zinc-500 uppercase">Número asignado</p>
+                    <p className="text-zinc-200 font-semibold mt-0.5 font-mono">{selected.wa_phone}</p>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-zinc-900 pt-2">
+                    <span className="text-[9px] text-zinc-500">Estado</span>
+                    <span className="inline-flex items-center gap-1 font-bold text-[10px] text-[#a3e635]">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#a3e635]" />
+                      CONECTADO
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-zinc-500">Calificación</span>
+                    <span className="text-zinc-200 text-[10px] font-bold">ALTA</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
       </div>
-
-    </div>
+    </>
   );
 }

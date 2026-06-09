@@ -22,6 +22,9 @@ import CRMWhatsApp from './pages/CRMWhatsApp.jsx'
 import DemoApp from './pages/DemoApp.jsx'
 import { canAccessPath, getDefaultPath } from './services/access'
 import { getCurrentUser, initializeAuthSession } from './services/auth'
+import CRMLayout from './layouts/CRMLayout.jsx'
+import CRMBots from './pages/CRMBots.jsx'
+import CRMContactos from './pages/CRMContactos.jsx'
 
 const MOBILE_MAX_WIDTH = 767
 const TABLET_MAX_WIDTH = 1024
@@ -54,7 +57,18 @@ function GuardedRoute({ path, element }) {
 
 function LoginRoute() {
   const currentUser = getCurrentUser()
+  const redirectTarget = sessionStorage.getItem("redirect_after_login")
+
+  useEffect(() => {
+    if (currentUser && redirectTarget) {
+      sessionStorage.removeItem("redirect_after_login")
+    }
+  }, [currentUser, redirectTarget])
+
   if (currentUser) {
+    if (redirectTarget) {
+      return <Navigate to={redirectTarget} replace />
+    }
     return <Navigate to={getDefaultPath(currentUser)} replace />
   }
   return <Login />
@@ -106,7 +120,16 @@ function App() {
             <Route path="/usuarios" element={<GuardedRoute path="/usuarios" element={<Users />} />} />
             <Route path="/meta-events" element={<GuardedRoute path="/meta-events" element={<MetaEvents />} />} />
           </Route>
-          <Route path="/crm" element={<GuardedRoute path="/crm" element={<CRMWhatsApp />} />} />
+          <Route path="/crm" element={<GuardedRoute path="/crm" element={<CRMLayout />} />}>
+            <Route index element={<CRMWhatsApp />} />
+            <Route path="contactos" element={<CRMContactos />} />
+            <Route path="bots" element={<CRMBots />} />
+            <Route path="stats" element={
+              <div className="p-5 w-full h-full min-h-0 overflow-y-auto">
+                <Stats />
+              </div>
+            } />
+          </Route>
           <Route path="/landing" element={<Landing />} />
           <Route path="/demo/*" element={<DemoApp />} />
         </Routes>

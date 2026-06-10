@@ -84,6 +84,8 @@ class Message(models.Model):
     body = models.TextField(blank=True, default="")
     tipo = models.CharField(max_length=20, default="text")
     estado = models.CharField(max_length=20, null=True, blank=True)
+    status_timestamp = models.DateTimeField(null=True, blank=True)
+    status_raw = models.JSONField(null=True, blank=True)
     file_url = models.URLField(max_length=1024, null=True, blank=True)
     file_name = models.CharField(max_length=255, null=True, blank=True)
     file_size = models.IntegerField(null=True, blank=True)

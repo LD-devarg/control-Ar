@@ -74,6 +74,8 @@ class MessageSerializer(serializers.ModelSerializer):
             "body",
             "tipo",
             "estado",
+            "status_timestamp",
+            "status_raw",
             "file_url",
             "file_name",
             "file_size",
@@ -90,6 +92,8 @@ class MessageSerializer(serializers.ModelSerializer):
             "body",
             "tipo",
             "estado",
+            "status_timestamp",
+            "status_raw",
             "file_url",
             "file_name",
             "file_size",
@@ -153,4 +157,3 @@ class WebPushSubscriptionSerializer(serializers.ModelSerializer):
         model = WebPushSubscription
         fields = ["id", "endpoint", "p256dh", "auth", "creado_en"]
         read_only_fields = ["id", "creado_en"]
-

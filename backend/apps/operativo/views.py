@@ -1070,10 +1070,102 @@ class EventosMetaViewSet(viewsets.ModelViewSet):
         if not (request.user.is_superuser or is_admin(request.user) or is_pauta(request.user)):
             raise ValidationError("Solo admin o pauta puede probar eventos.")
         tipo = request.data.get("tipo", "lead")
+        fuente = str(request.data.get("fuente") or "landing").strip().lower()
         test_event_code = request.data.get("test_event_code")
         landing = None
 
-        if tipo == "lead":
+        if tipo == "lead" and fuente == "whatsapp":
+            empresa_id = request.data.get("empresa") or request.data.get("empresa_id")
+            if not empresa_id:
+                raise ValidationError("empresa_id requerido para test de lead WhatsApp.")
+            empresa = get_object_or_404(Empresa, id=empresa_id)
+            _resolve_target_empresa_for_write(request, empresa_input=empresa.id)
+
+            raw_phone = str(request.data.get("phone") or "")
+            wa_phone = "".join(ch for ch in raw_phone if ch.isdigit())[:20] or "5490000000000"
+            contacto = wa_phone[:15]
+            ctwa_clid = str(request.data.get("ctwa_clid") or "").strip()
+            if not ctwa_clid:
+                raise ValidationError("ctwa_clid requerido para test de lead WhatsApp.")
+
+            waba_id = str(request.data.get("waba_id") or "").strip()
+            if not waba_id:
+                try:
+                    from apps.crm.models import WhatsAppConfig
+
+                    waba_id = (
+                        WhatsAppConfig.objects.filter(empresa=empresa, activo=True)
+                        .exclude(waba_id="")
+                        .order_by("id")
+                        .values_list("waba_id", flat=True)
+                        .first()
+                        or ""
+                    )
+                except Exception:
+                    waba_id = ""
+            if not waba_id:
+                raise ValidationError("waba_id requerido para test de lead WhatsApp.")
+
+            base_username = f"meta_test_wa_e{empresa.id}"
+            cliente = Cliente.objects.filter(username=base_username, empresa=empresa).first()
+            if not cliente:
+                username_candidate = base_username
+                suffix = 1
+                while Cliente.objects.filter(username=username_candidate).exists():
+                    username_candidate = f"{base_username}_{suffix}"
+                    suffix += 1
+                cliente = Cliente.objects.create(
+                    empresa=empresa,
+                    nombre=request.data.get("nombre") or "Meta Test WhatsApp Lead",
+                    contacto=contacto,
+                    username=username_candidate,
+                    wa_phone=wa_phone,
+                    ctwa_clid=ctwa_clid,
+                    origen="whatsapp",
+                )
+            else:
+                update_fields = []
+                next_nombre = request.data.get("nombre") or cliente.nombre or "Meta Test WhatsApp Lead"
+                if cliente.nombre != next_nombre:
+                    cliente.nombre = next_nombre
+                    update_fields.append("nombre")
+                if cliente.contacto != contacto:
+                    cliente.contacto = contacto
+                    update_fields.append("contacto")
+                if cliente.wa_phone != wa_phone:
+                    cliente.wa_phone = wa_phone
+                    update_fields.append("wa_phone")
+                if cliente.ctwa_clid != ctwa_clid:
+                    cliente.ctwa_clid = ctwa_clid
+                    update_fields.append("ctwa_clid")
+                if cliente.origen != "whatsapp":
+                    cliente.origen = "whatsapp"
+                    update_fields.append("origen")
+                if update_fields:
+                    cliente.save(update_fields=update_fields)
+
+            payload = {
+                "phone": wa_phone,
+                "nombre": cliente.nombre,
+                "external_id": str(request.data.get("external_id") or cliente.uuid),
+                "ctwa_clid": ctwa_clid,
+                "waba_id": waba_id,
+                "action_source": "business_messaging",
+                "messaging_channel": "whatsapp",
+            }
+            evento = crear_y_enviar_evento(
+                cliente=cliente,
+                empresa=empresa,
+                tipo="lead",
+                operador=request.user,
+                landing=None,
+                fuente="whatsapp",
+                data_payload=payload,
+                ocurrido_en=timezone.now(),
+                request=request,
+                test_event_code=test_event_code,
+            )
+        elif tipo == "lead":
             landing_token = request.data.get("landing_token")
             if not landing_token:
                 raise ValidationError("landing_token requerido para test de lead.")

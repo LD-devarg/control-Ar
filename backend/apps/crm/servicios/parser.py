@@ -78,6 +78,10 @@ def parse_statuses(payload: dict) -> list[dict]:
                         "wa_message_id": status.get("id"),
                         "estado": status.get("status"),
                         "timestamp": _ts(status.get("timestamp")),
+                        "recipient_id": status.get("recipient_id"),
+                        "conversation": status.get("conversation"),
+                        "pricing": status.get("pricing"),
+                        "errors": status.get("errors"),
                         "raw": status,
                     }
                 )

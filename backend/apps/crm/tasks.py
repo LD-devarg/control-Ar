@@ -1,9 +1,10 @@
 import logging
 from celery import shared_task
 
-from .models import Message, WhatsAppConfig, WebPushSubscription
+from .models import WhatsAppConfig, WebPushSubscription
 from .servicios.lead import crear_cliente_desde_whatsapp
 from .servicios.parser import parse_inbound, parse_statuses
+from .servicios.statuses import actualizar_estado_mensaje_whatsapp
 
 logger = logging.getLogger("apps.crm.tasks")
 
@@ -36,10 +37,7 @@ def procesar_evento_whatsapp(self, payload: dict):
     statuses = parse_statuses(payload or {})
     logger.info("Parsed statuses: %s", statuses)
     for status in statuses:
-        wa_message_id = status.get("wa_message_id")
-        if not wa_message_id:
-            continue
-        Message.objects.filter(wa_message_id=wa_message_id).update(estado=status.get("estado"))
+        actualizar_estado_mensaje_whatsapp(status)
 
 
 @shared_task
@@ -108,5 +106,3 @@ def enviar_push_notification_whatsapp_task(empresa_id, conversation_id, message_
                 logger.error(f"Error sending web push to endpoint {sub.endpoint}: {ex}")
                 
     logger.info(f"Sent {success_count} pushes for conversation {conversation_id}, cleaned up {deleted_count} invalid subscriptions.")
-
-

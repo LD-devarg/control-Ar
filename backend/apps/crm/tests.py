@@ -112,6 +112,7 @@ class WhatsAppParserTests(SimpleTestCase):
         self.assertEqual(len(statuses), 1)
         self.assertEqual(statuses[0]["wa_message_id"], "wamid.1")
         self.assertEqual(statuses[0]["estado"], "delivered")
+        self.assertEqual(statuses[0]["raw"]["status"], "delivered")
 
 
 class WhatsAppClientTests(SimpleTestCase):
@@ -266,6 +267,94 @@ class WhatsAppInboundFlowTests(TestCase):
         self.assertEqual(Conversation.objects.filter(empresa=self.empresa, wa_phone="5491122334455").count(), 1)
         self.assertEqual(Message.objects.filter(wa_message_id="wamid.1").count(), 1)
         self.assertEqual(EventosMeta.objects.filter(tipo="lead", fuente="whatsapp").count(), 1)
+
+    def test_procesa_status_actualiza_mensaje_y_publica_realtime(self):
+        conversation = Conversation.objects.create(
+            empresa=self.empresa,
+            wa_phone="5491122334455",
+            contact_name="Juan Perez",
+        )
+        message = Message.objects.create(
+            conversation=conversation,
+            direction=Message.DIRECTION_OUT,
+            wa_message_id="wamid.status1",
+            body="Hola",
+            tipo="text",
+            estado="sent",
+            timestamp=timezone.now(),
+        )
+        payload = {
+            "entry": [
+                {
+                    "changes": [
+                        {
+                            "value": {
+                                "statuses": [
+                                    {
+                                        "id": "wamid.status1",
+                                        "status": "delivered",
+                                        "timestamp": "1760000001",
+                                        "recipient_id": "5491122334455",
+                                        "conversation": {"id": "conv-meta-1"},
+                                        "pricing": {"pricing_model": "CBP"},
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+
+        with patch("apps.crm.servicios.statuses.publish_empresa_event") as publish:
+            procesar_evento_whatsapp.run(payload)
+
+        message.refresh_from_db()
+        self.assertEqual(message.estado, "delivered")
+        self.assertIsNotNone(message.status_timestamp)
+        self.assertEqual(message.status_raw["conversation"]["id"], "conv-meta-1")
+        publish.assert_called_once()
+        self.assertEqual(publish.call_args.kwargs["event_type"], "crm_message_status_updated")
+        self.assertEqual(publish.call_args.kwargs["payload"]["message_id"], message.id)
+
+    def test_procesa_status_no_regresa_read_a_delivered(self):
+        conversation = Conversation.objects.create(
+            empresa=self.empresa,
+            wa_phone="5491122334455",
+            contact_name="Juan Perez",
+        )
+        message = Message.objects.create(
+            conversation=conversation,
+            direction=Message.DIRECTION_OUT,
+            wa_message_id="wamid.status2",
+            body="Hola",
+            tipo="text",
+            estado="read",
+            timestamp=timezone.now(),
+        )
+        payload = {
+            "entry": [
+                {
+                    "changes": [
+                        {
+                            "value": {
+                                "statuses": [
+                                    {"id": "wamid.status2", "status": "delivered", "timestamp": "1760000001"}
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+
+        with patch("apps.crm.servicios.statuses.publish_empresa_event") as publish:
+            procesar_evento_whatsapp.run(payload)
+
+        message.refresh_from_db()
+        self.assertEqual(message.estado, "read")
+        self.assertIsNone(message.status_raw)
+        publish.assert_not_called()
 
 
 from rest_framework.test import APITestCase

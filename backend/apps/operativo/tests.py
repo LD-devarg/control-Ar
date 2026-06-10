@@ -20,6 +20,7 @@ from apps.operativo.models import (
 )
 from apps.recursos.models import WhatsApp
 from apps.recursos.models import TipoCambio
+from apps.crm.models import WhatsAppConfig
 from apps.operativo.servicios.compras import reconciliar_cliente_compras
 from apps.operativo.servicios.enviador import _build_capi_headers, _build_capi_url
 from apps.operativo.servicios.constructor import MetaEventBuilder
@@ -673,6 +674,55 @@ class MetaCapiUrlTests(TestCase):
         self.assertEqual(url, "https://graph.facebook.com/v18.0/123456/events?test_event_code=TEST123")
         self.assertNotIn("secret-token", url)
         self.assertEqual(headers["Authorization"], "Bearer secret-token")
+
+
+class EventosMetaTestEventWhatsAppTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.empresa = Empresa.objects.create(nombre="Empresa WA Test", codigo_prefijo="WT")
+        self.user = get_user_model().objects.create_superuser(
+            username="admin-wa-test",
+            password="test123",
+            email="admin-wa-test@example.com",
+        )
+        self.client.force_authenticate(user=self.user)
+        WhatsAppConfig.objects.create(
+            empresa=self.empresa,
+            phone_number_id="phone-test",
+            waba_id="waba-test-1",
+            activo=True,
+        )
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    @patch("apps.operativo.servicios.eventos.enviar_evento_meta", return_value={"ok": True})
+    def test_test_event_whatsapp_crea_lead_business_messaging(self, mock_enviar_evento_meta):
+        response = self.client.post(
+            "/eventos-meta/test-event/",
+            {
+                "tipo": "lead",
+                "fuente": "whatsapp",
+                "empresa_id": self.empresa.id,
+                "test_event_code": "TEST123",
+                "phone": "5491122334455",
+                "nombre": "Lead WhatsApp Test",
+                "ctwa_clid": "ctwa-test-123",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        evento = EventosMeta.objects.get(tipo="lead", fuente="whatsapp")
+        self.assertEqual(evento.empresa, self.empresa)
+        self.assertIsNone(evento.landing)
+        self.assertEqual(evento.ctwa_clid, "ctwa-test-123")
+        self.assertEqual(evento.data["ctwa_clid"], "ctwa-test-123")
+        self.assertEqual(evento.data["waba_id"], "waba-test-1")
+        self.assertEqual(evento.data["action_source"], "business_messaging")
+        self.assertEqual(evento.data["messaging_channel"], "whatsapp")
+        self.assertEqual(evento.cliente.origen, "whatsapp")
+        self.assertEqual(evento.cliente.wa_phone, "5491122334455")
+        mock_enviar_evento_meta.assert_called_once()
+        self.assertEqual(mock_enviar_evento_meta.call_args.kwargs["test_event_code"], "TEST123")
 
 
 class CompraReconciliacionTests(TestCase):

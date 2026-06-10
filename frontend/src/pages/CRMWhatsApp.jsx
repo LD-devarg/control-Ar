@@ -452,6 +452,37 @@ export default function CRMWhatsApp() {
         // Always refresh conversations list to show newest snippet and order
         loadConversations();
       }
+      if (message?.type === "crm_message_status_updated") {
+        const payload = message.payload;
+        const currentSelectedId = selectedIdRef.current;
+        if (currentSelectedId && Number(payload.conversation_id) === Number(currentSelectedId)) {
+          setMessages((prev) =>
+            prev.map((item) =>
+              Number(item.id) === Number(payload.message_id) || item.wa_message_id === payload.wa_message_id
+                ? {
+                  ...item,
+                  estado: payload.estado,
+                  status_timestamp: payload.status_timestamp,
+                }
+                : item
+            )
+          );
+        }
+        setConversations((prev) =>
+          prev.map((item) => {
+            const last = item.ultimo_mensaje;
+            if (!last || Number(last.id) !== Number(payload.message_id)) return item;
+            return {
+              ...item,
+              ultimo_mensaje: {
+                ...last,
+                estado: payload.estado,
+                status_timestamp: payload.status_timestamp,
+              },
+            };
+          })
+        );
+      }
     });
     return () => unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps

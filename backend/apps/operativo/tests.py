@@ -37,6 +37,8 @@ class MetaEventBuilderTests(SimpleTestCase):
                 "action_source": "business_messaging",
                 "messaging_channel": "whatsapp",
                 "event_source_url": "https://example.com/landing",
+                "ip_address": "181.9.213.220",
+                "user_agent": "Mozilla/5.0 Test",
             },
         )
 
@@ -44,6 +46,8 @@ class MetaEventBuilderTests(SimpleTestCase):
         self.assertEqual(data["messaging_channel"], "whatsapp")
         self.assertEqual(data["user_data"]["ctwa_clid"], "ctwa-123")
         self.assertNotIn("event_source_url", data)
+        self.assertNotIn("client_ip_address", data["user_data"])
+        self.assertNotIn("client_user_agent", data["user_data"])
 
 class ClienteCreateTests(TestCase):
     def setUp(self):

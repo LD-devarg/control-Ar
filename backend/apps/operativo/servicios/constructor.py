@@ -158,6 +158,8 @@ class MetaEventBuilder:
         if action_source == "business_messaging":
             data_dict["messaging_channel"] = payload.get("messaging_channel", "whatsapp")
             data_dict.pop("event_source_url", None)
+            user_data.pop("client_ip_address", None)
+            user_data.pop("client_user_agent", None)
 
         data = _clean_dict(data_dict)
 

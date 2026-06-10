@@ -145,8 +145,12 @@ class MetaEventBuilder:
         # payload final
         # -------------------------
         event_source_url = payload.get("event_source_url") or (request.build_absolute_uri() if request else None)
+        event_name = EVENT_NAME_MAP[tipo]
+        if action_source == "business_messaging" and tipo == "lead":
+            event_name = "LeadSubmitted"
+
         data_dict = {
-            "event_name": EVENT_NAME_MAP[tipo],
+            "event_name": event_name,
             "event_time": event_time_int,
             "event_id": str(event_id),
             "action_source": action_source,

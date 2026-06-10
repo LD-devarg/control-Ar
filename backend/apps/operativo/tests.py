@@ -42,6 +42,7 @@ class MetaEventBuilderTests(SimpleTestCase):
             },
         )
 
+        self.assertEqual(data["event_name"], "LeadSubmitted")
         self.assertEqual(data["action_source"], "business_messaging")
         self.assertEqual(data["messaging_channel"], "whatsapp")
         self.assertEqual(data["user_data"]["ctwa_clid"], "ctwa-123")

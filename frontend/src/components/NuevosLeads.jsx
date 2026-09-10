@@ -409,52 +409,56 @@ function NuevosLeads() {
     }, []);
 
     return (
-        <aside className="w-full rounded-[28px] border border-white/10 bg-[#121214] p-4 text-white shadow-xl shadow-black h-full flex flex-col">
-            <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-base font-semibold text-white">Nuevos Leads</h3>
-                <span className="text-xs text-white/55">{loading ? "Actualizando..." : "Tiempo real"}</span>
-            </div>
-
-            {error ? <p className="mb-3 text-sm text-rose-300">{error}</p> : null}
-
-            <div className="mb-5 rounded-2xl border border-white/6 bg-white/[0.03] px-2 py-3">
-                <div className="mb-1 pl-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-white/40">Hoy</div>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-sm">
-                    <div className="inline-flex items-center gap-1 text-sky-200">
-                        <PendingActionsOutlinedIcon sx={{ fontSize: 14 }} />
-                        <span className="text-[14px] font-semibold">{todayMetrics.total} leads</span>
-                    </div>
-                    <span className="text-white/20">|</span>
-                    <div className="inline-flex items-center gap-1 text-cyan-200">
-                        <ContentCopyOutlinedIcon sx={{ fontSize: 14 }} />
-                        <span className="text-[14px] font-semibold">{todayMetrics.deduplicados} dedup</span>
-                    </div>
-                    <span className="text-white/20">|</span>
-                    <div className="inline-flex items-center gap-1 text-amber-200">
-                        <AutorenewOutlinedIcon sx={{ fontSize: 14 }} />
-                        <span className="text-[14px] font-semibold">{todayMetrics.reasignados} reasignados</span>
-                    </div>
+        <aside className="w-full rounded-xl border border-white/[0.07] bg-[#0c0e14] p-3 text-zinc-100 shadow-sm h-full flex flex-col min-w-0">
+            <div className="mb-2.5 flex items-center justify-between">
+                <h3 className="text-[13.5px] font-semibold text-zinc-100 tracking-tight">Nuevos Leads</h3>
+                <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                    <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                    <span>{loading ? "Actualizando..." : "En vivo"}</span>
                 </div>
             </div>
 
-            <div className="recent-compras-scroll overflow-y-auto overflow-x-hidden pr-1 flex-1 min-h-0">
+            {error ? <p className="mb-2 text-xs text-rose-400">{error}</p> : null}
+
+            <div className="mb-3 rounded-lg border border-white/[0.05] bg-white/[0.02] p-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">Hoy</div>
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-300 font-medium text-[11.5px]">
+                        <PendingActionsOutlinedIcon sx={{ fontSize: 13 }} />
+                        <span>{todayMetrics.total} leads</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20 text-teal-300 font-medium text-[11.5px]">
+                        <ContentCopyOutlinedIcon sx={{ fontSize: 13 }} />
+                        <span>{todayMetrics.deduplicados} dedup</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-300 font-medium text-[11.5px]">
+                        <AutorenewOutlinedIcon sx={{ fontSize: 13 }} />
+                        <span>{todayMetrics.reasignados} reasig.</span>
+                    </span>
+                </div>
+            </div>
+
+            <div className="no-scrollbar overflow-y-auto overflow-x-hidden flex-1 min-h-0 space-y-3">
                 {!loading && !error && leadRows.length === 0 ? (
-                    <div className="rounded-xl bg-white/[0.03] px-3 py-4 text-sm text-white/55">
+                    <div className="rounded-lg bg-white/[0.02] border border-white/[0.04] px-3 py-4 text-xs text-zinc-500 text-center">
                         No hay leads sin contactar.
                     </div>
                 ) : null}
 
-                <div className="space-y-5">
+                <div className="space-y-4">
                     {groupedLeads.map((group) => (
                         <section key={group.label}>
-                            <div className="mb-2 flex items-center gap-3">
-                                <span className="text-[12px] font-semibold uppercase tracking-[0.18em] text-white/45">
+                            <div className="mb-1.5 flex items-center gap-2">
+                                <span className="text-[10.5px] font-semibold uppercase tracking-wider text-zinc-500">
                                     {group.label}
                                 </span>
-                                <div className="h-px flex-1 bg-white/8" />
+                                <div className="h-px flex-1 bg-white/[0.05]" />
                             </div>
 
-                            <div>
+                            <div className="space-y-0.5">
                                 {group.rows.map((lead) => (
                                     <div
                                         key={lead.id}
@@ -467,52 +471,45 @@ function NuevosLeads() {
                                                 handleOpen(lead);
                                             }
                                         }}
-                                        className="group grid w-full grid-cols-[52px_minmax(0,1fr)] items-start gap-3 border-b border-white/7 py-3 text-left transition-colors hover:bg-white/[0.03] cursor-pointer"
+                                        className="group grid w-full grid-cols-[44px_minmax(0,1fr)] items-start gap-2.5 border-b border-white/[0.04] py-2 px-1 rounded-md text-left transition-colors hover:bg-white/[0.03] cursor-pointer"
                                     >
-                                        <div className="pt-1 text-[13px] font-medium tabular-nums text-white/45">
+                                        <div className="pt-0.5 text-[11.5px] font-mono text-zinc-500 tabular-nums">
                                             {formatClock(lead.creado_en)}
                                         </div>
 
                                         <div className="min-w-0">
-                                            <div className="flex min-w-0 items-start justify-between gap-2">
-                                                <div className="flex min-w-0 items-center gap-2">
-                                                    <PendingActionsOutlinedIcon className="shrink-0 text-sky-300" sx={{ fontSize: 14 }} />
-                                                    <span className="truncate text-[14px] font-semibold text-white">
-                                                        {lead.title}
-                                                    </span>
-                                                </div>
-                                                <div className="shrink-0 pt-0.5 text-right">
+                                            <div className="flex min-w-0 items-center justify-between gap-1.5">
+                                                <span className="truncate text-[13px] font-medium text-zinc-200 group-hover:text-white transition-colors">
+                                                    {lead.title}
+                                                </span>
+                                                <div className="shrink-0">
                                                     {lead.cliente_codigo ? (
                                                         <button
                                                             type="button"
                                                             onClick={(event) => handleCopyCodigo(event, lead.cliente_codigo)}
-                                                            className="block whitespace-nowrap text-[15px] font-semibold tracking-[0.01em] text-sky-200 transition-colors hover:text-sky-100"
+                                                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white/[0.04] hover:bg-blue-500/15 border border-white/[0.06] hover:border-blue-500/30 font-mono text-[11px] font-medium text-zinc-300 hover:text-blue-300 transition-all"
                                                             title={copiedCode === String(lead.cliente_codigo) ? "Copiado" : `Copiar ${lead.cliente_codigo}`}
                                                         >
-                                                            {copiedCode === String(lead.cliente_codigo)
-                                                                ? "Copiado"
-                                                                : `ID ${lead.cliente_codigo}`}
+                                                            <span>{copiedCode === String(lead.cliente_codigo) ? "Copiado" : `ID ${lead.cliente_codigo}`}</span>
                                                         </button>
                                                     ) : (
-                                                        <span className="block whitespace-nowrap text-[15px] font-semibold tracking-[0.01em] text-sky-200">
-                                                            -
-                                                        </span>
+                                                        <span className="text-zinc-600 text-xs">-</span>
                                                     )}
                                                 </div>
                                             </div>
-                                            <div className="mt-1 pl-5 text-[12px] text-white/52">
+                                            <div className="mt-0.5 text-[11px] text-zinc-500">
                                                 {lead?.data?.deduplicado
                                                     ? (formatLeadResult(lead) || "Lead deduplicado")
                                                     : "Lead"}{" "}
                                                 • {formatClock(lead.creado_en)}
                                             </div>
-                                        </div>
 
-                                        {lead?.data?.codigo_provisorio_distinto ? (
-                                            <div className="col-[2/3] ml-5 mt-1 rounded-xl border border-amber-400/25 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-200">
-                                                Solicitado {lead?.data?.codigo_solicitado || "-"} {"->"} asignado {lead?.data?.codigo_final || lead?.cliente_codigo || "-"}
-                                            </div>
-                                        ) : null}
+                                            {lead?.data?.codigo_provisorio_distinto ? (
+                                                <div className="mt-1 rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10.5px] text-amber-300">
+                                                    Solicitado {lead?.data?.codigo_solicitado || "-"} {"->"} {lead?.data?.codigo_final || lead?.cliente_codigo || "-"}
+                                                </div>
+                                            ) : null}
+                                        </div>
                                     </div>
                                 ))}
                             </div>

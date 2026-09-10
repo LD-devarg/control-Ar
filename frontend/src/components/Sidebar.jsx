@@ -76,23 +76,24 @@ function Sidebar() {
         key={path}
         type="button"
         onClick={() => navigate(path)}
+        title={!expanded ? label : undefined}
         className={[
-          "group relative flex h-9 items-center overflow-hidden rounded-[10px] text-left transition-all duration-200",
-          expanded ? "w-full justify-start px-2.5" : "mx-auto w-11 justify-center px-0",
+          "group relative flex h-9 items-center overflow-hidden rounded-lg text-left transition-all duration-150",
+          expanded ? "w-full justify-start px-2.5" : "mx-auto w-10 justify-center px-0",
           active
-            ? "bg-neutral-900 shadow-[inset_-2px_0_0_rgba(45,124,255,0.9),inset_-20px_0_24px_rgba(45,124,255,0.25)]"
-            : "hover:bg-neutral-900 hover:shadow-[inset_-2px_0_0_rgba(45,124,255,0.9),inset_-20px_0_24px_rgba(45,124,255,0.25)]",
+            ? "bg-white/[0.08] text-white shadow-sm border border-white/[0.06] before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r before:bg-blue-500"
+            : "text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04]",
         ].join(" ")}
       >
         <Icon
-          sx={{ fontSize: 20 }}
-          className={active ? "shrink-0 text-white" : "shrink-0 text-black dark:text-slate-400 group-hover:text-white"}
+          sx={{ fontSize: 19 }}
+          className={active ? "shrink-0 text-blue-400" : "shrink-0 text-zinc-400 group-hover:text-zinc-200 transition-colors"}
         />
         <span
           className={[
-            "ml-2 whitespace-nowrap font-['Roboto'] text-[15px] font-medium leading-none transition-all duration-200",
-            active ? "text-white" : "text-black dark:text-slate-400 group-hover:text-white",
-            expanded ? "max-w-[165px] opacity-100" : "max-w-0 opacity-0",
+            "ml-2.5 whitespace-nowrap text-[13.5px] font-medium leading-none tracking-tight transition-all duration-150",
+            active ? "text-white" : "text-zinc-400 group-hover:text-zinc-200",
+            expanded ? "max-w-[150px] opacity-100" : "max-w-0 opacity-0 pointer-events-none",
           ].join(" ")}
         >
           {label}
@@ -106,35 +107,35 @@ function Sidebar() {
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
       className={[
-        "flex h-dvh min-h-svh shrink-0 flex-col overflow-hidden border-r border-zinc-700/70 bg-neutral-100 px-2 py-2 text-white transition-[width] duration-200 dark:bg-neutral-900",
-        expanded ? "w-[188px]" : "w-20",
+        "flex h-dvh min-h-svh shrink-0 flex-col overflow-hidden border-r border-white/[0.06] bg-[#090b10] px-2 py-3 text-zinc-100 transition-[width] duration-200 z-30",
+        expanded ? "w-[192px]" : "w-[64px]",
       ].join(" ")}
     >
-      <div className={["flex items-center border-b border-zinc-600/70 pb-1.5", expanded ? "justify-start" : "justify-center"].join(" ")}>
+      <div className={["flex items-center border-b border-white/[0.06] pb-2.5 mb-1 px-1", expanded ? "justify-start" : "justify-center"].join(" ")}>
         <img
           src={logoSrc}
-          className={["h-9 w-9 shrink-0 transition-all duration-200", expanded ? "mr-2" : "mr-0"].join(" ")}
+          className={["h-8 w-8 shrink-0 transition-all duration-200", expanded ? "mr-2.5" : "mr-0"].join(" ")}
           alt="Control-AR Logo"
         />
         <span
           className={[
-            "inline-flex items-start overflow-hidden whitespace-nowrap font-['Inter'] transition-all duration-200",
-            expanded ? "max-w-[160px] opacity-100" : "max-w-0 opacity-0",
+            "inline-flex items-baseline overflow-hidden whitespace-nowrap transition-all duration-150",
+            expanded ? "max-w-[150px] opacity-100" : "max-w-0 opacity-0 pointer-events-none",
           ].join(" ")}
         >
-          <span className="text-base font-bold leading-none font-['Roboto'] tracking-[0.5px]">CONTROL</span>
-          <span className="ml-0.5 self-start text-xs font-light leading-none font-['Roboto']">AR</span>
+          <span className="text-[14px] font-semibold tracking-tight text-white">Control</span>
+          <span className="ml-0.5 text-[11px] font-medium text-blue-400 tracking-wider">AR</span>
         </span>
       </div>
 
       <div className="mt-1 flex h-full min-h-0 flex-col">
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5 pl-2 pr-1">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar space-y-3 py-1">
           {sections.map((section) => (
-            <div key={section.title} className="space-y-0.5">
+            <div key={section.title} className="space-y-1">
               <h3
                 className={[
-                  "h-4 overflow-hidden whitespace-nowrap font-['Roboto'] text-xs font-normal text-black/80 dark:text-zinc-500 transition-all duration-200",
-                  expanded ? "max-w-[165px] opacity-100" : "max-w-[165px] opacity-0 pointer-events-none",
+                  "h-3.5 overflow-hidden whitespace-nowrap px-2.5 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase transition-all duration-150",
+                  expanded ? "max-w-[150px] opacity-100" : "max-w-0 opacity-0 pointer-events-none",
                 ].join(" ")}
               >
                 {section.title}
@@ -144,24 +145,24 @@ function Sidebar() {
           ))}
         </div>
 
-        <div className="mt-1 border-t border-zinc-600/70 pt-1.5">
+        <div className="mt-1 border-t border-white/[0.06] pt-2">
           <button
             type="button"
             onClick={async () => {
               await logout();
               navigate("/");
             }}
+            title={!expanded ? "Cerrar Sesion" : undefined}
             className={[
-              "group relative flex h-9 w-full items-center font-['Roboto'] overflow-hidden rounded-[10px] transition-all duration-200",
+              "group relative flex h-9 w-full items-center overflow-hidden rounded-lg text-left transition-all duration-150 text-zinc-400 hover:text-rose-300 hover:bg-rose-500/10",
               expanded ? "justify-start px-2.5" : "justify-center px-0",
-              "hover:bg-neutral-900 hover:shadow-[inset_-2px_0_0_rgba(45,124,255,0.9),inset_-20px_0_24px_rgba(45,124,255,0.25)]",
             ].join(" ")}
           >
-            <LogoutOutlinedIcon sx={{ fontSize: 20 }} className="shrink-0 text-black dark:text-slate-400 group-hover:text-white" />
+            <LogoutOutlinedIcon sx={{ fontSize: 19 }} className="shrink-0 text-zinc-400 group-hover:text-rose-400 transition-colors" />
             <span
               className={[
-                "ml-2 whitespace-nowrap font-['Roboto'] text-[15px] font-medium leading-none text-black dark:text-slate-400 group-hover:text-white transition-all duration-200",
-                expanded ? "max-w-[165px] opacity-100" : "max-w-0 opacity-0",
+                "ml-2.5 whitespace-nowrap text-[13px] font-medium leading-none tracking-tight transition-all duration-150",
+                expanded ? "max-w-[150px] opacity-100" : "max-w-0 opacity-0 pointer-events-none",
               ].join(" ")}
             >
               Cerrar Sesion

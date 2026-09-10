@@ -7,6 +7,10 @@ class PublicMediaStorage(S3Boto3Storage):
     custom_domain = settings.AWS_PUBLIC_S3_CUSTOM_DOMAIN or settings.AWS_S3_CUSTOM_DOMAIN
     region_name = settings.AWS_PUBLIC_S3_REGION_NAME or settings.AWS_S3_REGION_NAME
     endpoint_url = settings.AWS_PUBLIC_S3_ENDPOINT_URL or settings.AWS_S3_ENDPOINT_URL
+    access_key = settings.AWS_ACCESS_KEY_ID
+    secret_key = settings.AWS_SECRET_ACCESS_KEY
+    signature_version = getattr(settings, "AWS_S3_SIGNATURE_VERSION", "s3v4")
+    addressing_style = getattr(settings, "AWS_S3_ADDRESSING_STYLE", "path")
     default_acl = None
     file_overwrite = False
     querystring_auth = False
@@ -19,6 +23,10 @@ class PrivateMediaStorage(S3Boto3Storage):
     custom_domain = settings.AWS_PRIVATE_S3_CUSTOM_DOMAIN
     region_name = settings.AWS_PRIVATE_S3_REGION_NAME or settings.AWS_S3_REGION_NAME
     endpoint_url = settings.AWS_PRIVATE_S3_ENDPOINT_URL or settings.AWS_S3_ENDPOINT_URL
+    access_key = settings.AWS_ACCESS_KEY_ID
+    secret_key = settings.AWS_SECRET_ACCESS_KEY
+    signature_version = getattr(settings, "AWS_S3_SIGNATURE_VERSION", "s3v4")
+    addressing_style = getattr(settings, "AWS_S3_ADDRESSING_STYLE", "path")
     default_acl = None
     file_overwrite = False
     querystring_auth = True

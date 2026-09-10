@@ -26,47 +26,50 @@ function Home() {
 
   return (
     <Page title="Inicio">
-        <div className="flex justify-center mt-5 w-full">
-          <Stack spacing={2} direction="row">
-            <Button
-              variant="outlined"
-              startIcon={<ShoppingCartOutlinedIcon />}
+        <div className="flex justify-center mt-2 w-full">
+          <div className="inline-flex p-1 rounded-xl bg-white/[0.03] border border-white/[0.06] shadow-sm gap-1">
+            <button
+              type="button"
               onClick={() => setActiveForm("compra")}
-              sx={{
-                color: activeForm === "compra" ? theme.palette.primary.main : undefined,
-                borderColor: activeForm === "compra" ? theme.palette.primary.main : undefined,
-              }}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                activeForm === "compra"
+                  ? "bg-white/[0.08] text-white shadow-sm border border-white/[0.08]"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]"
+              }`}
             >
-              Nueva Compra
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<PhoneCallbackOutlinedIcon />}
+              <ShoppingCartOutlinedIcon sx={{ fontSize: 16 }} className={activeForm === "compra" ? "text-blue-400" : "text-zinc-400"} />
+              <span>Nueva Compra</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveForm("contacto")}
-              sx={{
-                color: activeForm === "contacto" ? theme.palette.primary.main : undefined,
-                borderColor: activeForm === "contacto" ? theme.palette.primary.main : undefined,
-              }}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                activeForm === "contacto"
+                  ? "bg-white/[0.08] text-white shadow-sm border border-white/[0.08]"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]"
+              }`}
             >
-              Nuevo Contacto
-            </Button>
+              <PhoneCallbackOutlinedIcon sx={{ fontSize: 16 }} className={activeForm === "contacto" ? "text-blue-400" : "text-zinc-400"} />
+              <span>Nuevo Contacto</span>
+            </button>
             {showRetiros ? (
-              <Button
-                variant="outlined"
-                startIcon={<CurrencyExchangeOutlinedIcon />}
+              <button
+                type="button"
                 onClick={() => setActiveForm("retiro")}
-                sx={{
-                  color: activeForm === "retiro" ? theme.palette.primary.main : undefined,
-                  borderColor: activeForm === "retiro" ? theme.palette.primary.main : undefined,
-                }}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  activeForm === "retiro"
+                    ? "bg-white/[0.08] text-white shadow-sm border border-white/[0.08]"
+                    : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.03]"
+                }`}
               >
-                Nuevo Retiro
-              </Button>
+                <CurrencyExchangeOutlinedIcon sx={{ fontSize: 16 }} className={activeForm === "retiro" ? "text-blue-400" : "text-zinc-400"} />
+                <span>Nuevo Retiro</span>
+              </button>
             ) : null}
-          </Stack>
+          </div>
         </div>
-        <div className="mt-8 w-full flex justify-center">
-          <div className="mx-auto w-full max-w-[420px] max-h-[calc(100vh-240px)] overflow-y-auto px-1 flex justify-center">
+        <div className="mt-6 w-full flex justify-center">
+          <div className="mx-auto w-full max-w-[420px] max-h-[calc(100vh-210px)] overflow-y-auto no-scrollbar px-1 flex justify-center">
             {activeForm === "compra" && <FormCompra />}
             {activeForm === "contacto" && <FormContacto />}
             {showRetiros && activeForm === "retiro" && <FormRetiro />}

@@ -31,14 +31,7 @@ export default function FormRetiro() {
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
   const { tenantId: empresaId } = useTenant();
 
-  const fieldSx = {
-    "& .MuiInputBase-input": { color },
-    "& .MuiInputLabel-root": { color },
-    "& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline": { borderColor: color },
-    "&:hover .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline": { borderColor: color },
-    "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: color },
-    "& .MuiSvgIcon-root": { color },
-  };
+  const fieldSx = {};
 
   useEffect(() => {
     let mounted = true;
@@ -130,7 +123,13 @@ export default function FormRetiro() {
         sx={fieldSx}
       />
       <UploadButton label="Subir comprobante" onUpload={setComprobanteFile} />
-      <Button variant="outlined" onClick={openConfirm} disabled={!canSubmit || submitting}>
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={openConfirm}
+        disabled={!canSubmit || submitting}
+        sx={{ height: 40, fontWeight: 500, mt: 1 }}
+      >
         {submitting ? "Guardando..." : "Guardar"}
       </Button>
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>

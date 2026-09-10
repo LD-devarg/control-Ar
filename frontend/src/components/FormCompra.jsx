@@ -38,14 +38,7 @@ export default function FormCompra() {
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
   const { tenantId: empresaId, features } = useTenant();
   const enableBonos = Boolean(features?.bonos);
-  const fieldSx = {
-    '& .MuiInputBase-input': { color: `${color} !important` },
-    '& .MuiInputLabel-root': { color: `${color} !important` },
-    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: `${color} !important` },
-    '&:hover .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: `${color} !important` },
-    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: `${color} !important` },
-    '& .MuiSvgIcon-root': { color: `${color} !important` },
-  };
+  const fieldSx = {};
 
   useEffect(() => {
     let mounted = true;
@@ -234,7 +227,13 @@ export default function FormCompra() {
           </>
         ) : null}
         <UploadButton label="Subir comprobante" onUpload={setComprobanteFile} />
-        <Button variant="outlined" onClick={openConfirm} disabled={!canSubmit || submitting}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={openConfirm}
+          disabled={!canSubmit || submitting}
+          sx={{ height: 40, fontWeight: 500, mt: 1 }}
+        >
           {submitting ? "Guardando..." : "Guardar"}
         </Button>
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>

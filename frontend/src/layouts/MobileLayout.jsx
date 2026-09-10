@@ -92,7 +92,7 @@ function MobileLayout() {
 
   return (
     <div className="flex h-dvh w-full flex-col overflow-hidden bg-[#090a0c]">
-      <header className="flex items-center justify-between border-b border-black/10 dark:border-white/10 px-3 py-2">
+      <header className="flex items-center justify-between border-b border-white/[0.06] bg-[#090a0f] px-3 py-2">
         <div className="flex items-center gap-2">
           <IconButton
             size="small"
@@ -100,9 +100,9 @@ function MobileLayout() {
             aria-label="Abrir menu"
             sx={{ color: "inherit" }}
           >
-            <MenuIcon />
+            <MenuIcon sx={{ fontSize: "1.25rem" }} />
           </IconButton>
-          <span className="text-sm font-bold tracking-wide text-black dark:text-white">CONTROL AR</span>
+          <span className="text-xs font-semibold tracking-tight text-white">Control<span className="text-blue-400 font-medium">AR</span></span>
         </div>
         <div className="flex items-center gap-1">
           <TenantSelector />
@@ -111,7 +111,7 @@ function MobileLayout() {
         </div>
       </header>
 
-      <main className="min-h-0 flex-1 overflow-y-auto p-3">
+      <main className="min-h-0 flex-1 overflow-y-auto no-scrollbar p-3">
         <div className="min-w-0">
           <Outlet />
         </div>
@@ -127,10 +127,23 @@ function MobileLayout() {
         ) : null}
       </main>
 
-      <Drawer anchor="left" open={menuOpen} onClose={() => setMenuOpen(false)}>
-        <div className="flex h-full w-72 flex-col bg-neutral-100 dark:bg-zinc-900 text-black dark:text-white">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-black/10 dark:border-white/10">
-            <span className="text-sm font-bold tracking-wide">Navegacion</span>
+      <Drawer
+        anchor="left"
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        slotProps={{
+          paper: {
+            sx: {
+              backgroundColor: "#0c0e14",
+              borderRight: "1px solid rgba(255, 255, 255, 0.06)",
+              color: "#f4f4f5",
+            },
+          },
+        }}
+      >
+        <div className="flex h-full w-72 flex-col bg-[#0c0e14] text-zinc-100">
+          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-white/[0.06]">
+            <span className="text-xs font-semibold tracking-wide text-zinc-300">Navegación</span>
             <IconButton
               size="small"
               onClick={() => setMenuOpen(false)}

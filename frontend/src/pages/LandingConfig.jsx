@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "../assets/css/LandingConfig.css";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
@@ -858,21 +858,22 @@ function LandingConfig() {
                     </div>
                 </div>
             }>
-            <div className="flex flex-col w-full px-1 sm:px-2 py-2 justify-center">
-                <div className="flex flex-row flex-wrap items-center justify-center w-full mb-2 border-b border-white/10">
-                    <FormControlLabel control={<Checkbox checked={activo} onChange={(e) => setActivo(e.target.checked)} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Activo" sx={{ color: "#fff", m: 0 }} />
-                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarDisclaimer)} onChange={(e) => setForm(p => ({ ...p, mostrarDisclaimer: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Disclaimer" sx={{ color: "#fff", m: 0 }} />
-                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarTicker)} onChange={(e) => setForm(p => ({ ...p, mostrarTicker: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Barra ganadores" sx={{ color: "#fff", m: 0 }} />
-                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarFormulario)} onChange={(e) => setForm(p => ({ ...p, mostrarFormulario: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Formulario" sx={{ color: "#fff", m: 0 }} />
-                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarCampoNombre)} onChange={(e) => setForm(p => ({ ...p, mostrarCampoNombre: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Campo nombre" sx={{ color: "#fff", m: 0 }} />
-                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarCampoTelefono)} onChange={(e) => setForm(p => ({ ...p, mostrarCampoTelefono: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Campo telefono" sx={{ color: "#fff", m: 0 }} />
-                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarMediosPago)} onChange={(e) => setForm(p => ({ ...p, mostrarMediosPago: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Medios de Pago" sx={{ color: "#fff", m: 0 }} />
-                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarComunidad)} onChange={(e) => setForm(p => ({ ...p, mostrarComunidad: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Testimonio Comunidad" sx={{ color: "#fff", m: 0 }} />
-                    <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarPasos)} onChange={(e) => setForm(p => ({ ...p, mostrarPasos: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Paso a Paso" sx={{ color: "#fff", m: 0 }} />
-                </div>
-                <div className="grid grid-cols-[50%_50%] gap-4 lg:gap-8 items-start">
-                    {/* Columna Izquierda: Datos */}
-                    <div className="flex flex-col w-full overflow-y-auto max-h-[60vh] lg:max-h-[55vh] pr-2 xl:pr-4 lg:border-r lg:border-white/10" style={{ scrollbarWidth: 'thin', scrollbarColor: '#444 transparent' }}>
+            <div className="flex flex-col w-full h-full min-h-0 overflow-hidden">
+                <div className="flex-1 min-h-0 overflow-y-auto delicate-scrollbar px-1 sm:px-3 py-2">
+                    <div className="flex flex-row flex-wrap items-center justify-center w-full mb-3 pb-2 border-b border-white/10 gap-x-2 gap-y-1">
+                        <FormControlLabel control={<Checkbox checked={activo} onChange={(e) => setActivo(e.target.checked)} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Activo" sx={{ color: "#fff", m: 0 }} />
+                        <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarDisclaimer)} onChange={(e) => setForm(p => ({ ...p, mostrarDisclaimer: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Disclaimer" sx={{ color: "#fff", m: 0 }} />
+                        <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarTicker)} onChange={(e) => setForm(p => ({ ...p, mostrarTicker: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Barra ganadores" sx={{ color: "#fff", m: 0 }} />
+                        <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarFormulario)} onChange={(e) => setForm(p => ({ ...p, mostrarFormulario: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Formulario" sx={{ color: "#fff", m: 0 }} />
+                        <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarCampoNombre)} onChange={(e) => setForm(p => ({ ...p, mostrarCampoNombre: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Campo nombre" sx={{ color: "#fff", m: 0 }} />
+                        <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarCampoTelefono)} onChange={(e) => setForm(p => ({ ...p, mostrarCampoTelefono: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Campo telefono" sx={{ color: "#fff", m: 0 }} />
+                        <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarMediosPago)} onChange={(e) => setForm(p => ({ ...p, mostrarMediosPago: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Medios de Pago" sx={{ color: "#fff", m: 0 }} />
+                        <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarComunidad)} onChange={(e) => setForm(p => ({ ...p, mostrarComunidad: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Testimonio Comunidad" sx={{ color: "#fff", m: 0 }} />
+                        <FormControlLabel control={<Checkbox checked={Boolean(form.mostrarPasos)} onChange={(e) => setForm(p => ({ ...p, mostrarPasos: e.target.checked }))} sx={{ color: "rgba(255,255,255,0.85)", "&.Mui-checked": { color: "rgba(255,255,255,0.85)" } }} />} label="Paso a Paso" sx={{ color: "#fff", m: 0 }} />
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start w-full min-w-0">
+                        {/* Columna Izquierda: Datos */}
+                        <div className="flex flex-col w-full pr-0 lg:pr-4 lg:border-r lg:border-white/10">
                         <div className="flex flex-row font-bold items-center gap-2 mb-2">
                             <h2 className="text-white font-bold text-base underline">Datos Generales</h2>
                         </div>
@@ -1006,10 +1007,11 @@ function LandingConfig() {
                             <Stack direction={{ xs: "column", md: "row" }} spacing={1}
                                 sx={{
                                     mb: 1,
-                                    width: "full",
+                                    width: "100%",
                                 }}
                             >
                                 <Autocomplete
+                                    fullWidth
                                     options={credencialesMetaOptions}
                                     value={selectedCredencialMeta}
                                     onChange={(_, value) =>
@@ -1023,13 +1025,13 @@ function LandingConfig() {
                                             label="Pixel vinculado"
                                             variant="outlined"
                                             size="small"
-                                            sx={{ ...commonTextFieldSx, width: "500%" }}
+                                            sx={commonTextFieldSx}
                                         />
                                     )}
                                 />
                             </Stack>
 
-                            <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1, width: "full" }}>
+                            <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1, width: "100%" }}>
                                 <FormControlLabel
                                     control={
                                         <Checkbox
@@ -1049,8 +1051,9 @@ function LandingConfig() {
                             </Stack>
 
                             {form.enviarCapiPixelExtra && (
-                                <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1, width: "full" }}>
+                                <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1, width: "100%" }}>
                                     <Autocomplete
+                                        fullWidth
                                         options={credencialesMetaOptions}
                                         value={selectedCredencialMetaExtra}
                                         onChange={(_, value) =>
@@ -1064,7 +1067,7 @@ function LandingConfig() {
                                                 label="Credencial Meta extra"
                                                 variant="outlined"
                                                 size="small"
-                                                sx={{ ...commonTextFieldSx, width: "500%" }}
+                                                sx={commonTextFieldSx}
                                             />
                                         )}
                                     />
@@ -1099,27 +1102,18 @@ function LandingConfig() {
                         </div>
                     </div>
                     {/* Right column */}
-                    <div className="flex flex-col w-full border-t lg:border-t-0 border-white/10 pt-4 lg:pt-0 lg:pr-6">
+                    <div className="flex flex-col w-full border-t lg:border-t-0 border-white/10 pt-4 lg:pt-0 lg:pl-2">
                         <div className="flex w-full justify-center lg:justify-start mb-3">
                             <h2 className="text-white font-bold text-base underline">Recursos Visuales</h2>
                         </div>
-                        <Stack direction="row" spacing={3} className="w-full items-center">
-                            <div className="flex flex-col items-center gap-2">
+                        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} className="w-full items-center">
+                            <div className="flex flex-col items-center gap-2 flex-1 w-full min-w-0">
                                 <UploadButton
                                     key={`upload-vertical-${uploadKey}`}
                                     label="Fondo Vertical (Mobile)"
                                     onUpload={(file) => {
                                         setForm((prev) => ({ ...prev, backgroundVertical: file }));
                                         setPreviewUrlFromFile("vertical", file);
-                                    }}
-                                    sx={{
-                                        gridColumn: "span 2",
-                                        width: "100%",
-                                        borderRadius: "50px",
-                                        backgroundColor: "rgba(217, 221, 88, 0.12)",
-                                        color: "rgba(255,255,255,0.85)",
-                                        "&:hover": { backgroundColor: "rgba(217, 221, 88, 0.2)" },
-                                        "& .MuiButton-startIcon": { marginRight: "8px" },
                                     }}
                                 />
                                 <Button
@@ -1131,22 +1125,13 @@ function LandingConfig() {
                                     Ver Fondo Vertical
                                 </Button>
                             </div>
-                            <div className="flex flex-col items-center gap-2">
+                            <div className="flex flex-col items-center gap-2 flex-1 w-full min-w-0">
                                 <UploadButton
                                     key={`upload-horizontal-${uploadKey}`}
                                     label="Fondo Horizontal (Desktop)"
                                     onUpload={(file) => {
                                         setForm((prev) => ({ ...prev, backgroundHorizontal: file }));
                                         setPreviewUrlFromFile("horizontal", file);
-                                    }}
-                                    sx={{
-                                        gridColumn: "span 2",
-                                        width: "100%",
-                                        borderRadius: "50px",
-                                        backgroundColor: "rgba(217, 221, 88, 0.12)",
-                                        color: "rgba(255,255,255,0.85)",
-                                        "&:hover": { backgroundColor: "rgba(217, 221, 88, 0.2)" },
-                                        "& .MuiButton-startIcon": { marginRight: "8px" },
                                     }}
                                 />
                                 <Button
@@ -1159,7 +1144,7 @@ function LandingConfig() {
                                 </Button>
                             </div>
                         </Stack>
-                        <div className="flex flex-col w-full mt-2 pt-2 items-center gap-2">
+                        <div className="flex flex-col w-full mt-3 pt-3 items-center gap-2">
                             <UploadButton
                                 key={`upload-reemplazoForm-${uploadKey}`}
                                 label="Imagen Formulario (Opcional)"
@@ -1168,93 +1153,91 @@ function LandingConfig() {
                                     setForm((prev) => ({ ...prev, imagenReemplazoForm: file }));
                                     setPreviewUrlFromFile("reemplazoForm", file);
                                 }}
-                                sx={{
-                                    gridColumn: "span 2",
-                                    width: "100%",
-                                    borderRadius: "50px",
-                                    backgroundColor: "rgba(217, 221, 88, 0.12)",
-                                    color: "rgba(255,255,255,0.85)",
-                                    "&:hover": { backgroundColor: "rgba(217, 221, 88, 0.2)" },
-                                    "& .MuiButton-startIcon": { marginRight: "8px" },
-                                }}
                             />
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                disabled={!previewUrls.reemplazoForm}
-                                onClick={() => previewUrls.reemplazoForm && window.open(previewUrls.reemplazoForm, "_blank", "noopener,noreferrer")}
-                            >
-                                Ver Imagen Formulario
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                color="error"
-                                size="small"
-                                disabled={!previewUrls.reemplazoForm}
-                                onClick={() => {
-                                    setForm((prev) => ({ ...prev, imagenReemplazoForm: null }));
-                                    setPreviewUrls((prev) => ({ ...prev, reemplazoForm: "" }));
-                                    setClearImagenReemplazoForm(Boolean(selectedLanding?.imagen_reemplazo_form));
-                                    setUploadKey((prev) => prev + 1);
-                                }}
-                            >
-                                Borrar Imagen Formulario
-                            </Button>
+                            <div className="flex flex-row flex-wrap justify-center gap-2 mt-1">
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    disabled={!previewUrls.reemplazoForm}
+                                    onClick={() => previewUrls.reemplazoForm && window.open(previewUrls.reemplazoForm, "_blank", "noopener,noreferrer")}
+                                >
+                                    Ver Imagen Formulario
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    color="error"
+                                    size="small"
+                                    disabled={!previewUrls.reemplazoForm}
+                                    onClick={() => {
+                                        setForm((prev) => ({ ...prev, imagenReemplazoForm: null }));
+                                        setPreviewUrls((prev) => ({ ...prev, reemplazoForm: "" }));
+                                        setClearImagenReemplazoForm(Boolean(selectedLanding?.imagen_reemplazo_form));
+                                        setUploadKey((prev) => prev + 1);
+                                    }}
+                                >
+                                    Borrar Imagen Formulario
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div className="w-full gap-2 mb-2 mt-2 items-center flex justify-center lg:justify-end border-t border-white/10 pt-3">
-                    <Button
-                        variant="outlined"
-                        startIcon={<SaveIcon />}
-                        disabled={primaryDisabled || submitting}
-                        onClick={handleSubmit}
-                        sx={{
-                            borderColor: "#fff",
-                            color: "#fff",
-                            "&:hover": {
-                                borderColor: "#fff",
-                            },
-                            "&.Mui-disabled": {
-                                borderColor: "rgba(255,255,255,0.4)",
-                                color: "rgba(255,255,255,0.4)",
-                            },
-                        }}
-                    >
-                        {submitting ? "Guardando..." : primaryLabel}
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        onClick={handleCancel}
-                        sx={{
-                            borderColor: "#ef4444",
-                            color: "#ef4444",
-                            "&:hover": {
-                                borderColor: "#dc2626",
-                                color: "#dc2626",
-                                backgroundColor: "rgba(239, 68, 68, 0.08)",
-                            },
-                            "&.Mui-disabled": {
-                                borderColor: "rgba(239, 68, 68, 0.4)",
-                                color: "rgba(239, 68, 68, 0.4)",
-                            },
-                        }}
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        className="mr-2"
-                        sx={{
-                            height: "100%",
-                        }}
-                        disabled={previewDisabled}
-                        onClick={openPreviewWindow}
-                    >
-                        Vista Previa
-                    </Button>
-                </div>
             </div>
+            <div className="shrink-0 flex w-full items-center justify-center lg:justify-end gap-3 py-3 px-4 border-t border-white/10 bg-[#090a0f] z-10">
+                <Button
+                    variant="contained"
+                    startIcon={<SaveIcon />}
+                    disabled={primaryDisabled || submitting}
+                    onClick={handleSubmit}
+                    sx={{
+                        backgroundColor: "#2563eb",
+                        color: "#ffffff",
+                        "&:hover": {
+                            backgroundColor: "#1d4ed8",
+                        },
+                        "&.Mui-disabled": {
+                            backgroundColor: "rgba(255,255,255,0.12)",
+                            color: "rgba(255,255,255,0.3)",
+                        },
+                    }}
+                >
+                    {submitting ? "Guardando..." : primaryLabel}
+                </Button>
+                <Button
+                    variant="outlined"
+                    onClick={handleCancel}
+                    sx={{
+                        borderColor: "rgba(239, 68, 68, 0.5)",
+                        color: "#ef4444",
+                        "&:hover": {
+                            borderColor: "#dc2626",
+                            color: "#dc2626",
+                            backgroundColor: "rgba(239, 68, 68, 0.08)",
+                        },
+                        "&.Mui-disabled": {
+                            borderColor: "rgba(239, 68, 68, 0.2)",
+                            color: "rgba(239, 68, 68, 0.2)",
+                        },
+                    }}
+                >
+                    Cancelar
+                </Button>
+                <Button
+                    variant="outlined"
+                    sx={{
+                        borderColor: "rgba(255,255,255,0.2)",
+                        color: "rgba(255,255,255,0.85)",
+                        "&:hover": {
+                            borderColor: "rgba(255,255,255,0.4)",
+                            backgroundColor: "rgba(255,255,255,0.05)",
+                        },
+                    }}
+                    disabled={previewDisabled}
+                    onClick={openPreviewWindow}
+                >
+                    Vista Previa
+                </Button>
+            </div>
+        </div>
             <Snackbar
                 open={toast.open}
                 autoHideDuration={4000}

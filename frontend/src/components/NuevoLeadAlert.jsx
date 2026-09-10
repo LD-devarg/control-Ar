@@ -60,18 +60,36 @@ export default function NuevoLeadAlert() {
   if (!canView) return null;
 
   return (
-    <div className="flex items-center text-black dark:text-white text-sm mr-2">
-      <IconButton size="small" onClick={(event) => setAnchorEl(event.currentTarget)} sx={{ color: "inherit" }}>
+    <div className="flex items-center text-zinc-300 text-sm">
+      <IconButton
+        size="small"
+        onClick={(event) => setAnchorEl(event.currentTarget)}
+        sx={{
+          color: "rgba(255, 255, 255, 0.65)",
+          p: "6px",
+          borderRadius: "8px",
+          "&:hover": {
+            color: "#ffffff",
+            backgroundColor: "rgba(255, 255, 255, 0.05)",
+          },
+        }}
+      >
         <Badge
           badgeContent={unreadCount}
+          max={99}
           sx={{
             "& .MuiBadge-badge": {
-              backgroundColor: "#FF3D00",
+              backgroundColor: "#ef4444",
               color: "#fff",
+              fontSize: "0.65rem",
+              height: "16px",
+              minWidth: "16px",
+              fontWeight: 600,
+              px: "4px",
             },
           }}
         >
-          <MarkChatUnreadOutlinedIcon sx={{ fontSize: "1.5rem", color: "inherit" }} />
+          <MarkChatUnreadOutlinedIcon sx={{ fontSize: "1.2rem" }} />
         </Badge>
       </IconButton>
 
@@ -81,13 +99,25 @@ export default function NuevoLeadAlert() {
         onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: "12px",
+              border: "1px solid rgba(255, 255, 255, 0.08)",
+              backgroundColor: "#11141c",
+              boxShadow: "0 16px 36px -4px rgba(0, 0, 0, 0.6)",
+              overflow: "hidden",
+            },
+          },
+        }}
       >
-        <div className="w-[340px] max-w-[90vw] bg-zinc-950 text-zinc-100 border border-white/10 rounded-md">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
-            <span className="text-sm font-semibold">Notificaciones</span>
+        <div className="w-[320px] max-w-[90vw] text-zinc-100">
+          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-white/[0.06]">
+            <span className="text-xs font-semibold text-zinc-200">Notificaciones</span>
             <Button
               size="small"
               disabled={marking || unreadCount === 0}
+              sx={{ fontSize: "0.72rem", py: "2px", px: "8px", minWidth: 0 }}
               onClick={async () => {
                 setMarking(true);
                 try {
@@ -102,19 +132,19 @@ export default function NuevoLeadAlert() {
             </Button>
           </div>
 
-          <div className="max-h-[360px] overflow-auto">
-            {loading ? <div className="px-3 py-2 text-xs text-zinc-400">Cargando...</div> : null}
+          <div className="max-h-[320px] overflow-y-auto delicate-scrollbar">
+            {loading ? <div className="px-3.5 py-3 text-xs text-zinc-400">Cargando...</div> : null}
             {!loading && items.length === 0 ? (
-              <div className="px-3 py-3 text-xs text-zinc-400">Sin notificaciones.</div>
+              <div className="px-3.5 py-4 text-xs text-zinc-400 text-center">Sin notificaciones nuevas.</div>
             ) : null}
             {items.map((item) => (
-              <div key={item.id} className="px-3 py-2 border-b border-white/5">
+              <div key={item.id} className="px-3.5 py-2.5 border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
                 <div className="flex items-center gap-2">
-                  <span className={`inline-block h-2 w-2 rounded-full ${item.leida ? "bg-zinc-600" : "bg-orange-500"}`} />
-                  <span className="text-[11px] uppercase tracking-wide text-zinc-400">{item.tipo}</span>
+                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${item.leida ? "bg-zinc-600" : "bg-rose-500"}`} />
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">{item.tipo}</span>
                 </div>
-                <div className="text-sm leading-snug mt-1">{item.mensaje}</div>
-                <div className="text-[11px] text-zinc-500 mt-1">{formatDateTime(item.creado_en)}</div>
+                <div className="text-[13px] leading-snug text-zinc-200 mt-1">{item.mensaje}</div>
+                <div className="text-[11px] text-zinc-500 font-mono mt-1">{formatDateTime(item.creado_en)}</div>
               </div>
             ))}
           </div>

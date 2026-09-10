@@ -29,16 +29,7 @@ export default function FormContacto() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ open: false, severity: "success", message: "" });
   const { tenantId: empresaId } = useTenant();
-  const fieldSx = {
-    '& .MuiInputBase-input': { color },
-    '& .MuiInputLabel-root': {
-      color,
-    },
-    '& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: color },
-    '&:hover .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline': { borderColor: color },
-    '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: color },
-    '& .MuiSvgIcon-root': { color },
-  };
+  const fieldSx = {};
 
   const markLeadsDirty = () => {
     try {
@@ -291,7 +282,13 @@ export default function FormContacto() {
         InputLabelProps={{ shrink: true }}
         sx={fieldSx}
       />
-        <Button variant="outlined" onClick={handleSubmit} disabled={!canSubmit || submitting}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSubmit}
+          disabled={!canSubmit || submitting}
+          sx={{ height: 40, fontWeight: 500, mt: 1 }}
+        >
           {submitting ? "Guardando..." : "Guardar"}
         </Button>
       <Snackbar
